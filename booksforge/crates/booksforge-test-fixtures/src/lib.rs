@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 #![cfg(test)]
 
+pub mod mock_ollama;
 pub mod nodes;
 pub mod projects;
 pub mod entities;

@@ -63,10 +63,22 @@ export function SceneEditor({
     }
   }, [editor, initialDoc]);
 
-  // Flush on unmount.
+  // Flush any pending autosave on unmount (e.g. project close, scene switch).
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
+
   useEffect(() => {
     return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+        const ed = editorRef.current;
+        if (ed) {
+          const doc = ed.getJSON();
+          const text = ed.getText();
+          onSaveRef.current(doc, countWords(text), countChars(text));
+        }
+      }
     };
   }, []);
 

@@ -32,12 +32,14 @@ export default function EditorShell({ project, onClose }: Props) {
     setNodes(list);
   }, []);
 
-  // On mount: load nodes and check for crash recovery.
+  // On mount: load nodes first, then check for crash recovery (so the node is
+  // already in the list when the dialog's onRestore tries to select it).
   useEffect(() => {
-    refreshNodes();
-    ipc.recoveryCheck().then((status) => {
-      if (status.has_pending) setRecovery(status);
-    }).catch(() => null);
+    (async () => {
+      await refreshNodes();
+      const status = await ipc.recoveryCheck().catch(() => null);
+      if (status?.has_pending) setRecovery(status);
+    })();
   }, [refreshNodes]);
 
   // Load scene content when selection changes.

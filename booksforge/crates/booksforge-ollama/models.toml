@@ -1,0 +1,74 @@
+# BooksForge curated model registry.
+# Loaded at compile time via include_str!() in registry.rs.
+#
+# Fields:
+#   id              — Ollama pull tag (exact)
+#   display_name    — Human-readable label for UI
+#   family          — Architecture family (qwen | llama | mistral | gemma | phi)
+#   size_bytes      — Approximate download size in bytes
+#   ram_min_gb      — Minimum RAM (GB) for comfortable inference
+#   context_window  — Maximum context tokens
+#   chat_format     — Prompt template format used by Ollama
+#   recommended_for — Genres/modes this model suits best
+#   strengths       — Short capability descriptors shown in tooltip
+#   notes           — One-line user-facing note
+
+[[model]]
+id              = "qwen2.5:7b-instruct-q4_K_M"
+display_name    = "Qwen 2.5 7B Instruct (Q4)"
+family          = "qwen"
+size_bytes      = 4_700_000_000
+ram_min_gb      = 8
+context_window  = 32768
+chat_format     = "chatml"
+recommended_for = ["fiction", "non_fiction", "memoir"]
+strengths       = ["dialogue", "non-english", "instruction-following"]
+notes           = "Strong all-rounder; excellent for multilingual fiction."
+
+[[model]]
+id              = "llama3.1:8b-instruct-q4_K_M"
+display_name    = "Llama 3.1 8B Instruct (Q4)"
+family          = "llama"
+size_bytes      = 4_900_000_000
+ram_min_gb      = 8
+context_window  = 128000
+chat_format     = "llama3"
+recommended_for = ["fiction", "non_fiction", "screenplay"]
+strengths       = ["long-context", "creative-writing", "English"]
+notes           = "Best-in-class 8B for English prose; huge context window."
+
+[[model]]
+id              = "mistral:7b-instruct-v0.3-q4_K_M"
+display_name    = "Mistral 7B Instruct v0.3 (Q4)"
+family          = "mistral"
+size_bytes      = 4_400_000_000
+ram_min_gb      = 8
+context_window  = 32768
+chat_format     = "mistral"
+recommended_for = ["non_fiction", "technical", "essay"]
+strengths       = ["concise", "factual", "fast"]
+notes           = "Snappy and factual; good for outlines and research notes."
+
+[[model]]
+id              = "gemma2:9b-instruct-q4_K_M"
+display_name    = "Gemma 2 9B Instruct (Q4)"
+family          = "gemma"
+size_bytes      = 5_800_000_000
+ram_min_gb      = 12
+context_window  = 8192
+chat_format     = "gemma"
+recommended_for = ["fiction", "poetry", "memoir"]
+strengths       = ["nuanced", "character-voice", "style"]
+notes           = "Nuanced prose and strong character voice; smaller context window."
+
+[[model]]
+id              = "phi3.5:3.8b-mini-instruct-q4_K_M"
+display_name    = "Phi-3.5 Mini Instruct (Q4)"
+family          = "phi"
+size_bytes      = 2_400_000_000
+ram_min_gb      = 4
+context_window  = 128000
+chat_format     = "phi3"
+recommended_for = ["non_fiction", "technical", "essay"]
+strengths       = ["lightweight", "fast", "low-RAM"]
+notes           = "Runs on 4 GB RAM; ideal for quick outlining on modest hardware."

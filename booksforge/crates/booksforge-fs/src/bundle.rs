@@ -57,6 +57,7 @@ const BUNDLE_GITIGNORE: &str = "\
 project.db-wal\n\
 project.db-shm\n\
 .booksforge.lock\n\
+.recovery.log\n\
 agent_runs/\n\
 exports/\n\
 ";

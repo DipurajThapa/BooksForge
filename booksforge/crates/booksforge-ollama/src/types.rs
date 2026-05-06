@@ -95,6 +95,22 @@ pub struct ChatOutcome {
     pub total_duration_ns:  u64,
 }
 
+/// Progress event emitted during `pull()` — mirrors Ollama's NDJSON stream.
+#[derive(Debug, Clone)]
+pub struct PullProgress {
+    pub status:    String,
+    pub completed: Option<u64>,
+    pub total:     Option<u64>,
+}
+
+/// Callback type used by `OllamaClient::pull` to report download progress.
+/// Each call corresponds to one NDJSON line from the Ollama stream.
+pub type ProgressSink = Box<dyn Fn(PullProgress) + Send>;
+
+/// Callback type used by `OllamaClient::generate` / `chat` to stream tokens.
+/// Called once per token fragment as Ollama streams the response.
+pub type TokenSink = Box<dyn Fn(&str) + Send>;
+
 /// Cooperative cancellation token shared between the orchestrator and an
 /// in-flight Ollama request.  `cancel()` is idempotent.
 #[derive(Debug, Clone, Default)]
