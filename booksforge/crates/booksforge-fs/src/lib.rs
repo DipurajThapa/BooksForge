@@ -30,6 +30,8 @@ pub mod atomic;
 pub mod bundle;
 pub mod lock;
 pub mod manifest;
+pub mod markdown_mirror;
+pub mod recovery;
 pub mod settings;
 pub mod traits;
 

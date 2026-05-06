@@ -13,10 +13,14 @@
 
 #![forbid(unsafe_code)]
 
+pub mod editor;
 pub mod error;
 pub mod project;
 pub mod system;
 
+pub use editor::{
+    NodeCreateInput, NodeInfo, NodeUpdateInput, RecoveryStatus, SceneLoadResult, SceneSaveInput,
+};
 pub use error::BooksForgeError;
 pub use project::{CreateProjectInput, OpenProjectInput, OpenProjectResult, RecentProjectEntry};
 pub use system::AppVersion;
@@ -40,6 +44,17 @@ mod ts_bindings {
     fn export_error_bindings() {
         crate::BooksForgeError::export_all_to(BINDINGS_DIR)
             .expect("failed to export BooksForgeError bindings");
+    }
+
+    #[test]
+    fn export_editor_bindings() {
+        use crate::editor::*;
+        NodeInfo::export_all_to(BINDINGS_DIR).expect("NodeInfo");
+        NodeCreateInput::export_all_to(BINDINGS_DIR).expect("NodeCreateInput");
+        NodeUpdateInput::export_all_to(BINDINGS_DIR).expect("NodeUpdateInput");
+        SceneSaveInput::export_all_to(BINDINGS_DIR).expect("SceneSaveInput");
+        SceneLoadResult::export_all_to(BINDINGS_DIR).expect("SceneLoadResult");
+        RecoveryStatus::export_all_to(BINDINGS_DIR).expect("RecoveryStatus");
     }
 
     #[test]

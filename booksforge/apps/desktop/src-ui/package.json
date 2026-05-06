@@ -11,6 +11,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@booksforge/editor": "workspace:*",
+    "@booksforge/shared-types": "workspace:*",
     "@tauri-apps/api": "^2.2.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "react": "^18.3.1",

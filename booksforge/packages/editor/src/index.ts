@@ -1,9 +1,10 @@
-// @booksforge/editor — ProseMirror-based chapter editor.
-// Full implementation in M3. See EDITOR_SPEC.md.
+// @booksforge/editor — TipTap-based scene editor for BooksForge.
 //
-// This package will export:
-//   EditorView  — React component wrapping ProseMirror
-//   editorSchema — ProseMirror schema matching the pm_doc JSON format
-//   useEditorState — hook for controlled editor state
+// Public surface:
+//   SceneEditor — React component (controlled editor with autosave)
+//   editorExtensions — TipTap extension array (for schema consistency)
+//   countWords — word-count utility used by the editor and IPC layer
 
-export {};
+export { SceneEditor } from "./SceneEditor";
+export { editorExtensions } from "./extensions";
+export { countWords } from "./wordcount";

@@ -23,6 +23,14 @@ pub fn run() {
             commands::project::project_open,
             commands::project::project_close,
             commands::project::project_recent,
+            commands::editor::node_list,
+            commands::editor::node_create,
+            commands::editor::node_update,
+            commands::editor::node_delete,
+            commands::editor::scene_save,
+            commands::editor::scene_load,
+            commands::editor::recovery_check,
+            commands::editor::recovery_clear,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri app failed to run");

@@ -90,14 +90,14 @@ pub async fn project_create(
         bundle_path: input.bundle_path.clone(),
     };
 
-    *state.open_project.lock().await = Some(OpenProject {
+    *state.open_project.lock().await = Some(Arc::new(OpenProject {
         bundle,
         storage,
         _lock: lock,
         project_id,
         title: input.title,
         author: input.author,
-    });
+    }));
 
     Ok(result)
 }
@@ -147,14 +147,14 @@ pub async fn project_open(
         bundle_path: input.bundle_path.clone(),
     };
 
-    *state.open_project.lock().await = Some(OpenProject {
+    *state.open_project.lock().await = Some(Arc::new(OpenProject {
         bundle,
         storage,
         _lock: lock,
         project_id,
         title,
         author,
-    });
+    }));
 
     Ok(result)
 }

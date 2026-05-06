@@ -11,14 +11,16 @@ use booksforge_storage::SqliteStorage;
 pub struct AppState {
     pub ollama: HttpOllamaClient,
     /// The currently-open project, if any.
-    pub open_project: Mutex<Option<OpenProject>>,
+    /// Wrapped in `Arc` so commands can clone the pointer without holding
+    /// the `Mutex` across await points.
+    pub open_project: Mutex<Option<Arc<OpenProject>>>,
 }
 
 /// State held while a project is open.
 pub struct OpenProject {
     pub bundle: BundlePath,
     pub storage: Arc<SqliteStorage>,
-    /// Advisory lock released when the project is closed.
+    /// Advisory lock released when the project is closed (drops with the Arc).
     pub _lock: BundleLock,
     pub project_id: String,
     pub title: String,

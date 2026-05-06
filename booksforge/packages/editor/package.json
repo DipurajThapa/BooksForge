@@ -9,9 +9,25 @@
   },
   "dependencies": {
     "@booksforge/shared-types": "workspace:*",
-    "@booksforge/ui": "workspace:*"
+    "@booksforge/ui": "workspace:*",
+    "@tiptap/core": "^2.10.4",
+    "@tiptap/react": "^2.10.4",
+    "@tiptap/starter-kit": "^2.10.4",
+    "@tiptap/extension-underline": "^2.10.4",
+    "@tiptap/extension-link": "^2.10.4",
+    "@tiptap/extension-image": "^2.10.4",
+    "@tiptap/extension-placeholder": "^2.10.4",
+    "@tiptap/extension-character-count": "^2.10.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
     "typescript": "5.6.3"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
   }
 }
