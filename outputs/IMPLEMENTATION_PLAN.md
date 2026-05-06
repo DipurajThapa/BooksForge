@@ -66,20 +66,50 @@ These are the **first ten tasks** Claude Code should pick up, in order. Each tas
 
 **Steps.**
 
-1. Implement `booksforge-fs` with atomic bundle creation (temp dir + rename), bundle layout per `DATA_MODEL.md §11`.
-2. Implement `booksforge-storage` with SQLite migration v1 covering `nodes`, `scene_content`, `notes`, `entities`, `entity_aliases`, `style_book`, `snapshots`. (Other tables come later milestones.)
-3. Implement `booksforge-domain` types: `Project`, `Node`, `SceneContent`, `Entity`, `StyleBook`.
-4. Tauri commands: `project.create({path, mode, template_id, meta})`, `project.open({path})`, `project.close({})`, `project.recent({})`.
-5. UI: Project Picker (per `UI_UX_SPEC.md §2`) and a stub New Project Wizard (Steps 1–2 + 4 only — no agent wiring yet).
-6. Lock file + recent-projects list persisted to `~/.booksforge/settings.toml`.
+1. Implement `booksforge-fs` with atomic bundle creation, bundle layout per `DATA_MODEL.md §13`.
+2. Implement `booksforge-storage` with SQLite migration v1 covering all tables in `DATA_MODEL.md §3` (nodes, scene_content, notes, entities, entity_aliases, entity_scene_appearances, snapshots, validator_runs, validator_issues, refs, comments, tracked_changes, exports) plus §4 (style_book), §5 (agent layer), §6 (model_settings). The v1 migration creates every table so future migrations are always additive.
+3. Implement `booksforge-domain` types per `DATA_MODEL.md`: `Project`, `Node`, `SceneContent`, `Entity`, `StyleBook`.
+4. Implement the `StorageRepository` and `BundleFilesystem` traits per `ARCHITECTURE.md §2.1`.
+5. Tauri commands: `project.create({path, mode, template_id, meta})`, `project.open({path})`, `project.close({})`, `project.recent({})`.
+6. UI: Project Picker (per `UI_UX_SPEC.md §2`) and a stub New Project Wizard (Steps 1–2 + 4 only — no agent wiring yet).
+7. Lock file + recent-projects list persisted to `~/.booksforge/settings.toml` per `DATA_MODEL.md §9`.
+
+**Atomic bundle creation — implementation contract.**
+
+Bundle creation must be atomic: a crashed process leaves no half-bundle. The exact sequence:
+
+```
+1. Generate a temp path: system_temp_dir() / "booksforge-create-{ulid}"
+2. Create the temp directory.
+3. Write all bundle files into the temp directory:
+     a. manifest.toml  (rendered from ProjectMeta + defaults)
+     b. .booksforge-version  (minimum app version string)
+     c. Subdirectories: manuscript/, assets/, snapshots/objects/,
+        exports/, agent_runs/, plugins/
+4. Open and migrate project.db inside the temp directory (migration v1).
+5. Write the initial style_book and model_settings rows.
+6. Atomic rename: std::fs::rename(temp_path, final_path)
+      - On POSIX this is atomic within the same filesystem.
+      - On Windows use MoveFileExW with MOVEFILE_REPLACE_EXISTING
+        only after verifying final_path does not exist.
+7. If rename fails: remove temp_path (best-effort); propagate FsError.
+8. On success: acquire the lock file, add to recent-projects list.
+```
+
+**Orphan temp-dir recovery.** On every app launch, `booksforge-fs` scans `system_temp_dir()` for directories matching `"booksforge-create-*"` that are older than 5 minutes and deletes them silently. This handles crashes between steps 2 and 6 above.
+
+**Lock file lifecycle.** The lock file (`.booksforge.lock`) is created immediately after a successful `open_bundle` and removed in the RAII guard's `drop`. If the process crashes, the lock file persists but contains the dead PID. On next open, `booksforge-fs` checks liveness (Unix: `kill(pid, 0)`; Windows: `OpenProcess`) and evicts stale locks.
 
 **Acceptance criteria.**
 
-- Creating a project produces a valid `.booksforge/` bundle on disk.
-- Killing the app mid-create leaves no half-bundle.
-- Reopening the project shows it in recent and loads.
+- Creating a project produces a valid `.booksforge/` bundle on disk with all required subdirectories.
+- Killing the app (SIGKILL / Windows terminate) mid-create leaves no bundle at the final path.
+- Orphan temp dirs from a killed create are cleaned up on next launch.
+- Reopening the project shows it in recent and loads correctly.
 - Moving the bundle directory and reopening shows a "missing" state with Locate / Remove actions.
-- Schema migration v1 is reversible (a script exists; tests verify a v1 → v0 → v1 round-trip).
+- Schema migration v1 runs cleanly on a fresh database.
+- A reversal script (`migrations/reverse/0001_initial_reverse.sql`) exists; an integration test verifies a clean v1 → reverse → v1 round-trip leaves the same schema.
+- `~/.booksforge/settings.toml` contains the opened project in `recent_projects.entries` after first open.
 
 ### MZ-03 — Single-scene editor
 

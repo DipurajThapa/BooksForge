@@ -68,28 +68,208 @@ locale_overrides = { "spelling" = "en-US" }
 
 The `[ai]` and `[style_book]` blocks are persisted to disk on every save; they round-trip to the in-database `model_settings` and `style_book` tables.
 
-## 3. Document tree
+## 3. Document tree — full v1 migration schema
 
-Per `04-… §4`, unchanged:
+All tables below are created in migration `0001_initial.sql`. Schemas are extracted from `_deep/04-…` and updated with MVP additions. The implementation-pack version is authoritative for Claude Code; the deep spec is reference only.
+
+### 3.1 Migrations bookkeeping
 
 ```sql
-CREATE TABLE nodes (
-  id            TEXT PRIMARY KEY,
-  parent_id     TEXT REFERENCES nodes(id) ON DELETE CASCADE,
-  kind          TEXT NOT NULL CHECK (kind IN ('project','part','chapter','scene','front_matter','back_matter')),
-  title         TEXT NOT NULL DEFAULT '',
-  position      INTEGER NOT NULL,        -- LexoRank
-  status        TEXT DEFAULT 'planned',  -- planned|drafting|revised|final
-  pov           TEXT,
-  beat          TEXT,
-  target_words  INTEGER,
-  created_at    TEXT NOT NULL,
-  updated_at    TEXT NOT NULL,
-  deleted_at    TEXT
+CREATE TABLE schema_migrations (
+  version     INTEGER PRIMARY KEY,
+  applied_at  TEXT NOT NULL,
+  description TEXT NOT NULL,
+  checksum    TEXT NOT NULL             -- blake3 of the migration file
 );
 ```
 
-Plus `scene_content`, `notes`, `entities`, `entity_aliases`, `entity_scene_appearances`, `references`, `bibliography`, `comments`, `tracked_changes`, `snapshots`, `validator_runs`, `validator_issues`, `plugin_installs`, `exports` — all per `04-…`. The MVP **uses but does not write to** `tracked_changes`, `bibliography`, `plugin_installs` — those are V1.0 surfaces.
+### 3.2 Document tree
+
+```sql
+CREATE TABLE nodes (
+  id            TEXT PRIMARY KEY,       -- ULID string
+  parent_id     TEXT REFERENCES nodes(id) ON DELETE CASCADE,
+  kind          TEXT NOT NULL CHECK (kind IN (
+                  'project','part','chapter','scene',
+                  'front_matter','back_matter')),
+  title         TEXT NOT NULL DEFAULT '',
+  position      TEXT NOT NULL,          -- LexoRank string (e.g. "0|hzzzzz:")
+  status        TEXT NOT NULL DEFAULT 'planned'
+                  CHECK (status IN ('planned','drafting','revised','final')),
+  pov           TEXT,
+  beat          TEXT,
+  target_words  INTEGER,
+  created_at    TEXT NOT NULL,          -- ISO-8601 UTC
+  updated_at    TEXT NOT NULL,
+  deleted_at    TEXT                    -- soft delete; NULL = alive
+);
+
+CREATE INDEX idx_nodes_parent ON nodes(parent_id);
+CREATE INDEX idx_nodes_kind   ON nodes(kind);
+CREATE INDEX idx_nodes_status ON nodes(status);
+```
+
+### 3.3 Scene content
+
+```sql
+CREATE TABLE scene_content (
+  node_id     TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE,
+  pm_doc      TEXT NOT NULL DEFAULT '{}', -- ProseMirror JSON (uncompressed in v1)
+  word_count  INTEGER NOT NULL DEFAULT 0,
+  char_count  INTEGER NOT NULL DEFAULT 0,
+  hash        TEXT NOT NULL DEFAULT '',   -- blake3 of pm_doc, updated on every save
+  updated_at  TEXT NOT NULL
+);
+```
+
+### 3.4 Notes
+
+```sql
+CREATE TABLE notes (
+  id          TEXT PRIMARY KEY,          -- ULID
+  node_id     TEXT REFERENCES nodes(id) ON DELETE CASCADE,
+  body        TEXT NOT NULL,
+  kind        TEXT NOT NULL DEFAULT 'general'
+                CHECK (kind IN ('general','todo','question')),
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+
+CREATE INDEX idx_notes_node ON notes(node_id);
+```
+
+### 3.5 Series bible — entities
+
+```sql
+CREATE TABLE entities (
+  id          TEXT PRIMARY KEY,          -- ULID
+  kind        TEXT NOT NULL CHECK (kind IN (
+                'character','location','item',
+                'organisation','theme','custom')),
+  name        TEXT NOT NULL,
+  fields_json TEXT NOT NULL DEFAULT '{}', -- typed per kind (see MEMORY_SYSTEM.md)
+  notes       TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  deleted_at  TEXT
+);
+
+CREATE INDEX idx_entities_kind ON entities(kind);
+
+CREATE TABLE entity_aliases (
+  entity_id   TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  alias       TEXT NOT NULL,
+  PRIMARY KEY (entity_id, alias)
+);
+
+CREATE TABLE entity_scene_appearances (
+  entity_id   TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  node_id     TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  confirmed   INTEGER NOT NULL DEFAULT 0, -- 0=auto-suggested, 1=user-confirmed
+  PRIMARY KEY (entity_id, node_id)
+);
+```
+
+### 3.6 Snapshots
+
+The `trigger` column extends the deep spec with two new values: `pre_agent_edit` and `crash_recovery`.
+
+```sql
+CREATE TABLE snapshots (
+  id          TEXT PRIMARY KEY,          -- ULID
+  scope       TEXT NOT NULL CHECK (scope IN ('project','part','chapter','scene')),
+  scope_id    TEXT,                      -- node ULID when scope != project
+  label       TEXT,
+  trigger     TEXT NOT NULL CHECK (trigger IN (
+                'manual','auto','pre_ai','pre_export','pre_migration',
+                'pre_agent_edit',        -- NEW: before any agent-applied edit
+                'crash_recovery')),      -- NEW: on recovery-log merge
+  tree_hash   TEXT NOT NULL,             -- root content-address in snapshots/objects/
+  created_at  TEXT NOT NULL,
+  size_bytes  INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_snapshots_scope ON snapshots(scope, scope_id, created_at);
+```
+
+### 3.7 Validator cache
+
+```sql
+CREATE TABLE validator_runs (
+  id           TEXT PRIMARY KEY,         -- ULID
+  validator_id TEXT NOT NULL,            -- e.g. 'kdp.print.v1'
+  ran_at       TEXT NOT NULL,
+  status       TEXT NOT NULL CHECK (status IN ('ok','warnings','errors','crashed')),
+  duration_ms  INTEGER NOT NULL,
+  scope_hash   TEXT NOT NULL             -- input hash; results valid until any input changes
+);
+
+CREATE TABLE validator_issues (
+  id          TEXT PRIMARY KEY,
+  run_id      TEXT NOT NULL REFERENCES validator_runs(id) ON DELETE CASCADE,
+  node_id     TEXT REFERENCES nodes(id) ON DELETE SET NULL,
+  severity    TEXT NOT NULL CHECK (severity IN ('info','warning','error')),
+  code        TEXT NOT NULL,
+  message     TEXT NOT NULL,
+  offset_from INTEGER,
+  offset_to   INTEGER,
+  auto_fixable INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_validator_issues_run ON validator_issues(run_id, severity);
+```
+
+### 3.8 Tables present in v1 but not written by MVP
+
+These tables are created in v1 migration so future migrations are additive-only. MVP **reads but does not write to** them.
+
+```sql
+-- Inline references (footnotes, endnotes, citations, cross-refs) — V1.0 write surface
+CREATE TABLE refs (
+  id          TEXT PRIMARY KEY,
+  kind        TEXT NOT NULL CHECK (kind IN ('footnote','endnote','citation','crossref')),
+  node_id     TEXT REFERENCES nodes(id) ON DELETE CASCADE,
+  body        TEXT NOT NULL,
+  csl_key     TEXT,
+  created_at  TEXT NOT NULL
+);
+
+-- Comments — V1.0 write surface
+CREATE TABLE comments (
+  id          TEXT PRIMARY KEY,
+  node_id     TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  range_from  INTEGER NOT NULL,
+  range_to    INTEGER NOT NULL,
+  parent_id   TEXT REFERENCES comments(id),
+  author      TEXT NOT NULL,
+  body        TEXT NOT NULL,
+  resolved_at TEXT,
+  created_at  TEXT NOT NULL
+);
+
+-- Tracked changes — V1.0 write surface
+CREATE TABLE tracked_changes (
+  id          TEXT PRIMARY KEY,
+  node_id     TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  op          TEXT NOT NULL CHECK (op IN ('insert','delete','format')),
+  range_from  INTEGER NOT NULL,
+  range_to    INTEGER NOT NULL,
+  payload_json TEXT NOT NULL,
+  author      TEXT NOT NULL,
+  state       TEXT NOT NULL DEFAULT 'pending'
+                CHECK (state IN ('pending','accepted','rejected')),
+  created_at  TEXT NOT NULL
+);
+
+-- Export history
+CREATE TABLE exports (
+  id          TEXT PRIMARY KEY,
+  profile     TEXT NOT NULL,             -- 'kdp_ebook'|'generic_epub'|'trade_pdf_5x8'|'trade_pdf_6x9'|'docx'
+  output_path TEXT NOT NULL,
+  hash        TEXT NOT NULL,
+  created_at  TEXT NOT NULL
+);
+```
 
 ## 4. Style book
 
@@ -245,7 +425,47 @@ Snapshot `trigger` values per `04-…` are extended:
 
 The `snapshots.trigger CHECK` constraint adds these new values.
 
-## 9. Migrations
+## 9. Per-user settings file (`~/.booksforge/settings.toml`)
+
+This file lives outside the bundle and persists the recent-projects list, global Ollama defaults, and UI preferences. It is **never** inside a `.booksforge/` bundle.
+
+```toml
+# ~/.booksforge/settings.toml
+# Created on first launch; updated atomically (write to .tmp then rename).
+
+[app]
+version = "0.0.1"                  # written on every save; not used for compatibility decisions
+
+[recent_projects]
+# Up to 10 entries; oldest is evicted when the cap is reached.
+[[recent_projects.entries]]
+id       = "01HF8X5ZQK0QY9YV6S0R6P8N3K"   # project ULID from manifest.toml
+path     = "/Users/alice/Writing/MyNovel.booksforge"
+name     = "MyNovel"                        # display name (title from manifest.toml)
+last_opened = "2026-05-06T11:02:01Z"       # ISO-8601 UTC
+
+# … more entries …
+
+[ollama]
+# Global defaults; per-project overrides live in the bundle's model_settings table.
+host = "http://127.0.0.1:11434"
+default_model = ""                         # empty = auto-select from registry on first use
+
+[ui]
+theme = "system"                           # "light" | "dark" | "system"
+```
+
+**Atomic write rule.** All writes to `settings.toml` go through a temp-file + rename pattern identical to bundle creation: write to `settings.toml.tmp`, then `rename` to `settings.toml`. A partially written `.tmp` file is silently discarded on next launch.
+
+**Lock file format.** `.booksforge.lock` inside the bundle root is a plain-text file containing the process ID of the holding process on one line:
+
+```
+1234
+```
+
+On open, if `.booksforge.lock` exists, read the PID. If the process is still running, show "Already open" with a Force Open option. If the process is dead (stale lock), delete the file and proceed. The lock is created at open and deleted on close (or at process exit via a `drop` RAII guard).
+
+## 10. Migrations
 
 The MVP starts at `schema_version = 1`. The deep spec (`_deep/04-data-model-and-project-format.md §4`) describes a notional v5 baseline; that was a planning convenience from before the implementation pack and does not reflect any shipped database. The first SQLite migration (M0 task **MZ-02**) creates everything in this document at v1 in one step.
 
@@ -254,15 +474,15 @@ The migration policy thereafter is per `04-… §5`:
 - Forward migrations are written by hand and run automatically on open after a `pre_migration` snapshot.
 - Reverse migrations exist as scripts for support; they are not auto-run.
 - A version-jump (e.g., v3 directly to v5 because an intermediate jump introduces bugs) requires a tested intermediate-build path.
-- Forward-compatibility rule (§10) is invariant.
+- Forward-compatibility rule (§11) is invariant.
 
 Future schema bumps for the MVP build are anticipated when the V1.0 features land: tracked-changes round-trip tables, citation/CSL tables, encryption parameters, and plugin install records. Each will be its own migration with the same pattern.
 
-## 10. Forward-compatibility rule
+## 11. Forward-compatibility rule
 
 A v7 project must not crash a v6 build; it shows a clear "this project was last opened with a newer BooksForge — please update." Newer BooksForge always opens older projects with a one-time migration that takes a snapshot first.
 
-## 11. Storage strategy summary
+## 13. Storage strategy summary
 
 - **SQLite** for structured state (the source of truth).
 - **Markdown mirror** under `manuscript/` regenerated on every save (disaster recovery).
@@ -272,7 +492,7 @@ A v7 project must not crash a v6 build; it shows a clear "this project was last 
 - **Local-first.** No cloud writes in MVP.
 - **Backups.** The bundle is one folder — copy/zip/move/sync are native. Self-contained export bundles to `*.booksforge.zip` for transport.
 
-## 12. Example SQL queries
+## 14. Example SQL queries
 
 These are the queries the UI will run. They are stable for the MVP.
 

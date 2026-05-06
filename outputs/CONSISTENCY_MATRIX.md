@@ -221,13 +221,57 @@ For each topic:
 
 ---
 
+## Topic 20 — Storage and filesystem trait signatures
+
+| File | Says |
+|------|------|
+| **AUTHORITATIVE: `ARCHITECTURE.md §2.1`** | `StorageRepository` and `BundleFilesystem` trait signatures defined with all MVP methods; `OllamaClient` cross-referenced from §5.4 |
+| `ARCHITECTURE.md §2` (prior) | Stated "each is a trait at Layer 3; only Layer 4 implements" but gave no trait signatures beyond Ollama |
+| `booksforge-storage`, `booksforge-fs` (code) | Implemented without a spec-level signature — now must be reconciled with `ARCHITECTURE.md §2.1` during MZ-02 |
+
+**Resolution status.** `Resolved`. `ARCHITECTURE.md §2.1` added 2026-05-06 with full trait signatures for `StorageRepository` and `BundleFilesystem`. **Last verified:** 2026-05-06.
+
+## Topic 21 — Missing v1 migration table schemas in implementation-pack docs
+
+| File | Says |
+|------|------|
+| **AUTHORITATIVE: `DATA_MODEL.md §3`** | Full `CREATE TABLE` statements for all v1 tables: nodes, scene_content, notes, entities, entity_aliases, entity_scene_appearances, snapshots (with updated trigger values), validator_runs, validator_issues, refs, comments, tracked_changes, exports, schema_migrations |
+| `DATA_MODEL.md §3` (prior) | Listed only the `nodes` table; deferred all others to `_deep/04-…` with "per 04-…" |
+| `_deep/04-data-model-and-project-format.md §4` | Full schemas present but describes a notional v5 baseline; superseded for the schema baseline |
+
+**Resolution status.** `Resolved`. `DATA_MODEL.md §3` patched 2026-05-06 to include all v1 CREATE TABLE statements extracted from the deep spec and updated with MVP additions (`pre_agent_edit`, `crash_recovery` snapshot triggers). **Last verified:** 2026-05-06.
+
+## Topic 22 — Settings file format and lock file semantics
+
+| File | Says |
+|------|------|
+| **AUTHORITATIVE: `DATA_MODEL.md §9`** | `~/.booksforge/settings.toml` TOML schema with `[recent_projects]`, `[ollama]`, `[ui]` blocks and worked example; atomic write rule; lock file format (PID text file) and liveness-check semantics |
+| `IMPLEMENTATION_PLAN.md §MZ-02` (prior) | "Lock file + recent-projects list persisted to `~/.booksforge/settings.toml`" — named the file but gave no schema |
+| `booksforge-fs` lock module | Implemented a RAII lock guard but did not specify PID liveness check — must add Unix `kill(pid,0)` / Windows `OpenProcess` check |
+
+**Resolution status.** `Resolved`. `DATA_MODEL.md §9` added 2026-05-06 with full TOML schema and lock file semantics. `IMPLEMENTATION_PLAN.md MZ-02` updated to reference it. **Last verified:** 2026-05-06.
+
+## Topic 23 — Atomic bundle creation recovery path
+
+| File | Says |
+|------|------|
+| **AUTHORITATIVE: `IMPLEMENTATION_PLAN.md §MZ-02`** | Full 8-step atomic creation contract; orphan temp-dir cleanup on launch; lock file lifecycle with PID liveness check; cross-platform rename semantics |
+| `ARCHITECTURE.md §7` | "atomic bundle creation (temp dir + rename)" — named the pattern but gave no steps |
+| `booksforge-fs` (code) | `init_bundle` written without a crash-recovery scan — must add on-launch orphan cleanup |
+
+**Resolution status.** `Resolved`. `IMPLEMENTATION_PLAN.md §MZ-02` patched 2026-05-06 with explicit implementation contract. **Last verified:** 2026-05-06.
+
+---
+
 ## Failure-mode walk-through
 
 If Claude Code follows the docs, what could still be ambiguous? Current findings:
 
 1. **Diagrams 02, 06, 07 are now refreshed.** Diagram 08 (roadmap gantt) remains stale until a milestone closes; the prose in `IMPLEMENTATION_PLAN.md` wins on that one.
 2. **Phase 06+ prompts assume the older roadmap.** Mitigation: they remain authoritative for V1.0+ tasks; status notes added to phase-00–05.
-3. **`docs/open-questions.md` does not yet exist.** Mitigation: Claude Code creates it on first ambiguity per the harness rule. Verified during MZ-01.
+3. **`docs/open-questions.md` exists as an empty template.** Claude Code populates it on first ambiguity per the harness rule.
 4. **The `_deep/09-export-pipeline.md` and `EXPORT_EPUB_SPEC.md` describe two different ePUB pipelines.** Mitigation: status note added; `09-…` is now Pandoc-only for DOCX/PDF.
+5. **`booksforge-fs` lock module lacks PID liveness check** (stale lock eviction). Must be added during MZ-02 per `DATA_MODEL.md §9` semantics.
+6. **`booksforge-fs::init_bundle` lacks orphan temp-dir cleanup.** Must be added during MZ-02 per `IMPLEMENTATION_PLAN.md §MZ-02` contract.
 
-No remaining contradictions block implementation start.
+**No remaining contradictions block MZ-02 implementation start.** Items 5 and 6 are code gaps, not documentation gaps — they are resolved by implementation during MZ-02. **Last verified:** 2026-05-06.

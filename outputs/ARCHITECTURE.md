@@ -59,6 +59,124 @@ Four strict layers with single-direction dependencies. Lints enforce.
 
 Any cross-layer call goes through a trait boundary. This is what makes the agent orchestrator unit-testable without spinning up a real Ollama.
 
+### 2.1 Layer boundary traits
+
+The three stable trait boundaries are defined here so every crate knows which side of the boundary it lives on.
+
+#### `StorageRepository` (defined in `booksforge-storage`, used by `apps/desktop`)
+
+```rust
+/// Layer 4 boundary — SQLite adapter.
+/// Implemented by `SqliteStorage` in booksforge-storage.
+/// Injected into Tauri command handlers as managed state.
+#[async_trait]
+pub trait StorageRepository: Send + Sync {
+    /// Open (or create) the project database at the given path.
+    /// Runs pending migrations automatically after taking a pre_migration snapshot.
+    async fn open(&self, db_path: &Path) -> Result<(), StorageError>;
+
+    /// Fetch all non-deleted nodes ordered by position.
+    async fn list_nodes(&self) -> Result<Vec<Node>, StorageError>;
+
+    /// Insert a new node row. Caller must ensure parent_id exists if set.
+    async fn insert_node(&self, node: &Node) -> Result<(), StorageError>;
+
+    /// Update an existing node (title, status, position, pov, beat, target_words).
+    async fn update_node(&self, node: &Node) -> Result<(), StorageError>;
+
+    /// Soft-delete a node by setting deleted_at = now().
+    async fn delete_node(&self, id: &Ulid) -> Result<(), StorageError>;
+
+    /// Load scene content for a node. Returns None if never saved.
+    async fn load_scene(&self, node_id: &Ulid) -> Result<Option<SceneContent>, StorageError>;
+
+    /// Upsert scene content (insert or replace).
+    async fn save_scene(&self, content: &SceneContent) -> Result<(), StorageError>;
+
+    /// Read the singleton style_book row. Returns default if no row yet.
+    async fn load_style_book(&self) -> Result<StyleBook, StorageError>;
+
+    /// Upsert the singleton style_book row.
+    async fn save_style_book(&self, style: &StyleBook) -> Result<(), StorageError>;
+
+    /// List all entities (non-deleted) with their aliases.
+    async fn list_entities(&self) -> Result<Vec<Entity>, StorageError>;
+
+    /// Insert a new entity and its aliases atomically.
+    async fn insert_entity(&self, entity: &Entity) -> Result<(), StorageError>;
+
+    /// Record an agent run row (status = running on insert).
+    async fn insert_agent_run(&self, run: &AgentRun) -> Result<(), StorageError>;
+
+    /// Update run status, completed_at, totals_json.
+    async fn update_agent_run(&self, run: &AgentRun) -> Result<(), StorageError>;
+
+    /// Insert a snapshot manifest row.
+    async fn insert_snapshot(&self, snap: &SnapshotRecord) -> Result<(), StorageError>;
+}
+```
+
+#### `BundleFilesystem` (defined in `booksforge-fs`, used by `apps/desktop`)
+
+```rust
+/// Layer 4 boundary — bundle filesystem adapter.
+/// Implemented by the real OS filesystem; test implementations use tmp dirs.
+#[async_trait]
+pub trait BundleFilesystem: Send + Sync {
+    /// Create a new empty bundle atomically.
+    ///
+    /// 1. Creates a temp directory under the system temp dir.
+    /// 2. Writes `manifest.toml`, empty subdirectories, `.booksforge-version`.
+    /// 3. Renames the temp dir to `final_path` atomically.
+    /// 4. On any failure before rename: removes the temp dir.
+    async fn create_bundle(
+        &self,
+        final_path: &Path,
+        manifest: &str,              // TOML string
+    ) -> Result<BundlePath, FsError>;
+
+    /// Open an existing bundle. Validates presence of `manifest.toml`.
+    /// Acquires the advisory lock file (fails if already locked by another PID).
+    fn open_bundle(&self, path: &Path) -> Result<BundlePath, FsError>;
+
+    /// Release the advisory lock and flush pending writes.
+    async fn close_bundle(&self, path: &BundlePath) -> Result<(), FsError>;
+
+    /// Write `manifest.toml` atomically (tmp + rename).
+    async fn write_manifest(
+        &self,
+        bundle: &BundlePath,
+        toml: &str,
+    ) -> Result<(), FsError>;
+
+    /// Write a chapter Markdown mirror file.
+    async fn write_chapter_md(
+        &self,
+        bundle: &BundlePath,
+        node_ulid: &str,
+        markdown: &str,
+    ) -> Result<(), FsError>;
+
+    /// Write a content-addressed snapshot object.
+    /// Returns the blake3 hex hash (which is also the filename).
+    async fn write_snapshot_object(
+        &self,
+        bundle: &BundlePath,
+        content: &[u8],
+    ) -> Result<String, FsError>;
+}
+```
+
+#### `OllamaClient` (defined in `booksforge-ollama` — see §5.4)
+
+Already specified in §5.4. Repeated here for completeness of the boundary map.
+
+| Trait | Defined in | Implemented by | Injected into |
+|-------|-----------|----------------|---------------|
+| `StorageRepository` | `booksforge-storage` | `SqliteStorage` | Tauri app state |
+| `BundleFilesystem` | `booksforge-fs` | `OsFilesystem` | Tauri app state |
+| `OllamaClient` | `booksforge-ollama` | `HttpOllamaClient` | Tauri app state |
+
 ## 3. Crate / module layout (MVP)
 
 ```
