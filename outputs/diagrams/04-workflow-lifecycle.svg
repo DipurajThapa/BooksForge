@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 540" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <marker id="aBack" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9333ea"/></marker>
+  </defs>
+  <rect width="1100" height="540" fill="#fff"/>
+  <text x="550" y="36" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">Workflow — Project lifecycle</text>
+  <text x="550" y="58" text-anchor="middle" font-size="12" fill="#64748b">Implicit states, derived from data. Users routinely loop back.</text>
+
+  <!-- Stages -->
+  <g font-size="13">
+    <rect x="40" y="180" width="160" height="80" rx="12" fill="#eff6ff" stroke="#1d4ed8" stroke-width="2"/>
+    <text x="120" y="210" text-anchor="middle" font-weight="700" fill="#1d4ed8">Created</text>
+    <text x="120" y="232" text-anchor="middle" fill="#475569">template + meta</text>
+    <text x="120" y="248" text-anchor="middle" fill="#94a3b8" font-size="11">atomic bundle write</text>
+
+    <rect x="220" y="180" width="160" height="80" rx="12" fill="#eff6ff" stroke="#1d4ed8" stroke-width="2"/>
+    <text x="300" y="210" text-anchor="middle" font-weight="700" fill="#1d4ed8">Drafting</text>
+    <text x="300" y="232" text-anchor="middle" fill="#475569">write • outline • AI</text>
+    <text x="300" y="248" text-anchor="middle" fill="#94a3b8" font-size="11">snapshots auto + manual</text>
+
+    <rect x="400" y="180" width="160" height="80" rx="12" fill="#eff6ff" stroke="#1d4ed8" stroke-width="2"/>
+    <text x="480" y="210" text-anchor="middle" font-weight="700" fill="#1d4ed8">Revising</text>
+    <text x="480" y="232" text-anchor="middle" fill="#475569">tracked changes</text>
+    <text x="480" y="248" text-anchor="middle" fill="#94a3b8" font-size="11">comments • beta-read</text>
+
+    <rect x="580" y="180" width="160" height="80" rx="12" fill="#fefce8" stroke="#a16207" stroke-width="2"/>
+    <text x="660" y="210" text-anchor="middle" font-weight="700" fill="#854d0e">Validated</text>
+    <text x="660" y="232" text-anchor="middle" fill="#475569">preflight gate</text>
+    <text x="660" y="248" text-anchor="middle" fill="#94a3b8" font-size="11">errors block / warn</text>
+
+    <rect x="760" y="180" width="160" height="80" rx="12" fill="#ecfdf5" stroke="#047857" stroke-width="2"/>
+    <text x="840" y="210" text-anchor="middle" font-weight="700" fill="#047857">Exported</text>
+    <text x="840" y="232" text-anchor="middle" fill="#475569">DOCX • PDF • EPUB</text>
+    <text x="840" y="248" text-anchor="middle" fill="#94a3b8" font-size="11">store profile</text>
+
+    <rect x="940" y="180" width="120" height="80" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="2"/>
+    <text x="1000" y="210" text-anchor="middle" font-weight="700" fill="#475569">Archived</text>
+    <text x="1000" y="232" text-anchor="middle" fill="#475569">zip + recents off</text>
+  </g>
+
+  <!-- Forward arrows -->
+  <line x1="200" y1="220" x2="218" y2="220" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="380" y1="220" x2="398" y2="220" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="560" y1="220" x2="578" y2="220" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="740" y1="220" x2="758" y2="220" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="920" y1="220" x2="938" y2="220" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- Loop-backs -->
+  <path d="M660 260 q-180 60 -180 0" fill="none" stroke="#9333ea" stroke-width="2" marker-end="url(#aBack)"/>
+  <text x="500" y="332" font-size="12" fill="#9333ea">validators surface issues → revise</text>
+
+  <path d="M840 260 q-360 80 -360 0" fill="none" stroke="#9333ea" stroke-width="2" marker-end="url(#aBack)"/>
+  <text x="500" y="362" font-size="12" fill="#9333ea">store rejection → revise + re-export</text>
+
+  <path d="M480 180 q60 -60 180 0" fill="none" stroke="#9333ea" stroke-width="2" marker-end="url(#aBack)"/>
+  <text x="558" y="118" text-anchor="middle" font-size="12" fill="#9333ea">deeper revision after AI critique</text>
+
+  <!-- Annotations -->
+  <g>
+    <rect x="40" y="380" width="1020" height="120" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="60" y="404" font-weight="700" fill="#0f172a">Cross-cutting flows during lifecycle</text>
+    <text x="60" y="426" fill="#334155" font-size="12">• Snapshots fire on a schedule + before any AI-applied edit + before validator fix-all + before schema migration + before export.</text>
+    <text x="60" y="446" fill="#334155" font-size="12">• Audit log records every AI call (provider, model, prompt template hash, token counts, cost estimate, status).</text>
+    <text x="60" y="466" fill="#334155" font-size="12">• Markdown mirror writes alongside SQLite saves; provides disaster recovery surface independent of the database.</text>
+    <text x="60" y="486" fill="#334155" font-size="12">• Plugins extend Drafting (UI panels), Validating (extra rules), Exporting (extra profiles), and AI (prompt overlays).</text>
+  </g>
+</svg>

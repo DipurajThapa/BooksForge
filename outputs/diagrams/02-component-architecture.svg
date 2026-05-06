@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 820" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13">
+  <style>
+    .layer { fill: #f7f9fc; stroke: #1f3a68; stroke-width: 1.5; }
+    .layer-label { fill: #1f3a68; font-weight: 700; font-size: 14px; }
+    .crate { fill: #ffffff; stroke: #5a7ca8; stroke-width: 1; rx: 6; }
+    .crate-l3 { fill: #eaf3ff; stroke: #2566b3; }
+    .crate-l4 { fill: #fff4e6; stroke: #c47b1f; }
+    .crate-presentation { fill: #f0e6ff; stroke: #6a4ab0; }
+    .crate-app { fill: #e6f7ee; stroke: #2c8a4e; }
+    .crate-text { fill: #1c2a44; font-weight: 600; }
+    .external { fill: #fbe9e7; stroke: #b9281e; stroke-dasharray: 4,3; }
+    .external-text { fill: #7a1a13; font-weight: 600; }
+    .arrow { fill: none; stroke: #5a6478; stroke-width: 1.4; marker-end: url(#arr); }
+    .title { fill: #0e1726; font-weight: 700; font-size: 18px; }
+    .subtitle { fill: #4d5b75; font-size: 12px; }
+    .note { fill: #4d5b75; font-style: italic; font-size: 11px; }
+  </style>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a6478"/>
+    </marker>
+  </defs>
+
+  <text x="20" y="32" class="title">BooksForge — Component Architecture (MVP)</text>
+  <text x="20" y="50" class="subtitle">Tauri v2 + React + Rust • Ollama-first • Canonical-HTML export • Memory + Vocabulary subsystems</text>
+
+  <rect x="20" y="70" width="1160" height="100" class="layer"/>
+  <text x="32" y="92" class="layer-label">Layer 1 — Presentation (TypeScript / React)</text>
+  <rect x="40"  y="105" width="180" height="55" class="crate crate-presentation" rx="6"/>
+  <text x="55"  y="128" class="crate-text">apps/desktop/src-ui</text>
+  <text x="55"  y="146" class="subtitle">Project Picker, Wizard, Workspace</text>
+  <rect x="240" y="105" width="160" height="55" class="crate crate-presentation" rx="6"/>
+  <text x="255" y="128" class="crate-text">packages/editor</text>
+  <text x="255" y="146" class="subtitle">TipTap (ProseMirror)</text>
+  <rect x="420" y="105" width="160" height="55" class="crate crate-presentation" rx="6"/>
+  <text x="435" y="128" class="crate-text">packages/preview</text>
+  <text x="435" y="146" class="subtitle">Canonical-HTML WebView</text>
+  <rect x="600" y="105" width="160" height="55" class="crate crate-presentation" rx="6"/>
+  <text x="615" y="128" class="crate-text">packages/ui</text>
+  <text x="615" y="146" class="subtitle">Design system</text>
+  <rect x="780" y="105" width="200" height="55" class="crate crate-presentation" rx="6"/>
+  <text x="795" y="128" class="crate-text">packages/shared-types</text>
+  <text x="795" y="146" class="subtitle">ts-rs codegen</text>
+
+  <rect x="20" y="190" width="1160" height="80" class="layer"/>
+  <text x="32" y="212" class="layer-label">Layer 2 — Application services (Tauri commands)</text>
+  <rect x="40" y="225" width="1120" height="35" class="crate crate-app" rx="6"/>
+  <text x="55" y="247" class="crate-text">project.* • scene.* • ai.suggest • workflow.* • snapshot.* • validator.run • export.* • ollama.* • memory.* • vocab.* • settings.*</text>
+
+  <rect x="20" y="290" width="1160" height="200" class="layer"/>
+  <text x="32" y="312" class="layer-label">Layer 3 — Domain (pure Rust crates; no I/O, no clocks, no randomness)</text>
+  <rect x="40"  y="325" width="170" height="60" class="crate crate-l3" rx="6"/>
+  <text x="55"  y="348" class="crate-text">booksforge-domain</text>
+  <text x="55"  y="368" class="subtitle">project model, doc tree</text>
+  <rect x="225" y="325" width="170" height="60" class="crate crate-l3" rx="6"/>
+  <text x="240" y="348" class="crate-text">booksforge-template</text>
+  <text x="240" y="368" class="subtitle">template parsing/compile</text>
+  <rect x="410" y="325" width="170" height="60" class="crate crate-l3" rx="6"/>
+  <text x="425" y="348" class="crate-text">booksforge-validator</text>
+  <text x="425" y="368" class="subtitle">manuscript + KDP validators</text>
+  <rect x="595" y="325" width="170" height="60" class="crate crate-l3" rx="6"/>
+  <text x="610" y="348" class="crate-text">booksforge-agents</text>
+  <text x="610" y="368" class="subtitle">9 MVP + 9 V1.0 agent specs</text>
+  <rect x="780" y="325" width="170" height="60" class="crate crate-l3" rx="6"/>
+  <text x="795" y="348" class="crate-text">booksforge-prompt</text>
+  <text x="795" y="368" class="subtitle">MiniJinja templates, hashes</text>
+  <rect x="965" y="325" width="195" height="60" class="crate crate-l3" rx="6"/>
+  <text x="980" y="348" class="crate-text">booksforge-export</text>
+  <text x="980" y="368" class="subtitle">Canonical Doc → HTML/Pandoc-AST</text>
+
+  <rect x="40"  y="400" width="170" height="60" class="crate crate-l3" rx="6"/>
+  <text x="55"  y="423" class="crate-text">booksforge-memory</text>
+  <text x="55"  y="443" class="subtitle">book/chapter/entity/style</text>
+  <rect x="225" y="400" width="170" height="60" class="crate crate-l3" rx="6"/>
+  <text x="240" y="423" class="crate-text">booksforge-vocab</text>
+  <text x="240" y="443" class="subtitle">layered dictionaries</text>
+  <rect x="410" y="400" width="170" height="60" class="crate crate-l3" rx="6"/>
+  <text x="425" y="423" class="crate-text">booksforge-ipc</text>
+  <text x="425" y="443" class="subtitle">IPC types (codegen → TS)</text>
+  <rect x="595" y="400" width="565" height="60" class="crate crate-l3" rx="6" opacity="0.5"/>
+  <text x="610" y="423" class="crate-text">No unwrap, no I/O, no network at this layer.</text>
+  <text x="610" y="443" class="subtitle">90%+ line coverage; property tests for invariants. cargo deny enforces no GPL static link.</text>
+
+  <rect x="20" y="510" width="1160" height="180" class="layer"/>
+  <text x="32" y="532" class="layer-label">Layer 4 — Infrastructure (adapters)</text>
+  <rect x="40"  y="545" width="170" height="60" class="crate crate-l4" rx="6"/>
+  <text x="55"  y="568" class="crate-text">booksforge-storage</text>
+  <text x="55"  y="588" class="subtitle">SQLite (sqlx, WAL)</text>
+  <rect x="225" y="545" width="170" height="60" class="crate crate-l4" rx="6"/>
+  <text x="240" y="568" class="crate-text">booksforge-fs</text>
+  <text x="240" y="588" class="subtitle">bundle filesystem</text>
+  <rect x="410" y="545" width="170" height="60" class="crate crate-l4" rx="6"/>
+  <text x="425" y="568" class="crate-text">booksforge-ollama</text>
+  <text x="425" y="588" class="subtitle">HTTP client (127.0.0.1:11434)</text>
+  <rect x="595" y="545" width="225" height="60" class="crate crate-l4" rx="6"/>
+  <text x="610" y="568" class="crate-text">booksforge-orchestrator</text>
+  <text x="610" y="588" class="subtitle">workflows, caps, gates, snapshots</text>
+  <rect x="835" y="545" width="170" height="60" class="crate crate-l4" rx="6"/>
+  <text x="850" y="568" class="crate-text">booksforge-export-epub</text>
+  <text x="850" y="588" class="subtitle">canonical HTML to EPUB-3</text>
+
+  <rect x="40"  y="615" width="170" height="60" class="crate crate-l4" rx="6"/>
+  <text x="55"  y="638" class="crate-text">booksforge-export-pandoc</text>
+  <text x="55"  y="658" class="subtitle">DOCX, PDF only</text>
+  <rect x="225" y="615" width="170" height="60" class="crate crate-l4" rx="6"/>
+  <text x="240" y="638" class="crate-text">booksforge-epubcheck</text>
+  <text x="240" y="658" class="subtitle">EPUBCheck sidecar</text>
+  <rect x="410" y="615" width="170" height="60" class="crate crate-l4" rx="6"/>
+  <text x="425" y="638" class="crate-text">booksforge-test-fixtures</text>
+  <text x="425" y="658" class="subtitle">mocks + fixture bundles</text>
+  <rect x="595" y="615" width="565" height="60" class="crate crate-l4" rx="6" opacity="0.5"/>
+  <text x="610" y="638" class="crate-text">Each L4 crate implements an L3 trait.</text>
+  <text x="610" y="658" class="subtitle">Mocks let agents/orchestrator be tested without spinning up a real Ollama or sidecar.</text>
+
+  <rect x="20" y="710" width="1160" height="90" class="layer"/>
+  <text x="32" y="732" class="layer-label">External processes (sidecars / runtime)</text>
+  <rect x="40"  y="745" width="220" height="45" class="crate external" rx="6"/>
+  <text x="55"  y="773" class="external-text">Ollama (127.0.0.1:11434)</text>
+  <rect x="280" y="745" width="180" height="45" class="crate external" rx="6"/>
+  <text x="295" y="773" class="external-text">Pandoc (sidecar)</text>
+  <rect x="480" y="745" width="220" height="45" class="crate external" rx="6"/>
+  <text x="495" y="773" class="external-text">EPUBCheck + JRE (sidecar)</text>
+  <rect x="720" y="745" width="440" height="45" class="crate external" rx="6"/>
+  <text x="735" y="773" class="external-text">Project bundle: MyBook.booksforge/ (manifest, project.db, manuscript, .memory, .vocab, snapshots, agent_runs, exports)</text>
+
+  <line x1="600" y1="170" x2="600" y2="190" class="arrow"/>
+  <line x1="600" y1="270" x2="600" y2="290" class="arrow"/>
+  <line x1="600" y1="490" x2="600" y2="510" class="arrow"/>
+  <line x1="525" y1="690" x2="525" y2="745" class="arrow"/>
+  <line x1="155" y1="690" x2="155" y2="745" class="arrow"/>
+
+  <text x="20" y="815" class="note">Diagram refreshed Pass 2 (2026-05-06). Authoritative source: outputs/ARCHITECTURE.md section 3.</text>
+</svg>

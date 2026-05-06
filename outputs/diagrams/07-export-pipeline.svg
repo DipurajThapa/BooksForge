@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13">
+  <style>
+    .panel { fill: #f7f9fc; stroke: #1f3a68; stroke-width: 1.5; }
+    .panel-label { fill: #1f3a68; font-weight: 700; font-size: 14px; }
+    .source { fill: #f0e6ff; stroke: #6a4ab0; }
+    .canon { fill: #e6f7ee; stroke: #2c8a4e; stroke-width: 2; }
+    .epub { fill: #d8eaff; stroke: #1f4a8a; stroke-width: 1.5; }
+    .pandoc { fill: #fff4e6; stroke: #c47b1f; stroke-width: 1.5; }
+    .preview { fill: #d6f1e3; stroke: #1f7a4d; stroke-width: 2; }
+    .qa { fill: #fbe9e7; stroke: #b9281e; }
+    .text { fill: #1c2a44; font-weight: 600; }
+    .subtle { fill: #4d5b75; font-size: 11px; }
+    .arrow { fill: none; stroke: #5a6478; stroke-width: 1.6; marker-end: url(#arr); }
+    .arrow-canon { fill: none; stroke: #2c8a4e; stroke-width: 2.5; marker-end: url(#arr-canon); }
+    .arrow-eq { fill: none; stroke: #1f7a4d; stroke-width: 2.5; stroke-dasharray: 2,2; }
+    .title { fill: #0e1726; font-weight: 700; font-size: 18px; }
+    .heading { fill: #1f3a68; font-weight: 700; font-size: 13px; }
+    .note { fill: #4d5b75; font-style: italic; font-size: 11px; }
+    .invariant { fill: #1f7a4d; font-weight: 700; font-size: 12px; }
+  </style>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a6478"/>
+    </marker>
+    <marker id="arr-canon" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2c8a4e"/>
+    </marker>
+  </defs>
+
+  <text x="20" y="32" class="title">BooksForge — Export Pipeline (canonical-HTML)</text>
+  <text x="20" y="50" class="subtitle">Editor preview HTML = EPUB content HTML (byte-identical). Pandoc handles DOCX/PDF only. EPUBCheck mandatory.</text>
+
+  <!-- Source -->
+  <rect x="20" y="80" width="280" height="120" class="panel"/>
+  <text x="32" y="102" class="panel-label">Source</text>
+  <rect x="40" y="115" width="240" height="35" class="source" rx="6"/>
+  <text x="55" y="138" class="text">Document tree (SQLite)</text>
+  <rect x="40" y="155" width="240" height="35" class="source" rx="6"/>
+  <text x="55" y="178" class="text">Markdown mirror (manuscript/)</text>
+
+  <!-- Canonical Document -->
+  <rect x="340" y="80" width="320" height="120" class="panel"/>
+  <text x="352" y="102" class="panel-label">booksforge-export (Layer 3, pure)</text>
+  <rect x="360" y="115" width="280" height="75" class="canon" rx="6"/>
+  <text x="375" y="138" class="text">Canonical Document</text>
+  <text x="375" y="156" class="subtle">typed Rust struct: metadata, blocks, footnotes, assets</text>
+  <text x="375" y="173" class="subtle">deterministic — same input = byte-identical output</text>
+
+  <!-- Three render targets -->
+  <rect x="700" y="80" width="480" height="120" class="panel"/>
+  <text x="712" y="102" class="panel-label">Three rendering paths</text>
+  <text x="712" y="120" class="heading">Canonical Document branches into:</text>
+  <rect x="720" y="128" width="220" height="30" class="canon" rx="5"/>
+  <text x="735" y="148" class="text">render_html(doc) → Canonical HTML</text>
+  <rect x="950" y="128" width="220" height="30" class="canon" rx="5"/>
+  <text x="965" y="148" class="text">render_css(doc) → Canonical CSS</text>
+  <rect x="720" y="163" width="450" height="30" class="pandoc" rx="5"/>
+  <text x="735" y="183" class="text">render_pandoc_ast(doc) → Pandoc-AST (DOCX/PDF only)</text>
+
+  <!-- Connectors top row -->
+  <line x1="300" y1="158" x2="340" y2="158" class="arrow-canon"/>
+  <line x1="660" y1="158" x2="700" y2="158" class="arrow-canon"/>
+
+  <!-- Preview pane -->
+  <rect x="20" y="230" width="380" height="180" class="panel"/>
+  <text x="32" y="252" class="panel-label">Editor preview pane (WebView)</text>
+  <rect x="40" y="265" width="340" height="40" class="preview" rx="6"/>
+  <text x="55" y="289" class="text">Renders Canonical HTML + Canonical CSS</text>
+  <rect x="40" y="315" width="340" height="35" class="preview" rx="6"/>
+  <text x="55" y="338" class="text">Same WebView engine as ePUB readers</text>
+  <rect x="40" y="360" width="340" height="40" class="preview" rx="6"/>
+  <text x="55" y="383" class="text">No React rendering for preview</text>
+
+  <!-- EPUB packager -->
+  <rect x="420" y="230" width="380" height="180" class="panel"/>
+  <text x="432" y="252" class="panel-label">booksforge-export-epub (Layer 4)</text>
+  <rect x="440" y="265" width="340" height="35" class="epub" rx="6"/>
+  <text x="455" y="288" class="text">Zips Canonical HTML/CSS into EPUB-3 container</text>
+  <rect x="440" y="310" width="340" height="35" class="epub" rx="6"/>
+  <text x="455" y="333" class="text">Generates: mimetype, container.xml, content.opf, nav.xhtml</text>
+  <rect x="440" y="355" width="340" height="40" class="epub" rx="6"/>
+  <text x="455" y="378" class="text">Profiles: epub-3.generic, epub-3.kdp-ebook</text>
+
+  <!-- Pandoc -->
+  <rect x="820" y="230" width="360" height="180" class="panel"/>
+  <text x="832" y="252" class="panel-label">booksforge-export-pandoc (Layer 4)</text>
+  <rect x="840" y="265" width="320" height="35" class="pandoc" rx="6"/>
+  <text x="855" y="288" class="text">Pandoc sidecar (process boundary)</text>
+  <rect x="840" y="310" width="320" height="35" class="pandoc" rx="6"/>
+  <text x="855" y="333" class="text">DOCX (manuscript)</text>
+  <rect x="840" y="355" width="320" height="35" class="pandoc" rx="6"/>
+  <text x="855" y="378" class="text">PDF (Trade 5×8, Trade 6×9)</text>
+
+  <!-- Connectors -->
+  <line x1="500" y1="160" x2="210" y2="265" class="arrow-canon"/>
+  <line x1="500" y1="160" x2="500" y2="265" class="arrow-canon"/>
+  <line x1="945" y1="195" x2="945" y2="265" class="arrow"/>
+
+  <!-- Equality bar -->
+  <line x1="380" y1="285" x2="440" y2="285" class="arrow-eq"/>
+  <text x="385" y="278" class="invariant">≡ byte-identical HTML/CSS</text>
+
+  <!-- QA layer -->
+  <rect x="20" y="430" width="780" height="180" class="panel"/>
+  <text x="32" y="452" class="panel-label">QA (per EXPORT_EPUB_QA.md)</text>
+  <rect x="40" y="465" width="240" height="40" class="qa" rx="6"/>
+  <text x="55" y="490" class="text">EPUBCheck (errors block; warnings prompt)</text>
+  <rect x="290" y="465" width="240" height="40" class="qa" rx="6"/>
+  <text x="305" y="490" class="text">Visual regression (Playwright + pixelmatch)</text>
+  <rect x="540" y="465" width="240" height="40" class="qa" rx="6"/>
+  <text x="555" y="490" class="text">Golden-file regression (blake3)</text>
+  <rect x="40" y="515" width="240" height="40" class="qa" rx="6"/>
+  <text x="55" y="540" class="text">Reproducibility (byte-identical reruns)</text>
+  <rect x="290" y="515" width="240" height="40" class="qa" rx="6"/>
+  <text x="305" y="540" class="text">Pre-export validators (KDP, manuscript)</text>
+  <rect x="540" y="515" width="240" height="40" class="qa" rx="6"/>
+  <text x="555" y="540" class="text">Round-trip (re-import EPUB → tree match)</text>
+  <rect x="40" y="565" width="740" height="35" class="qa" rx="6" opacity="0.7"/>
+  <text x="55" y="588" class="text">All gates run in CI on every PR. Performance budgets: EPUB ≤ 30 s, DOCX ≤ 15 s, PDF ≤ 45 s for 100k-word fixture.</text>
+
+  <!-- Output -->
+  <rect x="820" y="430" width="360" height="180" class="panel"/>
+  <text x="832" y="452" class="panel-label">Output</text>
+  <rect x="840" y="465" width="320" height="35" class="epub" rx="6"/>
+  <text x="855" y="488" class="text">.epub (KDP-eBook validated)</text>
+  <rect x="840" y="505" width="320" height="35" class="pandoc" rx="6"/>
+  <text x="855" y="528" class="text">.docx (manuscript profile)</text>
+  <rect x="840" y="545" width="320" height="35" class="pandoc" rx="6"/>
+  <text x="855" y="568" class="text">.pdf (Trade 5×8 / 6×9)</text>
+  <rect x="840" y="585" width="320" height="20" class="qa" rx="3"/>
+  <text x="855" y="600" class="subtle">Recorded in `exports` table; last 10 retained in bundle</text>
+
+  <!-- Connectors to QA / output -->
+  <line x1="600" y1="410" x2="500" y2="430" class="arrow"/>
+  <line x1="900" y1="410" x2="900" y2="430" class="arrow"/>
+  <line x1="500" y1="610" x2="900" y2="465" class="arrow" stroke-dasharray="3,2"/>
+
+  <!-- Invariant box -->
+  <rect x="20" y="640" width="1160" height="80" class="panel"/>
+  <text x="32" y="662" class="panel-label">Invariants ([DECISION-017])</text>
+  <text x="32" y="683" class="subtle">1. Editor preview HTML = EPUB content HTML, byte-identical (or visually identical under documented tolerance for anti-aliasing).</text>
+  <text x="32" y="700" class="subtle">2. Pandoc never touches EPUB. Drift between preview and export is structurally impossible.</text>
+  <text x="32" y="715" class="subtle">3. Same Canonical Document + same template + same engine version = byte-identical EPUB / DOCX / PDF on every CI run.</text>
+
+  <text x="20" y="745" class="note">Diagram refreshed Pass 2 (2026-05-06). Authoritative source: outputs/EXPORT_EPUB_SPEC.md, outputs/EXPORT_EPUB_QA.md.</text>
+</svg>

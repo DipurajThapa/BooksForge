@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 720" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <marker id="agreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#047857"/></marker>
+  </defs>
+  <rect width="1100" height="720" fill="#fff"/>
+  <text x="550" y="36" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">Dataflow — Edit loop (write → save → mirror → snapshot)</text>
+  <text x="550" y="58" text-anchor="middle" font-size="12" fill="#64748b">Hot path. Latency budget: 30 ms p95 keystroke; durability budget: ≤ 5 s loss on crash</text>
+
+  <!-- Steps -->
+  <g>
+    <rect x="40" y="100" width="240" height="76" rx="10" fill="#eff6ff" stroke="#1d4ed8"/>
+    <text x="160" y="128" text-anchor="middle" font-weight="700" fill="#1d4ed8">1. Keystroke</text>
+    <text x="160" y="148" text-anchor="middle" fill="#475569">User types in editor</text>
+    <text x="160" y="164" text-anchor="middle" fill="#94a3b8" font-size="11">React state untouched</text>
+  </g>
+
+  <g>
+    <rect x="320" y="100" width="240" height="76" rx="10" fill="#eff6ff" stroke="#1d4ed8"/>
+    <text x="440" y="128" text-anchor="middle" font-weight="700" fill="#1d4ed8">2. ProseMirror tx</text>
+    <text x="440" y="148" text-anchor="middle" fill="#475569">In-memory doc updated</text>
+    <text x="440" y="164" text-anchor="middle" fill="#94a3b8" font-size="11">virtualised view re-renders</text>
+  </g>
+
+  <g>
+    <rect x="600" y="100" width="240" height="76" rx="10" fill="#fefce8" stroke="#a16207"/>
+    <text x="720" y="128" text-anchor="middle" font-weight="700" fill="#854d0e">3. Debounce 250 ms</text>
+    <text x="720" y="148" text-anchor="middle" fill="#475569">word count + dirty flag</text>
+    <text x="720" y="164" text-anchor="middle" fill="#94a3b8" font-size="11">status bar updates</text>
+  </g>
+
+  <g>
+    <rect x="880" y="100" width="200" height="76" rx="10" fill="#fefce8" stroke="#a16207"/>
+    <text x="980" y="128" text-anchor="middle" font-weight="700" fill="#854d0e">4. Debounce 5 s</text>
+    <text x="980" y="148" text-anchor="middle" fill="#475569">commit triggered</text>
+    <text x="980" y="164" text-anchor="middle" fill="#94a3b8" font-size="11">or on blur / explicit save</text>
+  </g>
+
+  <line x1="280" y1="138" x2="318" y2="138" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="560" y1="138" x2="598" y2="138" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="840" y1="138" x2="878" y2="138" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- Layer separator -->
+  <line x1="40" y1="216" x2="1080" y2="216" stroke="#cbd5e1" stroke-dasharray="4 4"/>
+  <text x="60" y="232" font-size="11" fill="#94a3b8">UI thread above • Rust core below</text>
+
+  <!-- Step 5 -->
+  <g>
+    <rect x="40" y="248" width="240" height="76" rx="10" fill="#ecfdf5" stroke="#047857"/>
+    <text x="160" y="276" text-anchor="middle" font-weight="700" fill="#047857">5. IPC scene.save</text>
+    <text x="160" y="296" text-anchor="middle" fill="#475569">{node_id, pm_json, hash}</text>
+    <text x="160" y="312" text-anchor="middle" fill="#94a3b8" font-size="11">typed via booksforge-ipc</text>
+  </g>
+
+  <!-- Step 6 -->
+  <g>
+    <rect x="320" y="248" width="240" height="76" rx="10" fill="#fdf2f8" stroke="#9d174d"/>
+    <text x="440" y="276" text-anchor="middle" font-weight="700" fill="#9d174d">6. Recovery log append</text>
+    <text x="440" y="296" text-anchor="middle" fill="#475569">.recovery.log (atomic)</text>
+    <text x="440" y="312" text-anchor="middle" fill="#94a3b8" font-size="11">FIRST — survives crash</text>
+  </g>
+
+  <!-- Step 7 -->
+  <g>
+    <rect x="600" y="248" width="240" height="76" rx="10" fill="#fdf2f8" stroke="#9d174d"/>
+    <text x="720" y="276" text-anchor="middle" font-weight="700" fill="#9d174d">7. SQLite UPDATE</text>
+    <text x="720" y="296" text-anchor="middle" fill="#475569">scene_content (zstd, hash)</text>
+    <text x="720" y="312" text-anchor="middle" fill="#94a3b8" font-size="11">single-writer task, WAL</text>
+  </g>
+
+  <!-- Step 8 -->
+  <g>
+    <rect x="880" y="248" width="200" height="76" rx="10" fill="#fdf2f8" stroke="#9d174d"/>
+    <text x="980" y="276" text-anchor="middle" font-weight="700" fill="#9d174d">8. ACK to UI</text>
+    <text x="980" y="296" text-anchor="middle" fill="#475569">scene.saved event</text>
+    <text x="980" y="312" text-anchor="middle" fill="#94a3b8" font-size="11">"Saved" indicator</text>
+  </g>
+
+  <line x1="280" y1="286" x2="318" y2="286" stroke="#047857" stroke-width="2" marker-end="url(#agreen)"/>
+  <line x1="560" y1="286" x2="598" y2="286" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="840" y1="286" x2="878" y2="286" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- Step 9 -->
+  <g>
+    <rect x="320" y="364" width="240" height="76" rx="10" fill="#fdf2f8" stroke="#9d174d"/>
+    <text x="440" y="392" text-anchor="middle" font-weight="700" fill="#9d174d">9. Markdown mirror</text>
+    <text x="440" y="412" text-anchor="middle" fill="#475569">manuscript/.../scene.md</text>
+    <text x="440" y="428" text-anchor="middle" fill="#94a3b8" font-size="11">async; tmp + rename</text>
+  </g>
+
+  <!-- Step 10 -->
+  <g>
+    <rect x="600" y="364" width="240" height="76" rx="10" fill="#fdf2f8" stroke="#9d174d"/>
+    <text x="720" y="392" text-anchor="middle" font-weight="700" fill="#9d174d">10. Truncate recovery entry</text>
+    <text x="720" y="412" text-anchor="middle" fill="#475569">data is durable</text>
+    <text x="720" y="428" text-anchor="middle" fill="#94a3b8" font-size="11">recovery log shrinks</text>
+  </g>
+
+  <line x1="440" y1="324" x2="440" y2="362" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="720" y1="324" x2="720" y2="362" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="560" y1="402" x2="598" y2="402" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- Step 11 (snapshot scheduler) -->
+  <g>
+    <rect x="320" y="476" width="520" height="76" rx="10" fill="#fefce8" stroke="#a16207"/>
+    <text x="580" y="504" text-anchor="middle" font-weight="700" fill="#854d0e">11. Snapshot scheduler (every N saves OR every M minutes OR pre-AI/pre-export)</text>
+    <text x="580" y="524" text-anchor="middle" fill="#475569">Walks scope, computes hashes, dedupe-writes objects to snapshots/objects/</text>
+    <text x="580" y="540" text-anchor="middle" fill="#94a3b8" font-size="11">storage growth ≈ size of changed nodes only</text>
+  </g>
+  <line x1="580" y1="442" x2="580" y2="474" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- Failure modes box -->
+  <g>
+    <rect x="40" y="592" width="1040" height="100" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="60" y="616" font-weight="700" fill="#0f172a">Crash recovery surfaces (in order of preference)</text>
+    <text x="60" y="640" fill="#334155" font-size="12">A. Power-off between SQLite commit and Markdown mirror → mirror reconstructed at next launch from SQLite</text>
+    <text x="60" y="660" fill="#334155" font-size="12">B. Power-off mid-SQLite commit → WAL replay handles it; recovery log replays any post-WAL entries</text>
+    <text x="60" y="680" fill="#334155" font-size="12">C. Catastrophic loss → most recent snapshot (≤ snapshot interval) is the recovery surface; user prompted</text>
+  </g>
+</svg>

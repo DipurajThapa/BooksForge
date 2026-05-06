@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1300 720" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12">
+  <rect width="1300" height="720" fill="#fff"/>
+  <text x="650" y="36" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">Roadmap — phases mapped to weeks</text>
+  <text x="650" y="58" text-anchor="middle" font-size="12" fill="#64748b">MVP at week 18 • V1.0 at month 8 • V1.5 at month 14 • V2.0 at month 18</text>
+
+  <!-- Timeline header -->
+  <g>
+    <line x1="280" y1="100" x2="1280" y2="100" stroke="#0f172a" stroke-width="1.5"/>
+    <line x1="280" y1="660" x2="1280" y2="660" stroke="#0f172a" stroke-width="1.5"/>
+  </g>
+
+  <!-- month markers -->
+  <g font-size="11" fill="#475569">
+    <g><line x1="280" y1="100" x2="280" y2="660" stroke="#e2e8f0"/><text x="280" y="92" text-anchor="middle">M0</text></g>
+    <g><line x1="380" y1="100" x2="380" y2="660" stroke="#e2e8f0"/><text x="380" y="92" text-anchor="middle">M2</text></g>
+    <g><line x1="480" y1="100" x2="480" y2="660" stroke="#e2e8f0"/><text x="480" y="92" text-anchor="middle">M4</text></g>
+    <g><line x1="580" y1="100" x2="580" y2="660" stroke="#cbd5e1" stroke-dasharray="4 4"/><text x="580" y="92" text-anchor="middle" font-weight="700">MVP</text></g>
+    <g><line x1="680" y1="100" x2="680" y2="660" stroke="#e2e8f0"/><text x="680" y="92" text-anchor="middle">M6</text></g>
+    <g><line x1="780" y1="100" x2="780" y2="660" stroke="#cbd5e1" stroke-dasharray="4 4"/><text x="780" y="92" text-anchor="middle" font-weight="700">V1.0</text></g>
+    <g><line x1="880" y1="100" x2="880" y2="660" stroke="#e2e8f0"/><text x="880" y="92" text-anchor="middle">M10</text></g>
+    <g><line x1="980" y1="100" x2="980" y2="660" stroke="#e2e8f0"/><text x="980" y="92" text-anchor="middle">M12</text></g>
+    <g><line x1="1080" y1="100" x2="1080" y2="660" stroke="#cbd5e1" stroke-dasharray="4 4"/><text x="1080" y="92" text-anchor="middle" font-weight="700">V1.5</text></g>
+    <g><line x1="1180" y1="100" x2="1180" y2="660" stroke="#e2e8f0"/><text x="1180" y="92" text-anchor="middle">M16</text></g>
+    <g><line x1="1280" y1="100" x2="1280" y2="660" stroke="#cbd5e1" stroke-dasharray="4 4"/><text x="1280" y="92" text-anchor="middle" font-weight="700">V2.0</text></g>
+  </g>
+
+  <!-- Bars (each row = phase). x = 280 + (week/72)*1000 ; we approximate -->
+  <!-- 1 month = 50 px, week ≈ 12.5 px -->
+  <g font-size="12">
+    <!-- 0 Bootstrap weeks 0-2 -->
+    <text x="270" y="124" text-anchor="end">0 Bootstrap</text>
+    <rect x="280" y="112" width="25" height="22" rx="4" fill="#1d4ed8"/>
+
+    <!-- 1 Foundations w2-6 -->
+    <text x="270" y="148" text-anchor="end">1 Foundations</text>
+    <rect x="305" y="136" width="50" height="22" rx="4" fill="#1d4ed8"/>
+
+    <!-- 2 Editor core w4-10 -->
+    <text x="270" y="172" text-anchor="end">2 Editor core</text>
+    <rect x="330" y="160" width="75" height="22" rx="4" fill="#1d4ed8"/>
+
+    <!-- 3 Local AI w8-14 -->
+    <text x="270" y="196" text-anchor="end">3 Local AI</text>
+    <rect x="380" y="184" width="75" height="22" rx="4" fill="#1d4ed8"/>
+
+    <!-- 4 Export w10-16 -->
+    <text x="270" y="220" text-anchor="end">4 Export pipeline</text>
+    <rect x="405" y="208" width="75" height="22" rx="4" fill="#1d4ed8"/>
+
+    <!-- 5 Validators+templates w14-18 -->
+    <text x="270" y="244" text-anchor="end">5 Validators+Templates</text>
+    <rect x="455" y="232" width="50" height="22" rx="4" fill="#1d4ed8"/>
+
+    <!-- MVP marker -->
+    <text x="270" y="268" text-anchor="end" font-weight="700" fill="#a16207">MVP beta</text>
+    <rect x="555" y="256" width="50" height="22" rx="4" fill="#a16207"/>
+    <text x="610" y="271" fill="#475569">Win + Mac, fiction mode</text>
+
+    <!-- 6 Non-fiction & academic w18-24 -->
+    <text x="270" y="300" text-anchor="end">6 Non-fiction + academic</text>
+    <rect x="555" y="288" width="75" height="22" rx="4" fill="#047857"/>
+
+    <!-- 7 Plugin runtime w22-28 -->
+    <text x="270" y="324" text-anchor="end">7 Plugin runtime</text>
+    <rect x="605" y="312" width="75" height="22" rx="4" fill="#047857"/>
+
+    <!-- 8 Linux+signing w26-30 -->
+    <text x="270" y="348" text-anchor="end">8 Linux + signing</text>
+    <rect x="655" y="336" width="50" height="22" rx="4" fill="#047857"/>
+
+    <!-- 9 Encryption+backups w28-32 -->
+    <text x="270" y="372" text-anchor="end">9 Encryption + backups</text>
+    <rect x="680" y="360" width="50" height="22" rx="4" fill="#047857"/>
+
+    <!-- V1.0 marker -->
+    <text x="270" y="396" text-anchor="end" font-weight="700" fill="#1d4ed8">V1.0 GA</text>
+    <rect x="755" y="384" width="50" height="22" rx="4" fill="#1d4ed8"/>
+    <text x="810" y="399" fill="#475569">All-OS, code-signed</text>
+
+    <!-- 10 Marketplace + cloud LLM m9-11 -->
+    <text x="270" y="428" text-anchor="end">10 Marketplace + Cloud LLM</text>
+    <rect x="805" y="416" width="100" height="22" rx="4" fill="#9333ea"/>
+
+    <!-- 11 Sync m11-13 -->
+    <text x="270" y="452" text-anchor="end">11 E2EE Sync</text>
+    <rect x="905" y="440" width="100" height="22" rx="4" fill="#9333ea"/>
+
+    <!-- 12 Collab m12-14 -->
+    <text x="270" y="476" text-anchor="end">12 Collaboration v1</text>
+    <rect x="955" y="464" width="100" height="22" rx="4" fill="#9333ea"/>
+
+    <!-- V1.5 marker -->
+    <text x="270" y="500" text-anchor="end" font-weight="700" fill="#9333ea">V1.5</text>
+    <rect x="1055" y="488" width="50" height="22" rx="4" fill="#9333ea"/>
+    <text x="1115" y="503" fill="#475569">Marketplace + Studio + sync</text>
+
+    <!-- 13 Plugin write caps m15-16 -->
+    <text x="270" y="532" text-anchor="end">13 Plugin write caps</text>
+    <rect x="1105" y="520" width="50" height="22" rx="4" fill="#dc2626"/>
+
+    <!-- 14 Voice + advanced AI m15-17 -->
+    <text x="270" y="556" text-anchor="end">14 Voice + advanced AI</text>
+    <rect x="1105" y="544" width="100" height="22" rx="4" fill="#dc2626"/>
+
+    <!-- 15 Translator pack m16-18 -->
+    <text x="270" y="580" text-anchor="end">15 Translator pack</text>
+    <rect x="1155" y="568" width="100" height="22" rx="4" fill="#dc2626"/>
+
+    <!-- V2.0 -->
+    <text x="270" y="604" text-anchor="end" font-weight="700" fill="#dc2626">V2.0</text>
+    <rect x="1255" y="592" width="25" height="22" rx="4" fill="#dc2626"/>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(280,632)">
+    <rect width="14" height="14" fill="#1d4ed8"/><text x="22" y="12" font-size="12">Pre-MVP / Foundations</text>
+    <rect x="180" width="14" height="14" fill="#a16207"/><text x="202" y="12" font-size="12">MVP milestone</text>
+    <rect x="320" width="14" height="14" fill="#047857"/><text x="342" y="12" font-size="12">V1.0 phases</text>
+    <rect x="450" width="14" height="14" fill="#9333ea"/><text x="472" y="12" font-size="12">V1.5 phases</text>
+    <rect x="580" width="14" height="14" fill="#dc2626"/><text x="602" y="12" font-size="12">V2.0 phases</text>
+  </g>
+
+  <text x="280" y="690" font-size="11" fill="#94a3b8" font-style="italic">Bars are illustrative; the canonical schedule lives in 10-roadmap-and-phasing.md.</text>
+</svg>

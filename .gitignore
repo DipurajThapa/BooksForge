@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+
+# Audit / session artefacts (Claude Code harness)
+audit.jsonl
+shim-lib/
+shim-perm/
+uploads/
+
+# Rust (applies once booksforge/ workspace is created)
+target/
+Cargo.lock   # keep for binary crates; remove this line after MZ-01
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+
+# Tauri
+apps/desktop/src-ui/dist/
+apps/desktop/src-ui/.vite/
+
+# IDE
+.idea/
+.vscode/
+
+# Secrets / local env
+.env
+.env.local
+*.pem

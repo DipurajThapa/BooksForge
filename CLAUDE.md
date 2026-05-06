@@ -24,12 +24,15 @@ All specification and planning documents live under `outputs/`. When MZ-01 compl
 
 | Layer | Technology |
 |-------|-----------|
-| App shell | Tauri v2 (Rust + WebView) |
-| Frontend | React + TypeScript, Vite, TipTap (ProseMirror) |
-| Rust backend | Cargo workspace, `sqlx` (SQLite), `tokio`, `thiserror`, MiniJinja |
+| App shell | Tauri `2.2.3` (Rust + WebView) |
+| Frontend | React `18.3.x`, TypeScript `5.6.3`, Vite `5.4.x`, TipTap (ProseMirror) |
+| Rust | `1.82.0` (Edition 2021, MSRV), Cargo workspace, `sqlx` (SQLite), `tokio`, `thiserror`, MiniJinja |
+| JS runtime | Node.js `22.11.0` LTS, pnpm `9.12.3` |
 | Local LLM | Ollama over `127.0.0.1:11434` |
-| Export sidecars | Pandoc (DOCX/PDF), `booksforge-export-epub` (Rust crate), EPUBCheck |
-| CI matrix | `macos-14`, `macos-13`, `windows-2022` |
+| Export sidecars | Pandoc `3.5` (DOCX/PDF), `booksforge-export-epub` (Rust crate), EPUBCheck `5.1.0` |
+| CI matrix | `macos-14`, `macos-13`, `windows-2022` (gating) + `ubuntu-22.04` (smoke) |
+
+Exact pins and seed config files are in `outputs/TOOLCHAIN.md` (authoritative).
 
 ---
 
@@ -118,10 +121,12 @@ Load only what the task needs:
 | Task area | Documents to load |
 |-----------|------------------|
 | First coding task | `outputs/IMPLEMENTATION_PLAN.md §3` (MZ-01) |
+| Tool version pins | `outputs/TOOLCHAIN.md` |
 | Agent work | `outputs/AGENTS.md`, `outputs/MEMORY_SYSTEM.md` |
 | Schema / storage | `outputs/DATA_MODEL.md` |
 | Export / EPUB | `outputs/EXPORT_EPUB_SPEC.md`, `outputs/EXPORT_EPUB_QA.md` |
 | Editor / UI | `outputs/UI_UX_SPEC.md`, `outputs/ARCHITECTURE.md §3` |
+| UI visual tokens | `outputs/DESIGN_SYSTEM.md` |
 | Vocabulary | `outputs/VOCABULARY_DICTIONARIES.md` |
 | Security | `outputs/SECURITY_PRIVACY.md` |
 | Decisions | `outputs/ARCHITECTURE_DECISIONS.md`, `outputs/CONSISTENCY_MATRIX.md` |
