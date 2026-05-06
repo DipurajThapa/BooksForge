@@ -3,15 +3,18 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   CreateProjectInput,
+  ModelListEntry,
   NodeCreateInput,
   NodeInfo,
   NodeUpdateInput,
+  OllamaProbeResult,
   OpenProjectInput,
   OpenProjectResult,
   RecentProjectEntry,
   RecoveryStatus,
   SceneLoadResult,
   SceneSaveInput,
+  SmokeTestResult,
 } from "@booksforge/shared-types";
 
 export const ipc = {
@@ -57,5 +60,22 @@ export const ipc = {
   },
   recoveryClear(): Promise<void> {
     return invoke("recovery_clear");
+  },
+
+  // ── Ollama / AI setup ─────────────────────────────────────────────────────
+  ollamaProbe(): Promise<OllamaProbeResult> {
+    return invoke("ollama_probe");
+  },
+  ollamaLaunch(): Promise<void> {
+    return invoke("ollama_launch");
+  },
+  ollamaListModels(): Promise<ModelListEntry[]> {
+    return invoke("ollama_list_models");
+  },
+  ollamaPull(model: string): Promise<void> {
+    return invoke("ollama_pull", { model });
+  },
+  ollamaSmokeTest(model: string): Promise<SmokeTestResult> {
+    return invoke("ollama_smoke_test", { model });
   },
 };

@@ -19,6 +19,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::system::app_version,
             commands::system::ollama_status,
+            commands::ollama::ollama_probe,
+            commands::ollama::ollama_launch,
+            commands::ollama::ollama_list_models,
+            commands::ollama::ollama_pull,
+            commands::ollama::ollama_smoke_test,
             commands::project::project_create,
             commands::project::project_open,
             commands::project::project_close,

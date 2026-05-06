@@ -17,6 +17,10 @@ export type { CreateProjectInput } from "./bindings/CreateProjectInput";
 export type { OpenProjectInput } from "./bindings/OpenProjectInput";
 export type { OpenProjectResult } from "./bindings/OpenProjectResult";
 export type { RecentProjectEntry } from "./bindings/RecentProjectEntry";
+export type { OllamaProbeResult } from "./bindings/OllamaProbeResult";
+export type { ModelListEntry } from "./bindings/ModelListEntry";
+export type { PullProgressPayload } from "./bindings/PullProgressPayload";
+export type { SmokeTestResult } from "./bindings/SmokeTestResult";
 
 // Non-generated types used by Tauri command responses.
 export interface OllamaStatusResponse {

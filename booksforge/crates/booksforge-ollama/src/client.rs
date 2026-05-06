@@ -7,7 +7,7 @@ use reqwest::Client;
 use crate::{
     types::{
         CancelToken, ChatOutcome, ChatRequest, GenerateOutcome, GenerateRequest, LocalModel,
-        OllamaVersion, ProgressSink, PullProgress, TokenSink,
+        ModelInfo, OllamaVersion, ProgressSink, PullProgress, TokenSink,
     },
     OllamaError,
 };
@@ -23,6 +23,9 @@ pub trait OllamaClient: Send + Sync {
 
     /// `GET /api/tags` — lists all locally available models.
     async fn list_local_models(&self) -> Result<Vec<LocalModel>, OllamaError>;
+
+    /// `POST /api/show` — returns detailed metadata for an installed model.
+    async fn show(&self, model: &str) -> Result<ModelInfo, OllamaError>;
 
     /// `POST /api/pull` — downloads a model; streams NDJSON progress events to `progress`.
     async fn pull(&self, model: &str, progress: ProgressSink) -> Result<(), OllamaError>;
@@ -128,6 +131,57 @@ impl OllamaClient for HttpOllamaClient {
         Ok(tags.models)
     }
 
+    async fn show(&self, model: &str) -> Result<ModelInfo, OllamaError> {
+        #[derive(serde::Serialize)]
+        struct ShowBody<'a> { name: &'a str }
+
+        #[derive(serde::Deserialize)]
+        struct ShowDetails {
+            family:             Option<String>,
+            parameter_size:     Option<String>,
+            quantization_level: Option<String>,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct ShowResponse {
+            details: Option<ShowDetails>,
+        }
+
+        let resp = self
+            .http
+            .post(format!("{}/api/show", self.base_url))
+            .json(&ShowBody { name: model })
+            .send()
+            .await
+            .map_err(|e| {
+                if e.is_connect() { OllamaError::NotRunning } else { OllamaError::Request(e) }
+            })?;
+
+        if resp.status().as_u16() == 404 {
+            return Err(OllamaError::ModelNotFound { model: model.to_owned() });
+        }
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(OllamaError::Http { status, body });
+        }
+
+        let show: ShowResponse = resp.json().await?;
+        let details = show.details.unwrap_or(ShowDetails {
+            family: None,
+            parameter_size: None,
+            quantization_level: None,
+        });
+
+        Ok(ModelInfo {
+            name:               model.to_owned(),
+            digest:             None, // digest is available via /api/tags — use list_local_models
+            family:             details.family,
+            parameter_size:     details.parameter_size,
+            quantization_level: details.quantization_level,
+        })
+    }
+
     async fn pull(&self, model: &str, progress: ProgressSink) -> Result<(), OllamaError> {
         #[derive(serde::Serialize)]
         struct PullBody<'a> { name: &'a str, stream: bool }
@@ -182,7 +236,7 @@ impl OllamaClient for HttpOllamaClient {
     async fn generate(
         &self,
         mut request: GenerateRequest,
-        sink: TokenSink,
+        mut sink: TokenSink,
         cancel: CancelToken,
     ) -> Result<GenerateOutcome, OllamaError> {
         request.stream = true;
@@ -260,7 +314,7 @@ impl OllamaClient for HttpOllamaClient {
     async fn chat(
         &self,
         mut request: ChatRequest,
-        sink: TokenSink,
+        mut sink: TokenSink,
         cancel: CancelToken,
     ) -> Result<ChatOutcome, OllamaError> {
         request.stream = true;

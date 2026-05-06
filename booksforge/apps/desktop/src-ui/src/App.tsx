@@ -4,6 +4,7 @@ import type { AppVersion, OpenProjectResult, OllamaStatusResponse } from "@books
 import ProjectPicker from "./components/ProjectPicker";
 import NewProjectWizard from "./components/NewProjectWizard";
 import EditorShell from "./components/EditorShell";
+import OllamaWizard from "./components/OllamaWizard";
 
 type AppView =
   | { tag: "picker" }
@@ -14,6 +15,7 @@ export default function App() {
   const [view, setView] = useState<AppView>({ tag: "picker" });
   const [ollama, setOllama] = useState<OllamaStatusResponse | null>(null);
   const [version, setVersion] = useState<AppVersion | null>(null);
+  const [showOllamaWizard, setShowOllamaWizard] = useState(false);
 
   useEffect(() => {
     invoke<AppVersion>("app_version").then(setVersion).catch(() => null);
@@ -37,7 +39,11 @@ export default function App() {
 
   return (
     <>
-      <OllamaStatusBar ollama={ollama} version={version} />
+      <OllamaStatusBar
+        ollama={ollama}
+        version={version}
+        onOpenWizard={() => setShowOllamaWizard(true)}
+      />
       <ProjectPicker
         onProjectOpened={handleProjectOpened}
         onNewProject={() => setView({ tag: "new-project" })}
@@ -48,6 +54,19 @@ export default function App() {
           onCancel={() => setView({ tag: "picker" })}
         />
       )}
+      {showOllamaWizard && (
+        <OllamaWizard
+          onClose={() => setShowOllamaWizard(false)}
+          onComplete={(modelId) => {
+            setShowOllamaWizard(false);
+            // Refresh Ollama status after wizard completes.
+            invoke<OllamaStatusResponse>("ollama_status")
+              .then(setOllama)
+              .catch(() => null);
+            void modelId; // model stored in project settings in MZ-05+
+          }}
+        />
+      )}
     </>
   );
 }
@@ -55,9 +74,11 @@ export default function App() {
 function OllamaStatusBar({
   ollama,
   version,
+  onOpenWizard,
 }: {
   ollama: OllamaStatusResponse | null;
   version: AppVersion | null;
+  onOpenWizard: () => void;
 }) {
   if (!ollama && !version) return null;
   const dotColor = !ollama
@@ -68,11 +89,18 @@ function OllamaStatusBar({
   const title = !ollama
     ? "Checking…"
     : ollama.running
-    ? `Ollama ${ollama.version ?? "running"}`
-    : "Ollama offline";
+    ? `Ollama ${ollama.version ?? "running"} — click to manage`
+    : "Ollama offline — click to set up";
   return (
     <div style={s.bar}>
-      <span style={{ ...s.dot, background: dotColor }} title={title} />
+      <button
+        style={{ ...s.dotBtn, background: "none", border: "none", cursor: "pointer", padding: 0 }}
+        onClick={onOpenWizard}
+        title={title}
+        aria-label={title}
+      >
+        <span style={{ ...s.dot, background: dotColor }} />
+      </button>
       {version && (
         <span style={s.ver}>
           v{version.major}.{version.minor}.{version.patch}
@@ -92,6 +120,10 @@ const s: Record<string, React.CSSProperties> = {
     gap: "var(--space-2)",
     zIndex: 200,
     pointerEvents: "none",
+  },
+  dotBtn: {
+    display: "flex",
+    alignItems: "center",
   },
   dot: {
     width: 8,

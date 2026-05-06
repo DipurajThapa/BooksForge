@@ -95,6 +95,18 @@ pub struct ChatOutcome {
     pub total_duration_ns:  u64,
 }
 
+/// Detailed model metadata returned by `POST /api/show`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelInfo {
+    /// Ollama model tag.
+    pub name:        String,
+    /// Digest hash (sha256:…) for audit logging.
+    pub digest:      Option<String>,
+    pub family:      Option<String>,
+    pub parameter_size: Option<String>,
+    pub quantization_level: Option<String>,
+}
+
 /// Progress event emitted during `pull()` — mirrors Ollama's NDJSON stream.
 #[derive(Debug, Clone)]
 pub struct PullProgress {
@@ -109,7 +121,8 @@ pub type ProgressSink = Box<dyn Fn(PullProgress) + Send>;
 
 /// Callback type used by `OllamaClient::generate` / `chat` to stream tokens.
 /// Called once per token fragment as Ollama streams the response.
-pub type TokenSink = Box<dyn Fn(&str) + Send>;
+/// Uses `FnMut` so callers can accumulate tokens into a local buffer.
+pub type TokenSink = Box<dyn FnMut(&str) + Send>;
 
 /// Cooperative cancellation token shared between the orchestrator and an
 /// in-flight Ollama request.  `cancel()` is idempotent.

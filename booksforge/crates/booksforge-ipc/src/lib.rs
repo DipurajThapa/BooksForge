@@ -15,6 +15,7 @@
 
 pub mod editor;
 pub mod error;
+pub mod ollama;
 pub mod project;
 pub mod system;
 
@@ -22,6 +23,7 @@ pub use editor::{
     NodeCreateInput, NodeInfo, NodeUpdateInput, RecoveryStatus, SceneLoadResult, SceneSaveInput,
 };
 pub use error::BooksForgeError;
+pub use ollama::{ModelListEntry, OllamaProbeResult, PullProgressPayload, SmokeTestResult};
 pub use project::{CreateProjectInput, OpenProjectInput, OpenProjectResult, RecentProjectEntry};
 pub use system::AppVersion;
 
@@ -68,5 +70,14 @@ mod ts_bindings {
             .expect("failed to export OpenProjectResult");
         RecentProjectEntry::export_all_to(BINDINGS_DIR)
             .expect("failed to export RecentProjectEntry");
+    }
+
+    #[test]
+    fn export_ollama_bindings() {
+        use crate::ollama::*;
+        OllamaProbeResult::export_all_to(BINDINGS_DIR).expect("OllamaProbeResult");
+        ModelListEntry::export_all_to(BINDINGS_DIR).expect("ModelListEntry");
+        PullProgressPayload::export_all_to(BINDINGS_DIR).expect("PullProgressPayload");
+        SmokeTestResult::export_all_to(BINDINGS_DIR).expect("SmokeTestResult");
     }
 }

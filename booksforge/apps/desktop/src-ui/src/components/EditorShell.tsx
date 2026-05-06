@@ -11,6 +11,7 @@ import type { JSONContent } from "@tiptap/core";
 import type { NodeInfo, OpenProjectResult, RecoveryStatus, SceneLoadResult } from "@booksforge/shared-types";
 import { SceneEditor } from "@booksforge/editor";
 import Binder from "./Binder";
+import OllamaWizard from "./OllamaWizard";
 import RecoveryDialog from "./RecoveryDialog";
 import { ipc } from "../lib/ipc";
 
@@ -25,6 +26,7 @@ export default function EditorShell({ project, onClose }: Props) {
   const [sceneContent, setSceneContent] = useState<SceneLoadResult | null>(null);
   const [recovery, setRecovery] = useState<RecoveryStatus | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showOllamaWizard, setShowOllamaWizard] = useState(false);
 
   // Load node list.
   const refreshNodes = useCallback(async () => {
@@ -100,6 +102,13 @@ export default function EditorShell({ project, onClose }: Props) {
         <div style={s.headerRight}>
           {saving && <span style={s.savingDot} title="Saving…" />}
           <button
+            style={s.aiBtn}
+            onClick={() => setShowOllamaWizard(true)}
+            title="AI Setup"
+          >
+            AI Setup
+          </button>
+          <button
             style={s.closeBtn}
             onClick={() => {
               ipc.projectClose().catch(() => null);
@@ -153,6 +162,14 @@ export default function EditorShell({ project, onClose }: Props) {
           onDiscard={handleRecoveryDiscard}
         />
       )}
+
+      {/* ── Ollama Setup Wizard ── */}
+      {showOllamaWizard && (
+        <OllamaWizard
+          onClose={() => setShowOllamaWizard(false)}
+          onComplete={() => setShowOllamaWizard(false)}
+        />
+      )}
     </div>
   );
 }
@@ -202,6 +219,17 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: "50%",
     background: "var(--color-amber-400, #fbbf24)",
     display: "inline-block",
+  },
+  aiBtn: {
+    background: "none",
+    border: "1px solid var(--color-amber-400, #fbbf24)",
+    borderRadius: 4,
+    fontSize: 12,
+    color: "var(--color-amber-600)",
+    padding: "2px var(--space-2)",
+    cursor: "pointer",
+    fontFamily: "var(--font-ui)",
+    fontWeight: 600,
   },
   closeBtn: {
     background: "none",

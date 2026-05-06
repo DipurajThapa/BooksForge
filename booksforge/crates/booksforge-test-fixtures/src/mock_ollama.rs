@@ -149,6 +149,16 @@ impl OllamaClient for MockOllamaClient {
         }
     }
 
+    async fn show(&self, model: &str) -> Result<booksforge_ollama::ModelInfo, OllamaError> {
+        Ok(booksforge_ollama::ModelInfo {
+            name:               model.to_owned(),
+            digest:             Some("sha256:mock".into()),
+            family:             Some("mock".into()),
+            parameter_size:     Some("7B".into()),
+            quantization_level: Some("Q4_K_M".into()),
+        })
+    }
+
     async fn pull(
         &self,
         model: &str,
@@ -171,7 +181,7 @@ impl OllamaClient for MockOllamaClient {
     async fn generate(
         &self,
         request: GenerateRequest,
-        sink: TokenSink,
+        mut sink: TokenSink,
         _cancel: CancelToken,
     ) -> Result<GenerateOutcome, OllamaError> {
         self.generated.lock().unwrap().push(request.prompt.clone());
@@ -201,7 +211,7 @@ impl OllamaClient for MockOllamaClient {
     async fn chat(
         &self,
         request: ChatRequest,
-        sink: TokenSink,
+        mut sink: TokenSink,
         _cancel: CancelToken,
     ) -> Result<ChatOutcome, OllamaError> {
         self.chatted.lock().unwrap().push(request.messages.clone());

@@ -6,16 +6,19 @@
 //! The `OllamaClient` trait is the stable interface; `HttpOllamaClient` is the
 //! production implementation.  Tests inject a mock via the trait.
 
-#![forbid(unsafe_code)]
+// probe.rs uses `unsafe` for the Windows GlobalMemoryStatusEx API.
+// All other modules are safe.
+#![cfg_attr(not(target_os = "windows"), forbid(unsafe_code))]
 
 pub mod client;
+pub mod probe;
 pub mod registry;
 pub mod types;
 
 pub use client::{HttpOllamaClient, OllamaClient};
 pub use types::{
     CancelToken, ChatMessage, ChatOutcome, ChatRequest, GenerateOutcome, GenerateRequest,
-    LocalModel, OllamaVersion, ProgressSink, PullProgress, TokenSink,
+    LocalModel, ModelInfo, OllamaVersion, ProgressSink, PullProgress, TokenSink,
 };
 
 #[derive(Debug, thiserror::Error)]
