@@ -20,10 +20,12 @@ booksforge-ollama       = { path = "../../crates/booksforge-ollama" }
 booksforge-orchestrator = { path = "../../crates/booksforge-orchestrator" }
 booksforge-agents       = { path = "../../crates/booksforge-agents" }
 
-tauri.workspace         = true
-serde.workspace         = true
-serde_json.workspace    = true
-thiserror.workspace     = true
-tokio.workspace         = true
-tracing.workspace       = true
+tauri.workspace              = true
+tauri-plugin-dialog.workspace = true
+chrono.workspace             = true
+serde.workspace              = true
+serde_json.workspace         = true
+thiserror.workspace          = true
+tokio.workspace              = true
+tracing.workspace            = true
 tracing-subscriber.workspace = true

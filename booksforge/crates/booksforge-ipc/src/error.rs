@@ -37,3 +37,17 @@ pub enum BooksForgeError {
     #[error("internal error — please report this: {message}")]
     Internal { message: String },
 }
+
+impl BooksForgeError {
+    pub fn internal(message: impl Into<String>) -> Self {
+        Self::Internal { message: message.into() }
+    }
+
+    pub fn not_found(resource: impl Into<String>) -> Self {
+        Self::NotFound { resource: resource.into() }
+    }
+
+    pub fn validation(message: impl Into<String>) -> Self {
+        Self::Validation { message: message.into() }
+    }
+}

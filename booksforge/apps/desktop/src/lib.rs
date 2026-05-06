@@ -14,9 +14,15 @@ pub fn run() {
         .init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .manage(state::AppState::new())
         .invoke_handler(tauri::generate_handler![
             commands::system::app_version,
             commands::system::ollama_status,
+            commands::project::project_create,
+            commands::project::project_open,
+            commands::project::project_close,
+            commands::project::project_recent,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri app failed to run");

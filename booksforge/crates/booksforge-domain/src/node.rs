@@ -39,15 +39,16 @@ pub enum NodeStatus {
 
 /// A node in the document tree (Project → Part → Chapter → Scene).
 ///
-/// `position` is a LexoRank integer: siblings are ordered by ascending value.
-/// Rebalancing is handled in the storage layer — the domain layer only compares.
+/// `position` is a LexoRank string (e.g. `"0|hzzzzz:"`).  Siblings are
+/// ordered lexicographically.  Rebalancing is handled in the storage layer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node {
     pub id:           Ulid,
     pub parent_id:    Option<Ulid>,
     pub kind:         NodeKind,
     pub title:        String,
-    pub position:     i64,
+    /// LexoRank string — lexicographic ordering.  Default: `"0|hzzzzz:"`.
+    pub position:     String,
     pub status:       NodeStatus,
     pub pov:          Option<String>,
     pub beat:         Option<String>,
@@ -58,6 +59,8 @@ pub struct Node {
 }
 
 impl Node {
+    pub const DEFAULT_POSITION: &'static str = "0|hzzzzz:";
+
     pub fn is_deleted(&self) -> bool {
         self.deleted_at.is_some()
     }
@@ -67,12 +70,17 @@ impl Node {
 ///
 /// `pm_doc` is the ProseMirror document serialised as JSON. The storage layer
 /// writes it verbatim; the editor layer owns interpretation.
+///
+/// `hash` is the blake3 hex digest of the JSON representation, updated on
+/// every save.  It is used for snapshot deduplication and change detection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SceneContent {
     pub node_id:    Ulid,
     pub pm_doc:     serde_json::Value,
     pub word_count: u32,
     pub char_count: u32,
+    /// blake3 hex hash of `pm_doc` (updated on every save).
+    pub hash:       String,
     pub updated_at: DateTime<Utc>,
 }
 

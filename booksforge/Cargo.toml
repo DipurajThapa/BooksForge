@@ -32,8 +32,9 @@ license      = "UNLICENSED"
 [workspace.dependencies]
 
 # Tauri — exact pins per TOOLCHAIN.md
-tauri       = { version = "=2.2.3", features = ["protocol-asset"] }
-tauri-build = { version = "=2.2.3" }
+tauri               = { version = "=2.2.3", features = ["protocol-asset"] }
+tauri-build         = { version = "=2.2.3" }
+tauri-plugin-dialog = "2"
 
 # Async runtime
 tokio       = { version = "1", features = ["full"] }

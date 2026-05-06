@@ -14,9 +14,11 @@
 #![forbid(unsafe_code)]
 
 pub mod error;
+pub mod project;
 pub mod system;
 
 pub use error::BooksForgeError;
+pub use project::{CreateProjectInput, OpenProjectInput, OpenProjectResult, RecentProjectEntry};
 pub use system::AppVersion;
 
 // ── ts-rs export test ────────────────────────────────────────────────────────
@@ -38,5 +40,18 @@ mod ts_bindings {
     fn export_error_bindings() {
         crate::BooksForgeError::export_all_to(BINDINGS_DIR)
             .expect("failed to export BooksForgeError bindings");
+    }
+
+    #[test]
+    fn export_project_bindings() {
+        use crate::project::*;
+        CreateProjectInput::export_all_to(BINDINGS_DIR)
+            .expect("failed to export CreateProjectInput");
+        OpenProjectInput::export_all_to(BINDINGS_DIR)
+            .expect("failed to export OpenProjectInput");
+        OpenProjectResult::export_all_to(BINDINGS_DIR)
+            .expect("failed to export OpenProjectResult");
+        RecentProjectEntry::export_all_to(BINDINGS_DIR)
+            .expect("failed to export RecentProjectEntry");
     }
 }

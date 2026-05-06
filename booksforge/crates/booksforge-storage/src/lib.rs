@@ -1,19 +1,23 @@
 //! SQLite storage layer (Layer 4 — infrastructure).
 //!
 //! Manages a single per-bundle SQLite database opened in WAL mode with
-//! foreign-key enforcement.  All queries use compile-time–checked `sqlx`
-//! macros; raw SQL strings are forbidden here.
+//! foreign-key enforcement.  All queries use `sqlx::query!` macros.
 //!
-//! The pool is configured to allow at most one writer (SQLite limit) and
-//! up to 4 read-only connections, matching the WAL concurrency model.
+//! Public API: open the pool with `open_pool`, run migrations with
+//! `run_migrations`, then use `SqliteStorage` to satisfy the
+//! `StorageRepository` trait.
 
 #![forbid(unsafe_code)]
 
-pub mod pool;
 pub mod migrations;
+pub mod pool;
+pub mod repository;
+pub mod sqlite;
 
-pub use pool::{DbPool, open_pool};
 pub use migrations::run_migrations;
+pub use pool::{open_pool, DbPool};
+pub use repository::StorageRepository;
+pub use sqlite::SqliteStorage;
 
 #[derive(Debug, thiserror::Error)]
 pub enum StorageError {
@@ -31,4 +35,7 @@ pub enum StorageError {
 
     #[error("constraint violation: {detail}")]
     ConstraintViolation { detail: String },
+
+    #[error("serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
 }

@@ -7,6 +7,10 @@
 
 export type { AppVersion } from "./bindings/AppVersion";
 export type { BooksForgeError } from "./bindings/BooksForgeError";
+export type { CreateProjectInput } from "./bindings/CreateProjectInput";
+export type { OpenProjectInput } from "./bindings/OpenProjectInput";
+export type { OpenProjectResult } from "./bindings/OpenProjectResult";
+export type { RecentProjectEntry } from "./bindings/RecentProjectEntry";
 
 // Non-generated types used by Tauri command responses.
 export interface OllamaStatusResponse {
