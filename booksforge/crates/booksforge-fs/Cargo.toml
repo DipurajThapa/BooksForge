@@ -1,0 +1,12 @@
+[package]
+name        = "booksforge-fs"
+version.workspace     = true
+edition.workspace     = true
+rust-version.workspace = true
+
+[dependencies]
+booksforge-domain = { path = "../booksforge-domain" }
+thiserror.workspace  = true
+tokio.workspace      = true
+tracing.workspace    = true
+ulid.workspace       = true

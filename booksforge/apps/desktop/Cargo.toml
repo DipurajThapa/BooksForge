@@ -1,0 +1,29 @@
+[package]
+name        = "booksforge-desktop"
+version.workspace     = true
+edition.workspace     = true
+rust-version.workspace = true
+
+[lib]
+name          = "booksforge_desktop_lib"
+crate-type    = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build.workspace = true
+
+[dependencies]
+booksforge-domain       = { path = "../../crates/booksforge-domain" }
+booksforge-ipc          = { path = "../../crates/booksforge-ipc" }
+booksforge-storage      = { path = "../../crates/booksforge-storage" }
+booksforge-fs           = { path = "../../crates/booksforge-fs" }
+booksforge-ollama       = { path = "../../crates/booksforge-ollama" }
+booksforge-orchestrator = { path = "../../crates/booksforge-orchestrator" }
+booksforge-agents       = { path = "../../crates/booksforge-agents" }
+
+tauri.workspace         = true
+serde.workspace         = true
+serde_json.workspace    = true
+thiserror.workspace     = true
+tokio.workspace         = true
+tracing.workspace       = true
+tracing-subscriber.workspace = true

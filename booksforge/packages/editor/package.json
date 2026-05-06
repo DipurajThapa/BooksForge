@@ -1,0 +1,17 @@
+{
+  "name": "@booksforge/editor",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@booksforge/shared-types": "workspace:*",
+    "@booksforge/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3"
+  }
+}

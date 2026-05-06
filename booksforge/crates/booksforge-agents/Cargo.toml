@@ -1,0 +1,11 @@
+[package]
+name        = "booksforge-agents"
+version.workspace     = true
+edition.workspace     = true
+rust-version.workspace = true
+
+[dependencies]
+booksforge-domain = { path = "../booksforge-domain" }
+serde.workspace     = true
+serde_json.workspace = true
+thiserror.workspace  = true

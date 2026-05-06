@@ -1,0 +1,18 @@
+[package]
+name        = "booksforge-ipc"
+version.workspace     = true
+edition.workspace     = true
+rust-version.workspace = true
+
+# This crate defines every type that crosses the Tauri IPC boundary.
+# ts-rs generates TypeScript bindings; run `cargo test -p booksforge-ipc`
+# to regenerate packages/shared-types/src/bindings/.
+
+[dependencies]
+serde.workspace     = true
+serde_json.workspace = true
+thiserror.workspace = true
+ts-rs.workspace     = true
+
+[dev-dependencies]
+# ts-rs uses a test to drive export; no extra deps needed.

@@ -1,0 +1,18 @@
+[package]
+name        = "booksforge-domain"
+version.workspace     = true
+edition.workspace     = true
+rust-version.workspace = true
+
+# Layer 3 — pure logic, no I/O.
+# Must NOT depend on any Layer 4 crate (booksforge-storage, -fs, -ollama, etc.).
+
+[dependencies]
+serde.workspace      = true
+serde_json.workspace = true
+thiserror.workspace  = true
+ulid.workspace       = true
+chrono.workspace     = true
+
+[dev-dependencies]
+proptest.workspace = true

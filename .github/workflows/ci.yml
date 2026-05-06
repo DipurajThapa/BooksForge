@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "milestone/**"]
+  pull_request:
+    branches: [main]
+
+env:
+  RUST_VERSION: "1.82.0"
+  NODE_VERSION: "22.11.0"
+  PNPM_VERSION: "9.12.3"
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+# ── Job matrix ──────────────────────────────────────────────────────────────
+# Primary gates: macOS 14 (Apple Silicon) + macOS 13 (Intel) + Windows 2022
+# Smoke lane:    ubuntu-22.04 (cargo check + test only — no Tauri WebView)
+jobs:
+
+  # ── 1. Cargo deny (license + supply-chain) ──────────────────────────────
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: booksforge/Cargo.toml
+
+  # ── 2. Rust lint + test matrix ──────────────────────────────────────────
+  rust:
+    name: Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-13, windows-2022, ubuntu-22.04]
+    defaults:
+      run:
+        working-directory: booksforge
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust ${{ env.RUST_VERSION }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry + build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: booksforge
+
+      # Linux only: install WebKit2GTK for Tauri
+      - name: Install Linux Tauri deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run tests
+        run: cargo test --workspace
+
+  # ── 3. IPC type drift check ─────────────────────────────────────────────
+  ipc-drift:
+    name: IPC type drift
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: booksforge
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust ${{ env.RUST_VERSION }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: booksforge
+
+      - name: Regenerate TS bindings
+        run: cargo test -p booksforge-ipc
+
+      - name: Fail if bindings changed
+        run: |
+          if ! git diff --quiet packages/shared-types/src/bindings/; then
+            echo "::error::TS bindings are out of date. Run 'cargo test -p booksforge-ipc' and commit the updated files."
+            git diff packages/shared-types/src/bindings/
+            exit 1
+          fi
+
+  # ── 4. Frontend typecheck + lint ────────────────────────────────────────
+  frontend:
+    name: Frontend (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04]
+    defaults:
+      run:
+        working-directory: booksforge
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pnpm ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck all packages
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint

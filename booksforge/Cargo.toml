@@ -1,0 +1,91 @@
+[workspace]
+resolver = "2"
+members = [
+    "apps/desktop",
+    "crates/booksforge-domain",
+    "crates/booksforge-template",
+    "crates/booksforge-validator",
+    "crates/booksforge-agents",
+    "crates/booksforge-prompt",
+    "crates/booksforge-memory",
+    "crates/booksforge-vocab",
+    "crates/booksforge-export",
+    "crates/booksforge-ipc",
+    "crates/booksforge-storage",
+    "crates/booksforge-fs",
+    "crates/booksforge-ollama",
+    "crates/booksforge-orchestrator",
+    "crates/booksforge-export-epub",
+    "crates/booksforge-export-pandoc",
+    "crates/booksforge-epubcheck",
+    "crates/booksforge-test-fixtures",
+]
+
+[workspace.package]
+version      = "0.0.1"
+edition      = "2021"
+rust-version = "1.82"
+authors      = ["BooksForge Contributors"]
+license      = "UNLICENSED"
+
+# ── shared dependencies ─────────────────────────────────────────────────────
+[workspace.dependencies]
+
+# Tauri — exact pins per TOOLCHAIN.md
+tauri       = { version = "=2.2.3", features = ["protocol-asset"] }
+tauri-build = { version = "=2.2.3" }
+
+# Async runtime
+tokio       = { version = "1", features = ["full"] }
+async-trait = "0.1"
+
+# Serialization
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml       = "0.8"
+
+# Error handling — thiserror 1.x (stable API)
+thiserror = "1"
+
+# Database — SQLite with WAL and FK enforcement
+sqlx = { version = "0.8", default-features = false, features = [
+    "sqlite",
+    "runtime-tokio",
+    "macros",
+    "migrate",
+] }
+
+# HTTP — used by booksforge-ollama for Ollama API calls
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "stream",
+    "rustls-tls",
+] }
+
+# IPC type codegen: Rust → TypeScript
+ts-rs = "10"
+
+# Logging
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# ID generation (ULID)
+ulid   = { version = "1", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Hashing (content-addressed snapshots and prompt-template pins)
+blake3 = "1"
+
+# Property-based testing
+proptest = "1.5"
+
+# ── profile tweaks ───────────────────────────────────────────────────────────
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level     = "z"
+lto           = true
+codegen-units = 1
+panic         = "abort"
+strip         = true

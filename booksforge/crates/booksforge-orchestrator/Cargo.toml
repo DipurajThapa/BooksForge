@@ -1,0 +1,19 @@
+[package]
+name        = "booksforge-orchestrator"
+version.workspace     = true
+edition.workspace     = true
+rust-version.workspace = true
+
+[dependencies]
+booksforge-domain  = { path = "../booksforge-domain" }
+booksforge-agents  = { path = "../booksforge-agents" }
+booksforge-ollama  = { path = "../booksforge-ollama" }
+booksforge-memory  = { path = "../booksforge-memory" }
+booksforge-prompt  = { path = "../booksforge-prompt" }
+serde.workspace      = true
+serde_json.workspace = true
+thiserror.workspace  = true
+tokio.workspace      = true
+tracing.workspace    = true
+ulid.workspace       = true
+chrono.workspace     = true
