@@ -53,11 +53,14 @@ import type {
   SaveDiagnosticBundleInput,
   SaveDiagnosticBundleResult,
   AppVersion,
+  MemoryDeleteInput,
   MemoryEntryDto,
   MemoryListInput,
+  MemoryUpsertInput,
   ValidatorReportDto,
   VocabEntryDto,
   VocabListInput,
+  VocabUpsertInput,
   CreateProjectInput,
   ModelListEntry,
   NodeCreateInput,
@@ -312,5 +315,16 @@ export const ipc = {
   },
   vocabList(input: VocabListInput): Promise<VocabEntryDto[]> {
     return invoke("vocab_list", { input });
+  },
+
+  // ── Manual memory + vocabulary CRUD (audit #30) ──────────────────────────
+  memoryUpsert(input: MemoryUpsertInput): Promise<MemoryEntryDto> {
+    return invoke("memory_upsert", { input });
+  },
+  memoryDelete(input: MemoryDeleteInput): Promise<boolean> {
+    return invoke("memory_delete", { input });
+  },
+  vocabUpsert(input: VocabUpsertInput): Promise<VocabEntryDto> {
+    return invoke("vocab_upsert", { input });
   },
 };

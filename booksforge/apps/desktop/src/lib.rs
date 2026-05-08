@@ -101,6 +101,9 @@ pub fn run() {
             commands::validators::validators_apply_fix,
             commands::memory_vocab::memory_list,
             commands::memory_vocab::vocab_list,
+            commands::memory_vocab::memory_upsert,
+            commands::memory_vocab::memory_delete,
+            commands::memory_vocab::vocab_upsert,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri app failed to run");
