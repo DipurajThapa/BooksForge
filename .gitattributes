@@ -1,0 +1,46 @@
+# Default to LF for all text — the CI matrix runs on macOS, Windows, and Linux.
+* text=auto eol=lf
+
+# Rust / TOML / Cargo
+*.rs    text eol=lf
+*.toml  text eol=lf
+
+# JS / TS / JSON / Markdown
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+
+# Shell scripts must stay LF or they break on Linux/macOS runners.
+*.sh    text eol=lf
+
+# Windows scripts
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Binary assets — never normalise
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.icns  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.pdf   binary
+*.zip   binary
+
+# Generated bindings — diffable but don't merge-conflict on whitespace.
+booksforge/packages/shared-types/src/bindings/** text eol=lf merge=union linguist-generated=true
+
+# sqlx offline cache — diffable, machine-generated.
+booksforge/.sqlx/**.json text eol=lf linguist-generated=true

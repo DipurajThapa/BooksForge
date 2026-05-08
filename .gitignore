@@ -7,23 +7,28 @@ shim-lib/
 shim-perm/
 uploads/
 
-# Rust (applies once booksforge/ workspace is created)
+# Rust
 target/
-Cargo.lock   # keep for binary crates; remove this line after MZ-01
+# Cargo.lock IS committed for the booksforge binary workspace; do not add it here.
 
 # Node / pnpm
 node_modules/
 .pnpm-store/
 
-# Tauri
-apps/desktop/src-ui/dist/
-apps/desktop/src-ui/.vite/
+# Tauri build outputs (mirrored at booksforge/.gitignore)
+booksforge/apps/desktop/src-ui/dist/
+booksforge/apps/desktop/src-ui/.vite/
+booksforge/apps/desktop/gen/
 
 # IDE
 .idea/
 .vscode/
 
-# Secrets / local env
+# Secrets / local env (defence-in-depth)
 .env
-.env.local
+.env.*
+!.env.example
 *.pem
+*.key
+*.p12
+*.keystore
