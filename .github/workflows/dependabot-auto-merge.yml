@@ -1,0 +1,106 @@
+# Auto-merge Dependabot patch-level PRs that pass CI.
+#
+# Strategy:
+#   - Patch updates within trusted scopes auto-merge once CI is green.
+#   - Minor / major / development-tooling updates require human review.
+#   - Major bumps to react / react-dom / vite / tauri / sqlx / @tiptap/core
+#     are explicitly ignored at the Dependabot config level (.github/
+#     dependabot.yml), so they never appear here.
+#
+# Trusted scopes (mirrors the auto-merge policy in CONTRIBUTING.md):
+#   - patch updates from any group
+#   - @types/* (TypeScript type definitions are always patch-safe)
+#   - eslint*, prettier*, vitest, @testing-library/* (dev tooling)
+#
+# Refs: EXTERNAL_AUDIT_BACKLOG.md #58 (auto-merge guardrails),
+# .github/dependabot.yml (the upstream that produces these PRs),
+# docs/REPO_SETTINGS.md (repository-level branch protection that
+# this workflow assumes is in place).
+
+name: Dependabot auto-merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Auto-merge if patch + green
+    runs-on: ubuntu-22.04
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Decide eligibility
+        id: decide
+        run: |
+          # Auto-merge ONLY for:
+          #   - update-type == version-update:semver-patch (any package)
+          # OR for trusted dev-tooling minor updates:
+          #   - @types/*
+          #   - eslint*, prettier*, vitest, @testing-library/*
+          #
+          # All other minor / major bumps require human review.
+
+          update_type="${{ steps.metadata.outputs.update-type }}"
+          dep_name="${{ steps.metadata.outputs.dependency-names }}"
+          ecosystem="${{ steps.metadata.outputs.package-ecosystem }}"
+
+          echo "update_type=${update_type}"
+          echo "dep_name=${dep_name}"
+          echo "ecosystem=${ecosystem}"
+
+          eligible="false"
+
+          if [[ "${update_type}" == "version-update:semver-patch" ]]; then
+            eligible="true"
+            reason="patch-level update"
+          fi
+
+          # Trusted scopes for minor updates.
+          for trusted in \
+            "@types/" \
+            "eslint" \
+            "prettier" \
+            "vitest" \
+            "@testing-library/" \
+            ; do
+            if [[ "${dep_name}" == *"${trusted}"* ]] && [[ "${update_type}" == "version-update:semver-minor" ]]; then
+              eligible="true"
+              reason="trusted dev-tooling minor update (${trusted})"
+              break
+            fi
+          done
+
+          echo "eligible=${eligible}" >> "$GITHUB_OUTPUT"
+          echo "reason=${reason:-not eligible (${update_type} on ${dep_name})}" >> "$GITHUB_OUTPUT"
+
+      - name: Approve PR
+        if: steps.decide.outputs.eligible == 'true'
+        run: gh pr review --approve "$PR_URL" --body "Auto-approved: ${{ steps.decide.outputs.reason }}."
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge
+        if: steps.decide.outputs.eligible == 'true'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on non-eligible PR
+        if: steps.decide.outputs.eligible == 'false'
+        run: |
+          gh pr comment "$PR_URL" --body "Not eligible for auto-merge: ${{ steps.decide.outputs.reason }}.  A maintainer must review and merge manually."
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
