@@ -18,6 +18,7 @@ pub mod apply_copyedit;
 pub mod config;
 pub mod context_builder;
 pub mod council;
+pub mod crash_capture;
 pub mod cross_cutting;
 pub mod originality_provider;
 pub mod proposal_validator;

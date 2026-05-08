@@ -23,6 +23,32 @@ pub fn run() {
     // PII redaction barrier on log file writes.  See `logging.rs`.
     let _file_log_guard = logging::init_tracing();
 
+    // Install the MZ-09 crash-capture panic hook BEFORE any other
+    // boot work runs, so a panic in scheduler / orchestrator setup
+    // is captured.  The hook only WRITES to the local queue; it
+    // never sends.  See booksforge-orchestrator::crash_capture for
+    // the privacy contract.
+    if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
+        let queue_root = std::path::PathBuf::from(home)
+            .join(".booksforge")
+            .join("crash-reports");
+        match booksforge_orchestrator::crash_capture::CrashQueue::open(queue_root) {
+            Ok(queue) => {
+                let _ = booksforge_orchestrator::crash_capture::install_panic_hook(
+                    queue,
+                    env!("CARGO_PKG_VERSION").to_string(),
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    target: "booksforge::boot",
+                    error = %e,
+                    "could not open crash-report queue at boot — crashes will not be captured this session",
+                );
+            }
+        }
+    }
+
     // Clean up any temp dirs left by crashed bundle-creation attempts.
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -101,6 +127,11 @@ pub fn run() {
             commands::validators::validators_apply_fix,
             commands::memory_vocab::memory_list,
             commands::memory_vocab::vocab_list,
+            commands::crash::crash_list_queued,
+            commands::crash::crash_preview,
+            commands::crash::crash_send,
+            commands::crash::crash_delete,
+            commands::crash::crash_clear_all,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri app failed to run");
