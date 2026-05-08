@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO agent_tasks\n                (id, run_id, step_index, agent_id, prompt_template_id,\n                 prompt_template_hash, model, model_digest, input_hash,\n                 output_hash, context_tokens, output_tokens, duration_ms,\n                 retries, status, error_category, error_message, created_at, updated_at)\n            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 19
+    },
+    "nullable": []
+  },
+  "hash": "2de6c417b5b89f4beb81b29c33588110e9b8ce49ccf60b28435a81b1ce4fef1b"
+}

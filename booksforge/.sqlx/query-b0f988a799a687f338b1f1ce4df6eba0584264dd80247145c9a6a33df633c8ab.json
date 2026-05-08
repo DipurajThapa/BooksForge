@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM memory_entries WHERE scope = ? AND key = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "b0f988a799a687f338b1f1ce4df6eba0584264dd80247145c9a6a33df633c8ab"
+}

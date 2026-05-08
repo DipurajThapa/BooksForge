@@ -10,7 +10,10 @@ pub struct AppVersion {
     pub major: u32,
     pub minor: u32,
     pub patch: u32,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Pre-release tag (e.g. `"alpha.1"`).  Always serialised — TS sees
+    /// `string | null`.  Earlier versions used `skip_serializing_if`
+    /// which ts-rs 10 can't parse; emitting `null` is just as clear and
+    /// keeps the bindings deterministic.
     pub pre:   Option<String>,
 }
 

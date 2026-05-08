@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id, scope, key, value_json, agent_id, created_at, updated_at\n            FROM memory_entries\n            WHERE scope = ?\n            ORDER BY key ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "scope",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "key",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "value_json",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "agent_id",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 6,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b892225585741574013b8a270392d140dc4b0b1ce679d57238944b688fd4b938"
+}

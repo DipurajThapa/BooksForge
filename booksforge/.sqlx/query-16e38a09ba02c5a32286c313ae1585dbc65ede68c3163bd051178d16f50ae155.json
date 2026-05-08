@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT alias FROM entity_aliases WHERE entity_id = ? ORDER BY alias ASC",
+  "describe": {
+    "columns": [
+      {
+        "name": "alias",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "16e38a09ba02c5a32286c313ae1585dbc65ede68c3163bd051178d16f50ae155"
+}

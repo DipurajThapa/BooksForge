@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id, validator_id, ran_at, status, duration_ms, scope_hash\n            FROM validator_runs\n            ORDER BY ran_at DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "validator_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "ran_at",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "status",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "duration_ms",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "scope_hash",
+        "ordinal": 5,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "5031a7915b4ffeb3efbb0860bb03a566a2666bfa18478e6db4e87557e4c832a2"
+}

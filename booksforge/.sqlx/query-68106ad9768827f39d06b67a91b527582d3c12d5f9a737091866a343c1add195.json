@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) AS c FROM agent_applied_edits WHERE task_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "c",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "68106ad9768827f39d06b67a91b527582d3c12d5f9a737091866a343c1add195"
+}

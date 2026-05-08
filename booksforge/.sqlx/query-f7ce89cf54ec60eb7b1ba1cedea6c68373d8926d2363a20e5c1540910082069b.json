@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id, scope, scope_id, label, trigger, tree_hash, created_at, size_bytes\n            FROM snapshots\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "scope",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "scope_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "label",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "trigger",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "tree_hash",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "size_bytes",
+        "ordinal": 7,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f7ce89cf54ec60eb7b1ba1cedea6c68373d8926d2363a20e5c1540910082069b"
+}

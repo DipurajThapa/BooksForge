@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT e.id, e.task_id, e.node_id, e.pre_edit_snapshot_id,\n                   e.applied_at, e.edit_kind, e.edit_payload_json, e.reverted_at\n            FROM agent_applied_edits e\n            JOIN agent_tasks t ON t.id = e.task_id\n            JOIN agent_runs  r ON r.id = t.run_id\n            WHERE r.project_id = ? AND e.edit_kind = ?\n            ORDER BY e.applied_at DESC\n            LIMIT ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "task_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "node_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "pre_edit_snapshot_id",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "applied_at",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "edit_kind",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "edit_payload_json",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "reverted_at",
+        "ordinal": 7,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "65b5911f6f0142d2312d2f026f82e643f9bc9e616ba50a90ed57ad425c6becd1"
+}

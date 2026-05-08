@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT task_id, schema_id, schema_version, content_inline,\n                   content_path, hash, validated_at\n            FROM agent_outputs\n            WHERE task_id = ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "task_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "schema_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "schema_version",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "content_inline",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "content_path",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "hash",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "validated_at",
+        "ordinal": 6,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "898318bf13add306dd19bfb259afa434d8bf1a0360b2e5edc381d9fea657cb0a"
+}

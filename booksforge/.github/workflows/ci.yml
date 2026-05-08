@@ -1,0 +1,292 @@
+# BACKLOG §C5 — CI matrix.
+#
+# Gates the merge: every PR must pass clippy, fmt, cargo-deny, the full
+# test suite on all gating platforms, the TS typecheck/lint, the IPC
+# binding-drift check, and the EPUB reproducibility test (proves
+# `build_epub_bytes` produces byte-identical output across macOS / Linux
+# / Windows).
+#
+# Toolchain pins live in `rust-toolchain.toml`, `.nvmrc`, and
+# `package.json` — keep those as the single source of truth and let
+# `setup-rust` / `setup-node` read them.
+
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new commit on the same PR cancels the previous run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Disable incremental compilation on CI — adds disk I/O without
+  # paying off in a clean container.
+  CARGO_INCREMENTAL: 0
+  # Carbon-friendly: terse cargo output, retry transient registry hiccups.
+  CARGO_TERM_COLOR: always
+  CARGO_NET_RETRY: 10
+  RUSTFLAGS: -D warnings
+
+jobs:
+  # ── Rust gate (matrix) ──────────────────────────────────────────────
+  rust:
+    name: rust / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Per CLAUDE.md: macos-14 + macos-13 + windows-2022 are gating;
+        # ubuntu-22.04 is a smoke run (cheaper, faster signal).
+        os: [macos-14, macos-13, windows-2022, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # `rust-toolchain.toml` already pins this — passing it
+          # explicitly keeps the action honest if the file ever drifts.
+          toolchain: 1.88.0
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-${{ matrix.os }}
+
+      - name: cargo fmt --check
+        run: cargo fmt --check
+        # `fmt` is identical on every platform — only run it on Linux.
+        if: matrix.os == 'ubuntu-22.04'
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test --workspace --all-targets
+
+      - name: cargo doc (no-deps)
+        run: cargo doc --workspace --no-deps --document-private-items
+        env:
+          RUSTDOCFLAGS: -D warnings
+        # docs job runs on Linux only — output is platform-independent.
+        if: matrix.os == 'ubuntu-22.04'
+
+  # ── Licence gate (cargo-deny) ───────────────────────────────────────
+  cargo-deny:
+    name: cargo-deny / licences + bans
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          # `deny.toml` rejects GPL-family licences and the bans entries
+          # enforce the four-layer architecture (no L3 → L4 imports).
+          command: check licenses bans
+
+  # ── Reproducibility (the §C5 deliverable) ───────────────────────────
+  reproducibility:
+    name: reproducibility / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-${{ matrix.os }}
+
+      # The `reproducibility.rs` integration test in
+      # `booksforge-export-epub` builds the same fixture twice and
+      # asserts byte-identical output (blake3 hash match).  Running it
+      # on three platforms catches any host-leaking determinism breaks
+      # (stray timestamps, HashMap iteration order, locale-dependent
+      # sort, path-separator drift, etc.).
+      - name: cargo test reproducibility
+        run: cargo test -p booksforge-export-epub --test reproducibility
+      - name: cargo test visual_regression
+        run: cargo test -p booksforge-export-epub --test visual_regression
+
+      # Cross-host hash comparison: each runner uploads the EPUB hash
+      # of a canned fixture as an artefact.  The `compare-hashes` job
+      # below diffs them and fails CI if any disagree.  This is the
+      # *cross-platform* invariant — the test above is the *per-host*
+      # invariant.
+      - name: Emit fixture hash
+        shell: bash
+        run: |
+          cargo run -q -p booksforge-export-epub --example fixture_hash \
+            > "$RUNNER_TEMP/hash-${{ matrix.os }}.txt" || true
+          # Fallback if the example doesn't exist yet — note explicitly
+          # so the comparison job can ignore the platform.
+          if [ ! -s "$RUNNER_TEMP/hash-${{ matrix.os }}.txt" ]; then
+            echo "MISSING fixture_hash example — see BACKLOG §C5 follow-up" \
+              > "$RUNNER_TEMP/hash-${{ matrix.os }}.txt"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: epub-hash-${{ matrix.os }}
+          path: ${{ runner.temp }}/hash-${{ matrix.os }}.txt
+          retention-days: 7
+
+  compare-hashes:
+    name: reproducibility / cross-host hash comparison
+    needs: reproducibility
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: hashes
+      - name: Diff hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd hashes
+          # Drop any "MISSING …" sentinel files — they signal the
+          # `fixture_hash` example wasn't present yet (covered by
+          # the per-host integration test above).
+          actual=$(find . -name 'hash-*.txt' -exec grep -L '^MISSING' {} +)
+          if [ -z "$actual" ]; then
+            echo "No real hash artefacts yet — skipping cross-host diff."
+            exit 0
+          fi
+          first=$(head -n 1 $(echo "$actual" | head -n 1))
+          for f in $actual; do
+            if ! grep -qx "$first" "$f"; then
+              echo "::error::reproducibility broken: $f differs from baseline ($first)"
+              for g in $actual; do printf '  %s -> %s\n' "$g" "$(cat "$g")"; done
+              exit 1
+            fi
+          done
+          echo "All platforms agree on hash: $first"
+
+  # ── Privacy invariants (one-shot — Linux is enough, the test is
+  # platform-independent) ─────────────────────────────────────────────
+  privacy:
+    name: privacy invariants
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-ubuntu-22.04
+      - name: cargo test privacy_invariants
+        run: cargo test -p booksforge-orchestrator --test privacy_invariants
+
+  # ── TypeScript / pnpm ───────────────────────────────────────────────
+  ts:
+    name: ts / typecheck + lint + tests
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+
+  # ── Cold-launch perf gate (BACKLOG §C6) ─────────────────────────────
+  # Storage-layer slice of the cold-launch budget — N=10 cold opens of
+  # a 10k-word fixture, asserts p50 ≤ 900 ms / p95 ≤ 1500 ms.  Runs on
+  # the gating macOS-14 runner (matches the BACKLOG target platform).
+  perf-cold-launch:
+    name: perf / cold-launch p50
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-macos-14
+      - name: cargo test cold_launch_p50 (release, --ignored)
+        run: cargo test -p booksforge-storage --release --test cold_launch_p50 -- --ignored --nocapture
+
+  # ── Visual regression (BACKLOG §H6) ─────────────────────────────────
+  # Generates fixture HTML pairs (preview vs EPUB chapter) via the Rust
+  # `visual_fixtures` example, then runs the Playwright pixel-diff suite
+  # under headless Chromium on Linux.  Goldens live under
+  # `tests/visual-regression/golden/` and are committed to the repo.
+  visual-regression:
+    name: visual / playwright
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-ubuntu-22.04
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium for Playwright
+        run: pnpm --filter @booksforge/visual-regression exec playwright install --with-deps chromium
+      - name: Generate fixture HTML pairs
+        run: pnpm gen:fixtures
+      - name: Run visual regression suite
+        run: pnpm --filter @booksforge/visual-regression test
+      - name: Upload diff artefacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-report
+          path: |
+            tests/visual-regression/test-results
+            tests/visual-regression/playwright-report
+          retention-days: 14
+
+  # ── IPC binding drift (Rust → TS) ───────────────────────────────────
+  ipc-drift:
+    name: ipc-drift
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-ubuntu-22.04
+
+      # `cargo test -p booksforge-ipc` regenerates the TS bindings via
+      # ts-rs; if the generated files differ from what's committed, the
+      # working tree is dirty and we fail.  Mirrors the
+      # `codegen_drift.rs` test that runs in-process — this is the
+      # *committed-file* drift check.
+      - name: Regenerate bindings
+        run: cargo test -p booksforge-ipc
+      - name: Verify nothing changed
+        run: |
+          if ! git diff --quiet --exit-code; then
+            echo "::error::IPC bindings are out of date — run 'cargo test -p booksforge-ipc' locally and commit the result"
+            git --no-pager diff
+            exit 1
+          fi

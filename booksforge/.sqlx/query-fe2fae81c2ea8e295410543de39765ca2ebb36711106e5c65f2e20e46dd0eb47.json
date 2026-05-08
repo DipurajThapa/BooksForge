@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE ai_calls\n            SET pre_edit_snapshot_id = ?, applied_at = ?\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "fe2fae81c2ea8e295410543de39765ca2ebb36711106e5c65f2e20e46dd0eb47"
+}

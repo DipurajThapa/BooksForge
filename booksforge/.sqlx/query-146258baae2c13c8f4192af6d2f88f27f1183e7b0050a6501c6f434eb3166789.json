@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO exports (id, profile, output_path, hash, created_at)\n            VALUES (?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "146258baae2c13c8f4192af6d2f88f27f1183e7b0050a6501c6f434eb3166789"
+}

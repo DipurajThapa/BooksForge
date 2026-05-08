@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO style_book\n                (id, em_dash, oxford_comma, quote_style, spaces_after_period,\n                 ellipsis_form, spelling_locale, capitalize_after_colon,\n                 bold_emphasis_allowed, updated_at)\n            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n            ON CONFLICT(id) DO UPDATE SET\n                em_dash                = excluded.em_dash,\n                oxford_comma           = excluded.oxford_comma,\n                quote_style            = excluded.quote_style,\n                spaces_after_period    = excluded.spaces_after_period,\n                ellipsis_form          = excluded.ellipsis_form,\n                spelling_locale        = excluded.spelling_locale,\n                capitalize_after_colon = excluded.capitalize_after_colon,\n                bold_emphasis_allowed  = excluded.bold_emphasis_allowed,\n                updated_at             = excluded.updated_at\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "d8e5e31295f72cad8b4441a1dafd27c33d7fc6409e2f4a8bf73df3dcdb788c3e"
+}

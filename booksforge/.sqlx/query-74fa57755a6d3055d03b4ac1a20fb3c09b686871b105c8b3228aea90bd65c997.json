@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id, layer, term, display_term, kind, replacement, rationale,\n                   source, created_at, updated_at\n            FROM vocab_entries\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "layer",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "term",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "display_term",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "kind",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "replacement",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "rationale",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "source",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 9,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "74fa57755a6d3055d03b4ac1a20fb3c09b686871b105c8b3228aea90bd65c997"
+}

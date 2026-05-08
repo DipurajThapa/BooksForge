@@ -59,6 +59,7 @@ pub struct NodeUpdateInput {
 pub struct SceneSaveInput {
     pub node_id:    String,
     /// ProseMirror JSON document (matches `SceneContent.pm_doc`).
+    #[ts(type = "unknown")]
     pub pm_doc:     serde_json::Value,
     pub word_count: u32,
     pub char_count: u32,
@@ -69,6 +70,7 @@ pub struct SceneSaveInput {
 #[ts(export)]
 pub struct SceneLoadResult {
     pub node_id:    String,
+    #[ts(type = "unknown")]
     pub pm_doc:     serde_json::Value,
     pub word_count: u32,
     pub char_count: u32,

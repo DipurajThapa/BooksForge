@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO agent_applied_edits\n                (id, task_id, node_id, pre_edit_snapshot_id,\n                 applied_at, edit_kind, edit_payload_json, reverted_at)\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "a35609bd320646487f0f93f26b82c1bc368deefabea34cac165f6b3f9a2bd91e"
+}

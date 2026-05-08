@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO vocab_entries\n                    (id, layer, term, display_term, kind, replacement, rationale,\n                     source, created_at, updated_at)\n                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "6361448085c3c07e5b64b49d3925d793cd3207487e2acdca6ef7c8d45a8ff3c3"
+}

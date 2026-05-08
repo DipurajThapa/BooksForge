@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO ai_calls\n                (id, node_id, preset, model, prompt_template_id, prompt_template_hash,\n                 scope_text_len, output_text, context_tokens, output_tokens, duration_ms,\n                 status, error_message, created_at, pre_edit_snapshot_id, applied_at)\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 16
+    },
+    "nullable": []
+  },
+  "hash": "046ed03034db333c0a97080425d898210390e2ff11513b861eb37ea0a19ac1c5"
+}

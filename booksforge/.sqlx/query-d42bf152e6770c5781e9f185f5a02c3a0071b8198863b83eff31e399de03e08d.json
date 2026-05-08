@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO snapshots\n                (id, scope, scope_id, label, trigger, tree_hash, created_at, size_bytes)\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "d42bf152e6770c5781e9f185f5a02c3a0071b8198863b83eff31e399de03e08d"
+}
