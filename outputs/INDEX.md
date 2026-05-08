@@ -123,7 +123,7 @@ Long-form reference material. Read on demand for trade-off rationale, FR-IDs, or
 | `03-dataflow-edit-loop.svg` | Active | Edit-loop hot path |
 | `04-workflow-lifecycle.svg` | Active | Project state lifecycle |
 | `05-plugin-architecture.svg` | Active (post-MVP) | Reserved for V1.0+ |
-| `06-ai-flow.svg` | Active | Agent swarm + Ollama HTTP, 9 MVP agents, V1.0+ list |
+| `06-ai-flow.svg` | Stale (count) | Agent swarm + Ollama HTTP. Diagram shows 9 MVP agents; catalog is now 10 user-visible + 1 internal (refresh at next diagram pass) |
 | `07-export-pipeline.svg` | Active | Canonical-HTML pipeline; preview = export source |
 | `08-roadmap-gantt.svg` | Stale | Refresh at every milestone close |
 
@@ -149,7 +149,7 @@ outputs/
 - **9 SVG diagrams + 1 README** in `outputs/diagrams/`.
 - **20 files** under `outputs/.claude/` (1 README + 8 skill stubs + 1 hooks + 10 subagent stubs).
 - **27 architecture decisions** (D-001 through D-027) in `ARCHITECTURE_DECISIONS.md` plus the deep ADRs in `_deep/13-glossary-and-decision-log.md`.
-- **9 LLM agents in MVP**, 19 total (including the Orchestrator controller and V1.0+ agents).
+- **10 LLM agents in MVP** (the original 9 + Final Review Editor) plus 1 internal agent (Proposal Validator); 20 total registered (includes the Orchestrator controller and V1.0+ agents).
 - **8 Claude Code skills, 10 hooks, 10 subagents**.
 - **6 user personas** acknowledged: Anya (MVP target), Theo, Aisha, Editor Emma, Beta-reader Ben, Plugin-author Priya.
 

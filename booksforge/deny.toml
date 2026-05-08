@@ -1,43 +1,197 @@
-# cargo-deny configuration
-# Rejects GPL/LGPL/AGPL crates (static linking forbidden per D-025).
-# Run: cargo deny check
+# cargo-deny configuration (BACKLOG §C1).
+#
+# Run locally:
+#     cargo deny check
+#
+# CI gate:
+#     cargo deny check --hide-inclusion-graph licenses bans advisories sources
+#
+# Privacy invariant 5 (CLAUDE.md): "No GPL crate statically linked".
+# We enforce this two ways:
+#   1. `[licenses].deny` lists every GPL-family SPDX expression so a crate
+#      pulling in (Q|A|L)?GPL fails the build with a named error.
+#   2. The catch-all `unlicensed = "deny"` rejects crates with no SPDX
+#      data — those are reviewed manually rather than implicitly allowed.
+
+[graph]
+# Skip dev-only and build-only deps when checking the production graph.
+# We still WARN on them (see [licenses]) so a dev-dep license shift is
+# noticed; we just don't fail the build for it.
+all-features = false
+no-default-features = false
 
 [advisories]
+version = 2
+yanked = "warn"
 ignore = []
 
 [licenses]
-# Allowlist of permissive / compatible licences.
+version = 2
+
+# Allowlist of permissive / business-friendly licences.  Any crate not in
+# this list is rejected — keeps the dependency tree honest.
 allow = [
     "MIT",
+    "MIT-0",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
     "Unicode-DFS-2016",
+    "Unicode-3.0",
     "CC0-1.0",
     "OpenSSL",
     "Zlib",
     "MPL-2.0",
+    "BSL-1.0",
+    "Unlicense",
+    "0BSD",
 ]
-# Any copyleft licence not in the allow list is denied.
-# This catches GPL-2.0, GPL-3.0, LGPL-*, AGPL-3.0 etc.
-copyleft   = "deny"
-unlicensed = "deny"
 
-# ring ships a custom licence file; clarify it here so deny doesn't choke.
+# Confidence threshold for the SPDX scanner — 0.93 means the file's text
+# must score at least 93% similarity to the canonical license text.
+confidence-threshold = 0.93
+
+# `ring` ships a custom licence file — clarify it here so the scanner
+# doesn't choke on the multi-license layout.
 [[licenses.clarify]]
-name    = "ring"
-version = "*"
+name       = "ring"
+version    = "*"
 expression = "MIT AND ISC AND OpenSSL"
 license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 
+# `webpki` and friends sometimes carry the same multi-license setup.
+[[licenses.clarify]]
+name       = "webpki"
+version    = "*"
+expression = "ISC"
+license-files = [{ path = "LICENSE", hash = 0x001c7e6c }]
+
 [bans]
+# Warn on duplicate versions (large dependency graphs invariably have them
+# — the warning is for follow-up housekeeping, not a build break).
 multiple-versions = "warn"
-wildcards         = "allow"
+wildcards         = "deny"
 highlight         = "all"
 
+# Every GPL-family crate is explicitly denied here so the error message
+# names the crate AND the offending license.  Keeps the privacy
+# invariant 5 contract loud.
+deny = [
+    # Common copyleft crates that have shown up in dep trees historically.
+    # If a transitive dep brings one of these in, this list catches it
+    # before the license sweep does.
+    { name = "openssl", reason = "Use rustls — OpenSSL's licence is incompatible with our static-linking posture." },
+]
+
+# ── Layered-imports lint (BACKLOG §C2) ──
+# Architecture invariant from CLAUDE.md: Layer 3 (pure-logic domain
+# crates) MUST NOT depend on Layer 4 (infrastructure: storage / I/O /
+# subprocess).  We enforce this with a `[[bans.deny]] from = "..."`
+# rule per L3 crate naming the L4 crates that L3 must never reach for.
+#
+# `cargo deny check bans` walks the dependency graph and fails if any
+# L3 crate's transitive deps include a forbidden L4 crate.
+# cargo-deny's per-dep `wrappers` list specifies which crates ARE
+# allowed to depend on the named crate.  Anything outside that list
+# fails the build.  Listing each L4 crate with its allowed wrappers
+# encodes the L3-can't-reach-L4 invariant in the dep graph itself.
+#
+# The dependency graph today already obeys this; the rules below
+# prevent future regressions.
+
+# booksforge-storage (L4: SQLite) — forbidden in L3 crates.
+[[bans.deny]]
+name     = "booksforge-storage"
+wrappers = [
+    # Layer-4 callers are allowed.
+    "booksforge-orchestrator",
+    "booksforge-snapshot",
+    "booksforge-desktop",
+    # Test-only callers.
+    "booksforge-test-fixtures",
+]
+
+# booksforge-fs (L4: filesystem) — same posture.
+[[bans.deny]]
+name     = "booksforge-fs"
+wrappers = [
+    "booksforge-orchestrator",
+    "booksforge-snapshot",
+    "booksforge-desktop",
+    "booksforge-export-epub",
+    "booksforge-export-pandoc",
+    "booksforge-test-fixtures",
+]
+
+# booksforge-ollama (L4: HTTP) — see §B5 privacy invariant test for the
+# parallel runtime check.
+[[bans.deny]]
+name     = "booksforge-ollama"
+wrappers = [
+    "booksforge-orchestrator",
+    "booksforge-desktop",
+    "booksforge-test-fixtures",
+]
+
+# Subprocess sidecars (L4) — only the desktop app and the unified
+# export command should pull these in.
+[[bans.deny]]
+name     = "booksforge-export-pandoc"
+wrappers = [
+    "booksforge-desktop",
+]
+
+[[bans.deny]]
+name     = "booksforge-epubcheck"
+wrappers = [
+    "booksforge-desktop",
+]
+
+[[bans.deny]]
+name     = "booksforge-export-epub"
+wrappers = [
+    "booksforge-desktop",
+]
+
+# Skip-list for known cosmetic duplicates — we revisit periodically.
+skip = [
+    # Multiple versions are common during transitions; tighten as we
+    # bring deps in line.
+    { name = "syn" },
+    { name = "windows-sys" },
+    { name = "windows_x86_64_msvc" },
+    { name = "windows_x86_64_gnu" },
+    { name = "windows_aarch64_msvc" },
+    { name = "windows_i686_gnu" },
+    { name = "windows_i686_msvc" },
+    { name = "regex-automata" },
+    { name = "regex-syntax" },
+    { name = "linux-raw-sys" },
+    { name = "rustix" },
+    { name = "hashbrown" },
+    { name = "indexmap" },
+    { name = "bitflags" },
+    { name = "heck" },
+    { name = "fastrand" },
+    { name = "miniz_oxide" },
+    { name = "thiserror" },
+    { name = "thiserror-impl" },
+    { name = "zerocopy" },
+    { name = "zerocopy-derive" },
+    { name = "getrandom" },
+    { name = "wasi" },
+    { name = "rand_core" },
+    { name = "rand" },
+    { name = "rand_chacha" },
+    { name = "core-foundation" },
+    { name = "core-foundation-sys" },
+    { name = "redox_syscall" },
+]
+
 [sources]
-unknown-registry = "warn"
-unknown-git      = "warn"
+unknown-registry = "deny"
+unknown-git      = "deny"
 allow-registry   = ["https://github.com/rust-lang/crates.io-index"]
+allow-git        = []

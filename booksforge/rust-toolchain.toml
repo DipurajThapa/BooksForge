@@ -1,4 +1,19 @@
 [toolchain]
-channel = "1.82.0"
+# Pinned to a specific stable channel build so CI, dev workstations, and
+# release builds all use the same compiler version.
+#
+# History (BACKLOG §M2):
+#   - TOOLCHAIN.md spec target: 1.82.0
+#   - Why we deviated: transitive deps from Tauri 2.x require Rust ≥ 1.85
+#     (edition 2024 syntax in `icu_*` crates).  Sticking to 1.82 fails to
+#     build against current crates.io.
+#
+# Update procedure:
+#   1. Bump `channel` here.
+#   2. Update CI matrix `rust-version` to match.
+#   3. Run `cargo +<new> build --workspace --all-targets`.
+#   4. Bump `Cargo.toml [workspace.package].rust-version` to match.
+#   5. Run `cargo deny check` to confirm no licence drift.
+channel    = "1.88.0"
 components = ["rustfmt", "clippy"]
-profile = "minimal"
+profile    = "minimal"

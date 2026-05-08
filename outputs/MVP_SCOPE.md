@@ -52,7 +52,7 @@ Three built-in:
 - Pre-edit snapshot before any apply.
 - Cancellable; audit row recorded.
 
-### 2.6 Agentic swarm — nine MVP agents
+### 2.6 Agentic swarm — ten MVP agents
 
 (Per `AGENTS.md`.)
 
@@ -65,8 +65,9 @@ Three built-in:
 7. Continuity.
 8. Copyeditor.
 9. Humanization.
+10. Final Review Editor (opt-in; pinned to `qwen3.6:latest` for world-class final-pass polish).
 
-Plus the always-present **Orchestrator** (controller).
+Plus the always-present **Orchestrator** (controller) and one **internal** agent — the Proposal Validator (orchestrator-grade verifier; excluded from the user-visible catalog; see `AGENTS.md §4.12`).
 
 ### 2.7 Memory subsystem
 
@@ -171,7 +172,7 @@ These are tracked but **must not be built** in the first 16 weeks:
 Per `PRODUCT_REQUIREMENTS.md §9`, with two additions for the post-Pass-2 changes:
 
 1. The seven journeys (intake → outline → drafting → revising → continuity → copyedit → humanization → export) work end-to-end on macOS and Windows for a fiction project of 60k–120k words.
-2. The nine MVP agents run successfully on a clean install with `qwen2.5:7b-instruct-q4_K_M` and produce schema-valid outputs on the fixture suite.
+2. The ten MVP agents run successfully on a clean install with `qwen2.5:7b-instruct-q4_K_M` (plus `qwen3.6:latest` for the Final Review Editor when opted in) and produce schema-valid outputs on the fixture suite.
 3. A 100k-word manuscript exports to DOCX, PDF (Trade 5×8 and 6×9), and KDP-eBook EPUB-3 in under 60 seconds and passes the bundled KDP validator and EPUBCheck.
 4. Privacy invariant test: with the network disabled, every MVP feature except update check, Ollama install, and Ollama model pull works.
 5. Snapshot invariant test: every accepted agent edit produced a `pre_agent_edit` snapshot before applying.

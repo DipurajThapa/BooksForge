@@ -8,10 +8,13 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "dev":       "pnpm --filter @booksforge/desktop-ui tauri dev",
-    "build":     "pnpm --filter @booksforge/desktop-ui tauri build",
-    "typecheck": "pnpm -r typecheck",
-    "lint":      "pnpm -r lint",
-    "test":      "pnpm -r test"
+    "dev":             "pnpm --filter @booksforge/desktop-ui tauri dev",
+    "build":           "pnpm --filter @booksforge/desktop-ui tauri build",
+    "typecheck":       "pnpm -r typecheck",
+    "lint":            "pnpm -r lint",
+    "test":            "pnpm -r test",
+    "gen:fixtures":    "cargo run -p booksforge-export-epub --example visual_fixtures",
+    "visual:test":     "pnpm gen:fixtures && pnpm --filter @booksforge/visual-regression test",
+    "visual:update":   "pnpm gen:fixtures && pnpm --filter @booksforge/visual-regression update-golden"
   }
 }

@@ -111,7 +111,7 @@ These are non-negotiable. Each is enforced by a lint, a test, or a code-review g
 
 - 27 implementation-pack docs, internally consistent, naming uniform, every reference resolvable.
 - 27 architecture decisions locked; ADR template in place for new ones.
-- 9 MVP agents specified with prompt templates, schemas, validators, memory scopes, user-gate policies.
+- 10 MVP agents specified (the original 9 + Final Review Editor) plus 1 internal Proposal Validator (orchestrator-grade), all with prompt templates, typed input/output schemas, cross-cutting validators, memory scopes, user-gate policies, and explicit failure-mode documentation.
 - Memory and Vocabulary subsystems specified end-to-end with schema, audit ledgers, Markdown mirrors, and reversibility property tests.
 - Canonical-HTML ePUB pipeline specified with EPUBCheck integration, visual regression, golden-file regression, and reproducibility tests.
 - Eight Claude Code skills, ten hooks, ten subagents specified with seed stubs in `.claude/`.
