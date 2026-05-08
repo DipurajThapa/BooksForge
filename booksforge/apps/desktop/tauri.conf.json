@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http://127.0.0.1:11434"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http://127.0.0.1:11434 https://updates.booksforge.app"
     }
   },
   "bundle": {
@@ -40,8 +40,24 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "externalBin": [
+      "binaries/pandoc-3.5",
+      "binaries/epubcheck-runner"
+    ],
     "resources": [
       "resources/fonts/**/*"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "active": false,
+      "endpoints": [
+        "https://updates.booksforge.app/{{target}}/{{current_version}}"
+      ],
+      "pubkey": "REPLACE_ME_WITH_GENERATED_TAURI_UPDATER_PUBLIC_KEY",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

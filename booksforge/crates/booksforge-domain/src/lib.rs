@@ -11,6 +11,7 @@ pub mod agent_io;
 pub mod agent_record;
 pub mod brief;
 pub mod council;
+pub mod crash_report;
 pub mod entity;
 pub mod error;
 pub mod lexorank;
