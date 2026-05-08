@@ -1,0 +1,43 @@
+# Audit #59 — pre-commit + pre-push hooks via lefthook.
+#
+# Catches the cheapest CI gates locally before they get pushed:
+# Rust formatting, Rust clippy on the staged crate(s), pnpm typecheck
+# and lint.  Every step is skippable with `LEFTHOOK=0 git commit ...`
+# when you genuinely need to bypass it (a WIP commit on a branch,
+# for example) — but the default is loud, so accidental bypasses are
+# obvious in the diff.
+#
+# Install on a fresh checkout:
+#   cd booksforge && pnpm dlx lefthook install
+# or, if lefthook is already on $PATH:
+#   cd booksforge && lefthook install
+#
+# The `parallel: true` setting runs the steps in parallel; the slowest
+# step gates commit time.  `cargo fmt` is fast (sub-second on a warm
+# checkout); clippy is the long-pole (~30s cold, ~5s warm) which is
+# why it runs only on pre-push, not pre-commit.
+
+pre-commit:
+  parallel: true
+  commands:
+    rust-fmt:
+      glob: "**/*.rs"
+      run: cargo fmt --all -- --check
+      stage_fixed: false
+    ts-typecheck:
+      glob: "**/*.{ts,tsx}"
+      run: pnpm -r typecheck
+    ts-lint:
+      glob: "**/*.{ts,tsx}"
+      run: pnpm -r lint
+
+pre-push:
+  parallel: false
+  commands:
+    rust-clippy:
+      run: cargo clippy --workspace --all-targets -- -D warnings
+    rust-test:
+      # Smoke run, not the full matrix — full suite stays in CI to keep
+      # the local push gate under a minute.  Use `cargo test --workspace`
+      # before opening a PR.
+      run: cargo test --workspace --lib

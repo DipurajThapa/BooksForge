@@ -47,6 +47,44 @@ cargo test -p booksforge-domain entity_matches_name
 cd booksforge && pnpm --filter @booksforge/shared-types typecheck
 ```
 
+## Pre-commit / pre-push hooks (audit #59)
+
+We use [lefthook](https://github.com/evilmartians/lefthook) to run the
+cheapest CI gates locally before they reach CI.  The config lives at
+`booksforge/lefthook.yml`.
+
+```bash
+cd booksforge
+pnpm install        # `prepare` script auto-installs the hooks
+# or, manually:
+pnpm dlx lefthook install
+```
+
+Hooks run:
+
+| Stage      | Command                                        | When it fires |
+|------------|------------------------------------------------|---------------|
+| pre-commit | `cargo fmt --all -- --check`                   | any `*.rs` staged |
+| pre-commit | `pnpm -r typecheck`                            | any `*.ts*` staged |
+| pre-commit | `pnpm -r lint`                                 | any `*.ts*` staged |
+| pre-push   | `cargo clippy --workspace --all-targets -- -D warnings` | every push |
+| pre-push   | `cargo test --workspace --lib`                 | every push |
+
+Bypass with `LEFTHOOK=0 git commit ...` for genuine WIP work — the
+bypass is loud in the diff so accidents are easy to spot.
+
+## Frontend bundle-size reports (audit #52)
+
+The Vite build emits a treemap to `apps/desktop/src-ui/dist/bundle-report.html`
+when `BOOKSFORGE_BUNDLE_REPORT=1` is set or when running under CI.
+Local dev builds skip the visualiser to keep HMR cheap.  Open the HTML
+file in any browser to see gzipped/brotli-compressed module sizes.
+
+```bash
+BOOKSFORGE_BUNDLE_REPORT=1 pnpm --filter @booksforge/desktop-ui build
+open booksforge/apps/desktop/src-ui/dist/bundle-report.html
+```
+
 ## Dependency-pin policy
 
 | Layer | Pin specificity | Update path |
