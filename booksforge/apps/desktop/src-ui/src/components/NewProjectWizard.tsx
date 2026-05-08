@@ -276,6 +276,11 @@ function phaseLabel(step: Step, phase: Phase): string {
 }
 
 // ── Step 1 ───────────────────────────────────────────────────────────────────
+//
+// Audit #27 — inline per-field validation on the project-creation wizard.
+// The Next button is disabled until the form is valid, AND each field
+// surfaces a specific error message once the user has touched it
+// (touch-on-blur means we don't yell on first render).
 function Step1({
   form, onChange, onNext, onCancel,
 }: {
@@ -284,28 +289,91 @@ function Step1({
   onNext: () => void;
   onCancel: () => void;
 }) {
-  const valid = form.title.trim().length > 0 && form.author.trim().length > 0;
+  const [touchedTitle,  setTouchedTitle]  = useState(false);
+  const [touchedAuthor, setTouchedAuthor] = useState(false);
+
+  const titleError = validateTitle(form.title);
+  const authorError = validateAuthor(form.author);
+
+  const valid = titleError === null && authorError === null;
+
+  function handleAttemptNext() {
+    // Reveal both errors if the user clicks Next on a still-invalid form.
+    setTouchedTitle(true);
+    setTouchedAuthor(true);
+    if (valid) onNext();
+  }
+
   return (
     <div style={s.body}>
       <h2 style={s.title}>Name your project</h2>
       <label style={s.label}>
         Book title
-        <input style={s.input} value={form.title}
+        <input
+          style={touchedTitle && titleError ? { ...s.input, ...s.inputError } : s.input}
+          value={form.title}
           onChange={(e) => onChange("title", e.target.value)}
-          placeholder="e.g. The Midnight Archive" autoFocus />
+          onBlur={() => setTouchedTitle(true)}
+          placeholder="e.g. The Midnight Archive"
+          autoFocus
+          aria-invalid={touchedTitle && titleError !== null}
+          aria-describedby={touchedTitle && titleError ? "bf-wizard-title-err" : undefined}
+        />
+        {touchedTitle && titleError && (
+          <span id="bf-wizard-title-err" role="alert" style={s.fieldErr}>
+            {titleError}
+          </span>
+        )}
       </label>
       <label style={s.label}>
         Author
-        <input style={s.input} value={form.author}
+        <input
+          style={touchedAuthor && authorError ? { ...s.input, ...s.inputError } : s.input}
+          value={form.author}
           onChange={(e) => onChange("author", e.target.value)}
-          placeholder="e.g. Jane Smith" />
+          onBlur={() => setTouchedAuthor(true)}
+          placeholder="e.g. Jane Smith"
+          aria-invalid={touchedAuthor && authorError !== null}
+          aria-describedby={touchedAuthor && authorError ? "bf-wizard-author-err" : undefined}
+        />
+        {touchedAuthor && authorError && (
+          <span id="bf-wizard-author-err" role="alert" style={s.fieldErr}>
+            {authorError}
+          </span>
+        )}
       </label>
       <div style={s.footer}>
         <button style={s.ghostBtn} onClick={onCancel}>Cancel</button>
-        <button style={s.primaryBtn} onClick={onNext} disabled={!valid}>Next</button>
+        <button
+          style={s.primaryBtn}
+          onClick={handleAttemptNext}
+          disabled={!valid}
+          aria-disabled={!valid}
+        >
+          Next
+        </button>
       </div>
     </div>
   );
+}
+
+/** Returns null if the title is acceptable, otherwise the user-visible reason. */
+export function validateTitle(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0)        return "Title is required.";
+  if (trimmed.length > 200)        return "Title is too long (max 200 characters).";
+  if (/[<>:"\\|?*\x00-\x1f]/.test(trimmed)) {
+    return "Title contains characters that won't survive the filesystem (< > : \" \\ | ? *).";
+  }
+  return null;
+}
+
+/** Returns null if the author is acceptable, otherwise the user-visible reason. */
+export function validateAuthor(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return "Author is required.";
+  if (trimmed.length > 120) return "Author is too long (max 120 characters).";
+  return null;
 }
 
 // ── Step 2 ───────────────────────────────────────────────────────────────────
@@ -525,6 +593,16 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 5, fontSize: 14, background: "var(--color-surface)",
     color: "var(--color-text-primary)", fontFamily: "var(--font-ui)", outline: "none",
     width: "100%", boxSizing: "border-box",
+  },
+  // Audit #27 — inline-error styling for the wizard's per-field validation.
+  inputError: {
+    borderColor:  "var(--color-error, #d1242f)",
+    background:   "var(--color-error-bg, rgba(209, 36, 47, 0.05))",
+  },
+  fieldErr: {
+    fontSize:    12,
+    color:       "var(--color-error, #d1242f)",
+    marginTop:   "calc(var(--space-1) * -0.25)",
   },
   gridTwo: {
     display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)",

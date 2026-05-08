@@ -11,13 +11,28 @@
 import React, { useState } from "react";
 import { useDialogA11y } from "../lib/useDialogA11y";
 
-interface Props { onClose: () => void; }
+interface Props {
+  onClose: () => void;
+  /**
+   * Optional callback that re-opens the welcome onboarding tour.
+   * When provided, the Quickstart tab surfaces a "Show welcome tour"
+   * button that fires this callback and closes the drawer.  Audit
+   * #28 — onboarding must be re-openable from the Help menu.
+   */
+  onReplayWelcome?: () => void;
+}
 
 type Tab = "quickstart" | "shortcuts" | "agents";
 
-export default function HelpDrawer({ onClose }: Props) {
+export default function HelpDrawer({ onClose, onReplayWelcome }: Props) {
   const { dialogProps, titleId } = useDialogA11y(onClose);
   const [tab, setTab] = useState<Tab>("quickstart");
+
+  function handleReplayWelcome() {
+    if (!onReplayWelcome) return;
+    onClose();
+    onReplayWelcome();
+  }
 
   return (
     <div style={s.overlay} role="presentation">
@@ -34,7 +49,25 @@ export default function HelpDrawer({ onClose }: Props) {
         </div>
 
         <div style={s.body}>
-          {tab === "quickstart" && <Quickstart />}
+          {tab === "quickstart" && (
+            <>
+              <Quickstart />
+              {onReplayWelcome && (
+                <div style={s.replayRow}>
+                  <button
+                    type="button"
+                    style={s.replayBtn}
+                    onClick={handleReplayWelcome}
+                  >
+                    Show welcome tour
+                  </button>
+                  <span style={s.replayHint}>
+                    Re-opens the three-card walkthrough you saw on first launch.
+                  </span>
+                </div>
+              )}
+            </>
+          )}
           {tab === "shortcuts"  && <Shortcuts />}
           {tab === "agents"     && <AgentsHelp />}
         </div>
@@ -224,4 +257,7 @@ const s: Record<string, React.CSSProperties> = {
   cellName: { padding: 6, fontWeight: 600 },
   cellCat:  { padding: 6, opacity: 0.7, fontStyle: "italic" },
   cellBlurb:{ padding: 6 },
+  replayRow:  { display: "flex", alignItems: "center", gap: 10, marginTop: 8, paddingTop: 12, borderTop: "1px solid var(--color-border)", flexWrap: "wrap" },
+  replayBtn:  { background: "var(--color-accent, #2e7d32)", color: "#fff", border: "none", borderRadius: 4, padding: "6px 12px", cursor: "pointer", fontSize: 13, fontWeight: 500 },
+  replayHint: { fontSize: 12, opacity: 0.7, lineHeight: 1.4, flex: 1, minWidth: 200 },
 };
