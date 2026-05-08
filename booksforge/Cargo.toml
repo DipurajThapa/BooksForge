@@ -33,7 +33,7 @@ license      = "UNLICENSED"
 
 # Tauri — exact pins per TOOLCHAIN.md
 tauri               = { version = "=2.2.3", features = ["protocol-asset"] }
-tauri-build         = { version = "=2.2.3" }
+tauri-build         = { version = "=2.6.1" }
 tauri-plugin-dialog = "2"
 
 # Async runtime
