@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { AppVersion, OpenProjectResult, OllamaStatusResponse } from "@booksforge/shared-types";
 import ProjectPicker from "./components/ProjectPicker";
@@ -7,6 +7,9 @@ import EditorShell from "./components/EditorShell";
 import OllamaWizard from "./components/OllamaWizard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/ToastProvider";
+import { ShortcutHelp } from "./components/ShortcutHelp";
+import { useShortcut } from "./lib/keymap";
+import { t } from "./lib/i18n";
 
 type AppView =
   | { tag: "picker" }
@@ -34,6 +37,14 @@ function AppContent() {
   const [ollama, setOllama] = useState<OllamaStatusResponse | null>(null);
   const [version, setVersion] = useState<AppVersion | null>(null);
   const [showOllamaWizard, setShowOllamaWizard] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // `?` (or `mod+?` on macOS-style binding) opens the shortcut help.
+  // The `app.show-shortcuts` binding is registered in lib/keymap.ts.
+  useShortcut(
+    "app.show-shortcuts",
+    useCallback(() => setShowShortcuts(true), []),
+  );
 
   useEffect(() => {
     invoke<AppVersion>("app_version").then(setVersion).catch(() => null);
@@ -85,6 +96,9 @@ function AppContent() {
           }}
         />
       )}
+      {showShortcuts && (
+        <ShortcutHelp onClose={() => setShowShortcuts(false)} />
+      )}
     </>
   );
 }
@@ -105,10 +119,10 @@ function OllamaStatusBar({
     ? "var(--color-success)"
     : "var(--color-error)";
   const title = !ollama
-    ? "Checking…"
+    ? t("ollama.status.checking")
     : ollama.running
-    ? `Ollama ${ollama.version ?? "running"} — click to manage`
-    : "Ollama offline — click to set up";
+    ? `${t("ollama.status.online")} ${ollama.version ?? ""}`.trim()
+    : t("ollama.status.offline");
   return (
     <div style={s.bar}>
       <button

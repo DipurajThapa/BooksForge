@@ -22,6 +22,11 @@ import type {
   ExportDependencyReport, ExportDependencyStatus, SaveDiagnosticBundleResult,
 } from "@booksforge/shared-types";
 import { ipc } from "../lib/ipc";
+import {
+  getThemePreference,
+  setThemePreference,
+  type ThemePreference,
+} from "../lib/theme";
 
 interface Props { onClose: () => void; }
 
@@ -45,6 +50,12 @@ export default function SettingsPanel({ onClose }: Props) {
   // promise; persistence lands when the settings table arrives.
   const [crashReports, setCrashReports] = useState(false);
   const [usageMetrics, setUsageMetrics] = useState(false);
+
+  // Theme preference (System / Light / Dark) — persisted in
+  // localStorage by lib/theme.ts.  initThemeSystem() in main.tsx
+  // applies the saved preference at boot; changing it here applies
+  // immediately via setThemePreference.
+  const [theme, setTheme] = useState<ThemePreference>(() => getThemePreference());
 
   useEffect(() => {
     ipc.exportCheckDependencies().then(setDeps).catch(() => null);
@@ -92,6 +103,48 @@ export default function SettingsPanel({ onClose }: Props) {
         </header>
 
         <div style={s.body}>
+          {/* ── Section 0: Appearance (theme) ── */}
+          <section style={s.section}>
+            <h4 style={s.sectionTitle}>Appearance</h4>
+            <p style={s.sectionBlurb}>
+              Match the operating-system theme, or pin BooksForge to a
+              specific light or dark theme.
+            </p>
+            <div role="radiogroup" aria-label="Theme" style={{ display: "flex", gap: "0.5rem" }}>
+              {(["system", "light", "dark"] as const).map((value) => (
+                <label
+                  key={value}
+                  style={{
+                    flex: 1,
+                    padding: "0.5rem 0.75rem",
+                    border: theme === value
+                      ? "1px solid var(--color-primary, #0969da)"
+                      : "1px solid var(--color-neutral-300, #d0d7de)",
+                    borderRadius: "0.375rem",
+                    cursor: "pointer",
+                    textTransform: "capitalize",
+                    background: theme === value
+                      ? "var(--color-primary-bg, #ddf4ff)"
+                      : "transparent",
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="bf-theme"
+                    value={value}
+                    checked={theme === value}
+                    onChange={() => {
+                      setTheme(value);
+                      setThemePreference(value);
+                    }}
+                    style={{ marginRight: "0.5rem" }}
+                  />
+                  {value === "system" ? "Match system" : value}
+                </label>
+              ))}
+            </div>
+          </section>
+
           {/* ── Section 1: Telemetry ── */}
           <section style={s.section}>
             <h4 style={s.sectionTitle}>Telemetry &amp; crash reports</h4>
