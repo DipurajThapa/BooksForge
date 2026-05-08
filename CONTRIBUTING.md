@@ -36,6 +36,35 @@ Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`
 - [ ] No `unwrap()` / `expect()` in non-test code
 - [ ] Layer boundaries respected: L3 crates have no L4 imports in `Cargo.toml`
 - [ ] Privacy invariant: Ollama calls only go to `127.0.0.1:11434`
+- [ ] **New React component?** add an `axe` test in `src/a11y.test.tsx` (see "Accessibility testing" below)
+- [ ] **New panel / dialog?** uses `useDialogA11y()` for focus management + `aria-labelledby` + `role="dialog"` (or `alertdialog` for errors)
+
+## Accessibility testing
+
+Every new React component should be exercised by `axe-core` in
+`apps/desktop/src-ui/src/a11y.test.tsx`.  The setup file
+(`src/test-setup.ts`) registers the `toHaveNoViolations` matcher
+globally so any vitest test can:
+
+```typescript
+import { axe } from "vitest-axe";
+
+it("MyComponent is accessible", async () => {
+  const { container } = render(<MyComponent />);
+  const result = await axe(container);
+  expect(result).toHaveNoViolations();
+});
+```
+
+`axe` automatically detects ~57 % of WCAG 2.2 violations.  The
+remaining issues require manual / AT testing on real hardware
+(VoiceOver, NVDA, JAWS); that is a pre-release task in
+[`MILESTONES.md`](MILESTONES.md) M6 §I1, not a per-PR gate.
+
+Running `pnpm test` runs the a11y suite alongside everything else.
+A failed `toHaveNoViolations` prints the rule, the offending
+selector, and the recommended fix — *don't suppress violations*,
+fix the component or file an issue.
 
 ## Running a single test
 
