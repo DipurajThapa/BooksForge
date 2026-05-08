@@ -10,7 +10,7 @@
  *   - generic_epub / kdp_ebook → in-process EPUB-3 packager + opt-in EPUBCheck
  *   - docx / trade_pdf_5x8 / trade_pdf_6x9 → Pandoc subprocess
  */
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import type {
   ExportHistoryEntry, ExportRunResult,
@@ -131,6 +131,21 @@ export default function ExportPanel({ onClose }: Props) {
   const [result,    setResult]    = useState<ExportRunResult | null>(null);
   const [error,     setError]     = useState<string | null>(null);
   const [history,   setHistory]   = useState<ExportHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError,   setHistoryError]   = useState<string | null>(null);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const list = await ipc.exportHistory();
+      setHistory(list);
+    } catch (e) {
+      setHistoryError(String(e));
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
 
   const profile = PROFILES.find(p => p.id === profileId)!;
   // Genre typography is meaningful for EPUB, PDF, and DOCX.  Markdown
@@ -150,8 +165,8 @@ export default function ExportPanel({ onClose }: Props) {
   }
 
   useEffect(() => {
-    ipc.exportHistory().then(setHistory).catch(() => null);
-  }, []);
+    void loadHistory();
+  }, [loadHistory]);
 
   async function handleExport() {
     setError(null);
@@ -172,7 +187,7 @@ export default function ExportPanel({ onClose }: Props) {
       });
       setResult(r);
       // Refresh history after a successful run.
-      ipc.exportHistory().then(setHistory).catch(() => null);
+      void loadHistory();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -291,8 +306,27 @@ export default function ExportPanel({ onClose }: Props) {
 
           <section>
             <h4 style={s.sectionTitle}>History</h4>
-            {history.length === 0 ? (
-              <div style={s.empty}>No exports yet.</div>
+            {historyLoading ? (
+              <div style={s.empty} role="status" aria-live="polite">
+                Loading export history…
+              </div>
+            ) : historyError ? (
+              <div style={s.historyError} role="alert">
+                <div style={s.historyErrorMsg}>
+                  Couldn't load export history: {historyError}
+                </div>
+                <button
+                  type="button"
+                  style={s.historyRetry}
+                  onClick={() => void loadHistory()}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : history.length === 0 ? (
+              <div style={s.empty}>
+                No exports yet. Pick a profile above and click <strong>Run export</strong> to ship your first build.
+              </div>
             ) : (
               <ul style={s.history}>
                 {history.map(h => (
@@ -353,4 +387,7 @@ const s: Record<string, React.CSSProperties> = {
   twoLevel:    { display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" },
   twoLevelLabel: { display: "flex", flexDirection: "column", gap: 4 },
   twoLevelLabelText: { fontSize: 11, opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.05em" },
+  historyError:    { display: "flex", flexDirection: "column", gap: 6, padding: 8, border: "1px solid var(--color-error, #c62828)", borderRadius: 4, color: "var(--color-error, #c62828)", background: "var(--color-error-bg, rgba(198,40,40,0.08))" },
+  historyErrorMsg: { fontSize: 12, lineHeight: 1.4 },
+  historyRetry:    { alignSelf: "flex-start", padding: "4px 10px", border: "1px solid currentColor", borderRadius: 3, background: "transparent", color: "inherit", cursor: "pointer", fontSize: 12 },
 };
