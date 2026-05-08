@@ -1,0 +1,45 @@
+# BooksForge — code ownership and review gates.
+#
+# Lines later in this file take precedence. The default owner is the
+# repository owner; specific paths add additional required reviewers.
+#
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything in the repo.
+*                                          @DipurajThapa
+
+# ── Security-sensitive surfaces ─────────────────────────────────────────
+#
+# Tauri capability JSONs widen the desktop attack surface. Any change
+# here must be reviewed for least-privilege. Adding `shell:`, `http:`,
+# or broad `fs:` patterns requires a documented justification in the PR.
+# (Audit ref: EXTERNAL_AUDIT_BACKLOG.md #16)
+booksforge/apps/desktop/capabilities/**    @DipurajThapa
+booksforge/apps/desktop/tauri.conf.json    @DipurajThapa
+
+# CI workflows define what runs on every PR — including the privacy
+# invariants tests. Drift here can silently disable enforcement.
+.github/workflows/**                       @DipurajThapa
+booksforge/.github/workflows/**            @DipurajThapa
+
+# Privacy posture: cross-layer policy. Any new entry to deny.toml's
+# bans / licenses block, or any change to the privacy_invariants test,
+# must be reviewed against outputs/SECURITY_PRIVACY.md.
+booksforge/deny.toml                                                    @DipurajThapa
+booksforge/crates/booksforge-orchestrator/tests/privacy_invariants.rs   @DipurajThapa
+
+# IPC contract: changes here ripple to TS via ts-rs codegen. Reviewers
+# should verify codegen_drift CI is green and that handwritten TS bindings
+# are not introduced.
+booksforge/crates/booksforge-ipc/**        @DipurajThapa
+booksforge/packages/shared-types/**        @DipurajThapa
+
+# Storage migrations are forward-only at runtime. New SQL files OK;
+# edits to existing migration files are NOT.
+booksforge/crates/booksforge-storage/migrations/**   @DipurajThapa
+
+# Governance / legal artefacts.
+LICENSE                                    @DipurajThapa
+SECURITY.md                                @DipurajThapa
+CODE_OF_CONDUCT.md                         @DipurajThapa
+THIRD_PARTY_LICENSES.md                    @DipurajThapa

@@ -1,0 +1,152 @@
+# Dependabot configuration for BooksForge.
+#
+# Strategy: weekly grouped PRs per ecosystem. Patch-level updates within
+# a trusted scope (`@tiptap/*`, `@types/*`, formatter / linter ecosystem)
+# are auto-merged if CI is green; everything else requires manual review.
+#
+# Refs: EXTERNAL_AUDIT_BACKLOG.md #41 (Dependabot enable), #58 (auto-merge
+# scope guardrails). This file enables the bot; auto-merge automation
+# is configured separately at the repository settings level.
+
+version: 2
+
+updates:
+  # ─────────────────────────────────────────────────────────────────────
+  # Cargo workspace (booksforge/)
+  # ─────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "cargo"
+    directory: "/booksforge"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "deps"
+      - "rust"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      tauri-stack:
+        patterns:
+          - "tauri*"
+      sqlx-stack:
+        patterns:
+          - "sqlx*"
+      tokio-stack:
+        patterns:
+          - "tokio*"
+          - "tracing*"
+      serde-stack:
+        patterns:
+          - "serde*"
+          - "serde_json"
+      patch-updates:
+        update-types:
+          - "patch"
+        # Group every patch-level change into a single PR — keeps noise
+        # down and is the bucket eligible for auto-merge once CI is green.
+    ignore:
+      # Pin Rust core deps tightly; bumps to these are deliberate human
+      # decisions, not bot-driven.
+      - dependency-name: "tauri"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "sqlx"
+        update-types: ["version-update:semver-major"]
+
+  # ─────────────────────────────────────────────────────────────────────
+  # pnpm workspace (booksforge/)
+  # ─────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/booksforge"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "deps"
+      - "frontend"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      tiptap-stack:
+        patterns:
+          - "@tiptap/*"
+      react-stack:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react*"
+      vite-stack:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+      tooling:
+        patterns:
+          - "typescript"
+          - "eslint*"
+          - "prettier*"
+          - "vitest"
+          - "@testing-library/*"
+      patch-updates:
+        update-types:
+          - "patch"
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@tiptap/core"
+        update-types: ["version-update:semver-major"]
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Sub-package workspaces (each pnpm package gets its own scan)
+  # ─────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/booksforge/apps/desktop/src-ui"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    labels: ["deps", "frontend", "desktop-ui"]
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  # ─────────────────────────────────────────────────────────────────────
+  # GitHub Actions — keep the CI pipeline itself patched.
+  # ─────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels: ["deps", "ci"]
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/booksforge"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels: ["deps", "ci"]
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"
+    groups:
+      actions:
+        patterns:
+          - "*"
