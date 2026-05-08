@@ -1,0 +1,61 @@
+name: Feature request
+description: Suggest a new capability or change to BooksForge.
+title: "[feat] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion.  Before filing, please skim
+        `outputs/MVP_SCOPE.md §3` for the explicit
+        out-of-MVP list — many requested features (Linux build, cloud
+        LLMs, real-time collaboration, marketplace, voice / audiobook,
+        etc.) are deliberately deferred to V1+ and your request will be
+        closed with a pointer to that section.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem you are trying to solve
+      description: Describe the user problem or workflow gap, not the implementation idea.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: One paragraph.  If you have alternatives in mind, list them too.
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Where does this fit in the architecture?
+      options:
+        - "Editor / TipTap"
+        - "Binder / project navigation"
+        - "Agents / AI workflows"
+        - "Memory / vocabulary"
+        - "Snapshots / restore"
+        - "Templates / validators"
+        - "Export pipeline (DOCX / PDF / EPUB)"
+        - "Settings / Ollama / privacy"
+        - "Onboarding / help / a11y"
+        - "Distribution / installer / updater"
+        - "Not sure"
+
+  - type: input
+    id: spec-ref
+    attributes:
+      label: Relevant spec doc (if any)
+      description: A pointer to `outputs/<file>.md §X` if your idea overlaps an existing spec section.
+      placeholder: "outputs/UI_UX_SPEC.md §5"
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Your sense of priority
+      options:
+        - "Nice to have"
+        - "Would make my workflow noticeably better"
+        - "I cannot use BooksForge for what I want without it"

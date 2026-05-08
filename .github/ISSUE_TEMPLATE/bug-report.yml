@@ -1,0 +1,104 @@
+name: Bug report
+description: Something is broken or behaving unexpectedly.
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.  **Privacy first:** do
+        not paste manuscript content here unless it is essential to
+        reproducing the bug.  If you must, redact names / passages, or
+        attach a `.zip` from *Settings → Diagnostics → Save diagnostic
+        bundle* (it auto-redacts manuscript text and bundle paths).
+
+        For security or privacy vulnerabilities, **stop here** and use
+        the private link in `SECURITY.md` instead.
+
+  - type: input
+    id: app-version
+    attributes:
+      label: BooksForge version
+      description: From *Help → About* (e.g. `0.1.0-rc.3`).
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS 14 (Sonoma) on Apple Silicon
+        - macOS 14 (Sonoma) on Intel
+        - macOS 13 (Ventura)
+        - Windows 11
+        - Windows 10
+        - Other / older
+    validations:
+      required: true
+
+  - type: input
+    id: ollama-version
+    attributes:
+      label: Ollama version (if relevant)
+      description: From `ollama --version` in a terminal.
+      placeholder: "0.x.y"
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe what went wrong.  Please include any error message text verbatim.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: One or two sentences.
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a project of size …
+        2. Click …
+        3. Observe …
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / diagnostic bundle
+      description: |
+        Drag-drop the diagnostic bundle (*Settings → Diagnostics → Save
+        diagnostic bundle*) here, or paste the relevant lines from
+        `~/.booksforge/logs/`.  PII redaction is automatic.
+      render: text
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity (best guess)
+      options:
+        - Data loss / data corruption
+        - Crash / cannot launch
+        - Feature broken (workaround possible)
+        - Visual / cosmetic
+        - Performance
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy posture
+      options:
+        - label: I have not pasted any sensitive manuscript content above.
+          required: true
+        - label: I am willing to be contacted by the maintainers via this issue thread for follow-up.
+          required: true

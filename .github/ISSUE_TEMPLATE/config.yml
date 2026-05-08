@@ -1,0 +1,16 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security or privacy vulnerability
+    url: https://github.com/DipurajThapa/BooksForge/security/advisories/new
+    about: |
+      Do NOT open a public issue for security or privacy bugs.  Use the
+      private GitHub Security Advisory link, or email the address in
+      SECURITY.md.  This includes anything that might cause manuscript
+      content to leave the device, anything that bypasses the AI-consent
+      gate, or anything that breaks the Ollama loopback invariant.
+  - name: Question / discussion
+    url: https://github.com/DipurajThapa/BooksForge/discussions
+    about: |
+      For "how do I…" or "is this expected…" please use Discussions
+      rather than the issue tracker.  Bug reports and feature requests
+      remain in Issues.
