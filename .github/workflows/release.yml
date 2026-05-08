@@ -1,0 +1,285 @@
+# BooksForge — release pipeline.
+#
+# Triggers:
+#   - manual via `workflow_dispatch` (always available, useful for dry-runs)
+#   - push of a tag matching `v*.*.*` (production release)
+#
+# Status: SCAFFOLDED.  This file is in place but the production release
+# path requires the following secrets/inputs to be provisioned at the
+# GitHub repository or organisation level *before* the first tag push:
+#
+#   - APPLE_DEVELOPER_ID_CERT          (base64 .p12, macOS code-signing)
+#   - APPLE_DEVELOPER_ID_PASSWORD      (.p12 password)
+#   - APPLE_NOTARIZATION_APPLE_ID      (Apple ID with notarization rights)
+#   - APPLE_NOTARIZATION_TEAM_ID       (10-char team identifier)
+#   - APPLE_NOTARIZATION_PASSWORD      (app-specific password)
+#   - WINDOWS_SIGNING_CERT             (base64 .pfx EV cert)
+#   - WINDOWS_SIGNING_PASSWORD         (.pfx password)
+#   - TAURI_UPDATER_PUBLIC_KEY         (paired with the private key in TAURI_SIGNING_PRIVATE_KEY)
+#   - TAURI_SIGNING_PRIVATE_KEY        (used by the Tauri updater plugin to sign manifests)
+#   - TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+#
+# Until those are set, runs will skip the signing+notarization steps
+# and produce *unsigned* artefacts useful only for manual smoke-testing.
+#
+# Refs: EXTERNAL_AUDIT_BACKLOG.md #37 (code-signing), #38 (release
+#       pipeline), #39 (auto-updater), #44 (production tauri.conf.json
+#       metadata).  MILESTONES.md M6.A.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (no leading v, e.g. 0.1.0-rc.1)"
+        required: true
+        type: string
+      sign:
+        description: "Sign + notarize (requires secrets to be set)"
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write   # create release, upload assets
+  id-token: write   # for keyless OIDC signing of SBOMs (future)
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────
+  # Pre-release verification.  Fail fast if CI gates aren't green.
+  # ─────────────────────────────────────────────────────────────────────
+  preflight:
+    name: Pre-release verification
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+      should_sign: ${{ steps.sign-decision.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            v="${GITHUB_REF#refs/tags/v}"
+          else
+            v="${{ inputs.version }}"
+          fi
+          echo "value=${v}" >> "$GITHUB_OUTPUT"
+          echo "Releasing version ${v}"
+
+      - name: Decide signing posture
+        id: sign-decision
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "value=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ inputs.sign }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify Cargo.toml version matches tag
+        if: github.event_name == 'push'
+        run: |
+          cargo_version=$(grep '^version = ' booksforge/Cargo.toml | head -1 | cut -d'"' -f2)
+          tag_version="${{ steps.version.outputs.value }}"
+          if [[ "${cargo_version}" != "${tag_version}" ]]; then
+            echo "::error::Cargo.toml version (${cargo_version}) does not match tag (${tag_version})"
+            exit 1
+          fi
+
+      # The production release reuses CI's gating jobs.  Anything that
+      # would fail on a normal PR fails here too — there is no fast path
+      # that skips clippy / tests / privacy_invariants for release.
+      - name: cargo fmt
+        run: cd booksforge && cargo fmt --all -- --check
+
+      - name: cargo clippy
+        run: cd booksforge && cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo deny check
+        run: |
+          cargo install --locked cargo-deny || true
+          cd booksforge && cargo deny check licenses bans advisories sources
+
+      - name: cargo test
+        run: cd booksforge && cargo test --workspace --all-targets
+
+      - name: cargo test privacy_invariants
+        run: cd booksforge && cargo test -p booksforge-orchestrator --test privacy_invariants
+
+      - name: cargo test reproducibility
+        run: cd booksforge && cargo test -p booksforge-export-epub --test reproducibility
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Build + sign + bundle on every gating platform.
+  # ─────────────────────────────────────────────────────────────────────
+  build:
+    name: Build (${{ matrix.platform }})
+    needs: preflight
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-arm64
+            runner: macos-14
+            target: aarch64-apple-darwin
+            bundle: dmg
+          - platform: macos-x64
+            runner: macos-13
+            target: x86_64-apple-darwin
+            bundle: dmg
+          - platform: windows-x64
+            runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            bundle: msi
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.11.0"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "9.12.3"
+          run_install: false
+
+      - name: Install npm deps
+        run: cd booksforge && pnpm install --frozen-lockfile
+
+      - name: Tauri build (unsigned)
+        if: needs.preflight.outputs.should_sign != 'true'
+        run: |
+          cd booksforge
+          pnpm tauri build --target ${{ matrix.target }}
+
+      # ── Signed-build branch: only runs when secrets are provisioned. ──
+      - name: Tauri build (signed)
+        if: needs.preflight.outputs.should_sign == 'true' && runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_DEVELOPER_ID_CERT }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_NOTARIZATION_APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_NOTARIZATION_TEAM_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          cd booksforge
+          pnpm tauri build --target ${{ matrix.target }}
+
+      - name: Tauri build (signed)
+        if: needs.preflight.outputs.should_sign == 'true' && runner.os == 'Windows'
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_SIGNING_CERT }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          cd booksforge
+          pnpm tauri build --target ${{ matrix.target }}
+
+      # ── SBOM generation (CycloneDX) per artefact. ──
+      - name: Generate SBOM (cargo)
+        run: |
+          cargo install --locked cargo-cyclonedx || true
+          cd booksforge
+          cargo cyclonedx --format json --output-pattern bom-rust-${{ matrix.platform }}.json
+
+      - name: Generate SBOM (npm)
+        run: |
+          cd booksforge
+          pnpm dlx @cyclonedx/cyclonedx-npm --output-file ../bom-npm-${{ matrix.platform }}.json
+        continue-on-error: true   # CycloneDX npm tool is best-effort.
+
+      # ── Upload artefacts so the release-publish job can pick them up. ──
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.platform }}
+          path: |
+            booksforge/target/${{ matrix.target }}/release/bundle/${{ matrix.bundle }}/*
+          if-no-files-found: error
+
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.platform }}
+          path: |
+            bom-rust-${{ matrix.platform }}.json
+            bom-npm-${{ matrix.platform }}.json
+          if-no-files-found: warn
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Aggregate artefacts and publish to GitHub Releases.
+  # ─────────────────────────────────────────────────────────────────────
+  publish:
+    name: Publish GitHub Release
+    needs: [preflight, build]
+    if: github.event_name == 'push'   # only on real tags
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artefacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artefacts
+
+      - name: Compute SHA256 checksums
+        run: |
+          cd artefacts
+          find . -type f \( -name "*.dmg" -o -name "*.msi" \) -exec sha256sum {} \; > ../SHA256SUMS.txt
+          cat ../SHA256SUMS.txt
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true   # human reviews + publishes manually for the first releases
+          prerelease: ${{ contains(needs.preflight.outputs.version, '-rc') || contains(needs.preflight.outputs.version, '-alpha') || contains(needs.preflight.outputs.version, '-beta') }}
+          name: BooksForge ${{ needs.preflight.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            artefacts/installer-*/**
+            artefacts/sbom-*/**
+            SHA256SUMS.txt
+          body: |
+            ## BooksForge ${{ needs.preflight.outputs.version }}
+
+            > Auto-generated draft release.  Verify the artefacts and
+            > publish manually.
+
+            ### Verification
+            - Verify each installer's SHA256 against `SHA256SUMS.txt`.
+            - On macOS: `spctl --assess --verbose <BooksForge.app>` should
+              return `accepted source=Notarized Developer ID`.
+            - On Windows: right-click MSI → Properties → Digital
+              Signatures should show a valid EV signature.
+
+            ### Privacy
+            BooksForge does not transmit manuscript content.  The auto-
+            updater check (if enabled) is the only outbound network
+            call this build performs.  Disable it in
+            *Settings → Updates* to operate fully offline.
+
+            ### Source
+            ${{ github.server_url }}/${{ github.repository }}/tree/${{ github.sha }}
