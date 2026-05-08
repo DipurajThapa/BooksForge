@@ -22,12 +22,17 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:11434"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http://127.0.0.1:11434 https://updates.booksforge.app"
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "BooksForge",
+    "copyright": "Copyright (c) 2026 BooksForge contributors. All rights reserved.",
+    "shortDescription": "Local-first writing app with on-device AI agents.",
+    "longDescription": "BooksForge is a local-first desktop application that helps writers go from idea to publication-ready files (DOCX, PDF, EPUB-3) using a bounded swarm of local-LLM agents running on Ollama. Your manuscript never leaves your device by default.",
+    "category": "Productivity",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -36,7 +41,23 @@
       "icons/icon.ico"
     ],
     "externalBin": [
-      "binaries/pandoc-3.5"
+      "binaries/pandoc-3.5",
+      "binaries/epubcheck-runner"
+    ],
+    "resources": [
+      "resources/fonts/**/*"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "active": false,
+      "endpoints": [
+        "https://updates.booksforge.app/{{target}}/{{current_version}}"
+      ],
+      "pubkey": "REPLACE_ME_WITH_GENERATED_TAURI_UPDATER_PUBLIC_KEY",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
