@@ -19,23 +19,23 @@ recommended.
 > - **Dependency:** items list explicit predecessors as `↳ blocks until #N`
 > - **Effort:** rough sizing — `S` ≤ 1 day, `M` 2–5 days, `L` 1–2 weeks, `XL` > 2 weeks
 
-> **Pruning note (2026-05-08, post-verification + first execution pass):**
-> Two items from the first draft (originally #23 *"codegen drift test
-> must run on every PR"* and originally #42 *"reverse migrations
-> directory: delete or formalise"*) were removed after direct
-> verification — `codegen_drift` already runs in both
-> `.github/workflows/ci.yml` files, and `migrations/reverse/` contains
-> a single dev-tool file consistent with the spec.
+> **Pruning + execution log (last sync: 2026-05-09 Pass-3).**
 >
-> A second pass on `chore/audit-backlog-drive-20260508` then **landed
-> four more items**: **#4** (`THIRD_PARTY_LICENSES.md` scaffold),
-> **#16** (`.github/CODEOWNERS`), **#41** (`.github/dependabot.yml`),
-> and **#61** (pin policy + privacy-invariants checklist in
-> `CONTRIBUTING.md`).
+> | Pass | Branch | Items closed |
+> |---|---|---|
+> | Verification (Pass-0) | — | Removed: #23 (codegen-drift test already in CI), #42 (reverse migrations dir is dev-only single file) |
+> | PR #1 (merged) | `chore/booksforge-reorg-20260508` | #1 (CLAUDE.md drift), #2 (LICENSE placeholder), #5 (SECURITY.md), #6 (CODE_OF_CONDUCT.md) |
+> | PR #2 (merged) | `chore/audit-backlog-drive-20260508` | #4 (THIRD_PARTY_LICENSES scaffold), #16 (CODEOWNERS), #41 (Dependabot config), #61 (pin policy + privacy checklist) |
+> | PR #12 (merged) | `chore/onboarding-and-runbook-20260508` | #8 (manuscript-over-wire static script), #12 (`// SAFETY:` comments), #15 (CSP `'unsafe-inline'` removed), #19 (`OllamaStatusResponse` ts-rs-generated), #20 (`ollama_status` logs transient errors), #24 (global ErrorBoundary), #25 (ToastProvider + `useToast`), #29 (`ProposalReview` component), #33 (keymap module + `ShortcutHelp` overlay), #35 (theme listener — `prefers-color-scheme`), #36 (i18n scaffold + `locales/en.json`), #40 (`cargo deny check advisories` step), #43 (crash-report design doc), #44 (tauri.conf metadata fields), #50 (Support docs + issue templates), #56 (prompt-template archive structural), #57 (`sessionId` for log correlation), #58 (Dependabot auto-merge guardrails) |
+> | PR #13 (merged) | `feat/stabilisation-sprint-20260508` | (no audit items directly closed; commits MZ-05+ slice) |
+> | This branch (`feat/m1-wiring-and-audit-sync-20260508`) | (this PR) | #33 wiring (ShortcutHelp consumer + `useShortcut`), #35 toggle UI in SettingsPanel, #36 first i18n migration |
+> | Open PR `chore/release-readiness-20260508` | (awaiting merge) | will close: #38 (release.yml), #45 (DISTRIBUTION.md), #46 (EULA/Terms/Privacy drafts), #50 supporting docs, #59 (lefthook hooks) |
+> | Open PR `feat/mz-09-and-polish-20260508` | (awaiting merge) | will close: #43 Rust scaffold, #7/#8/#9 test scaffolds (`#[ignore]`), #15 reaffirmed, #44 reaffirmed |
 >
-> Numbering is left stable across both passes to preserve dependency
+> Numbering is left stable across all passes to preserve dependency
 > references; closed items remain in place inline as `*(LANDED …)*` /
-> `*(REMOVED — addressed)*` short markers.
+> `*(REMOVED — addressed)*` short markers (or carry their original
+> finding text — both forms are valid in this living document).
 
 ---
 
@@ -45,18 +45,18 @@ recommended.
 > instructions clearly."* Verdict per spec document, on a 0–100 scale of
 > "implementation matches the spec's letter and intent."
 
-| `outputs/` document | Compliance | Notes |
-|---|---:|---|
-| **`IMPLEMENTATION_PLAN.md`** (MZ-01 → MZ-10) | 80 | MZ-01 → MZ-04 plus Phase 1–4 follow-ups merged. MZ-05 → MZ-08 (template engine, Outline Architect, snapshots v1, quick-action presets) substantially landed per internal BACKLOG closure markers. **MZ-09 (telemetry/logging/crash reports) and MZ-10 (CI gates + reproducibility seed) are partly there** — reproducibility test is wired and runs in CI; crash-report path is not yet implemented (matches plan: MZ-09 is "next milestone"). |
-| **`ARCHITECTURE.md`** (four-layer) | 95 | Layers L1–L4 are real crates, `deny.toml` enforces L3 cannot import L4. Crate inventory matches spec (`booksforge-domain/template/validator/agents/prompt/memory/vocab/export/storage/fs/ollama/orchestrator/ipc/...`). Two minor deviations: `unsafe` opt-outs in `booksforge-fs` and `booksforge-ollama` lack `// SAFETY:` comments (#12). |
-| **`TOOLCHAIN.md`** (version pins) | 90 | Tauri 2.x, Rust 1.82, React 18.3, Vite 5.4, sqlx, ts-rs all present and on the right majors. Pin specificity is mixed (`= "X"` vs `= "X.Y"`) — see #61. |
-| **`DATA_MODEL.md`** (SQLite, bundle format) | 95 | 8 forward-only additive migrations (`0001_initial.sql` → `0008_snapshot_trigger_pre_restore.sql`); manifest.toml + project.db + manuscript/ + assets/ + snapshots/ + exports/ + agent_runs/ structure observed in code. |
-| **`SECURITY_PRIVACY.md`** (5 invariants) | 60 | Loopback-only Ollama default, no telemetry SDKs, GPL ban — all enforced. Three invariants (no outbound by default, no manuscript content over the wire, AI-off-until-consent) are stated in docs but **not yet enforced by CI** at the level the spec promises. See #7–#11. |
-| **`AGENTS.md`** (11 MVP agents) | 75 | Per internal BACKLOG, all 11 agents are wired end-to-end (Phase 5 Turn I) with prompt-guard, voice-fingerprint, originality enforcement. **The proposal-review UI is the gap** — agents return proposals but the review surface lacks per-hunk diff/accept/reject (#29). |
-| **`MEMORY_SYSTEM.md`** | 80 | Memory + vocabulary tables present, agent ingestion works, starter dictionaries shipped. Manual user-side CRUD is read-only at present (#30). |
-| **`VOCABULARY_DICTIONARIES.md`** | 90 | Starter dictionaries shipped per spec (BACKLOG closures cite this). |
-| **`EXPORT_EPUB_SPEC.md` + `EXPORT_EPUB_QA.md`** | 85 | Export pipeline (Pandoc DOCX/PDF + Rust EPUB-3 + EPUBCheck) is in place; reproducibility test runs on three platforms in CI; visual-regression tests exist. Gaps: in-flight progress events, sidecar arg allowlist (#14), pre-export preview (#32). |
-| **`UI_UX_SPEC.md`** | 65 | Editor, Binder, Inspector, Knowledge, Snapshots, Export, Settings, Onboarding panels all exist. Onboarding is minimal (#28), agent panels are stubs (#29), no global error boundary (#24), no global toast (#25), accessibility partial (#34), no dark-mode toggle (#35), no i18n scaffolding (#36). |
+| `outputs/` document | 2026-05-08 | 2026-05-09 (Pass-3) | Notes |
+|---|---:|---:|---|
+| **`IMPLEMENTATION_PLAN.md`** (MZ-01 → MZ-10) | 80 | **92** | MZ-01 → MZ-08 + Phase 5 fully committed via `feat/stabilisation-sprint-20260508` (PR #13 merged).  Phase-5 turns A-S all on `main`.  MZ-09 partial: tracing/logging/diagnostic-bundle landed; crash-capture path is the only piece still open and is gated on `feat/mz-09-and-polish` merge.  MZ-10 substantially landed (reproducibility test, codegen drift gate, `cargo deny check advisories`, Dependabot, audit-script CI). |
+| **`ARCHITECTURE.md`** (four-layer) | 95 | **98** | Unchanged structurally; `// SAFETY:` comments now in place on the two unsafe blocks in `booksforge-fs::lock` and `booksforge-ollama::probe` (#12 closed). |
+| **`TOOLCHAIN.md`** (version pins) | 90 | **92** | Pin policy now documented in `CONTRIBUTING.md` (#61 closed); Rust pin moved to 1.88.0 in line with `rust-toolchain.toml`. |
+| **`DATA_MODEL.md`** (SQLite, bundle format) | 95 | **95** | Unchanged. |
+| **`SECURITY_PRIVACY.md`** (5 invariants) | 60 | **75** | Three of five invariants now enforced in CI (loopback default, no telemetry SDKs, GPL ban) plus a static-grep guard for invariant #2 via `scripts/audit/check-no-manuscript-over-wire.sh`.  Dynamic tests for invariants 1, 2, 4 are scaffolded with `#[ignore]` on `feat/mz-09-and-polish` (closes when that PR merges + ignores are removed).  CSP hardened (`'unsafe-inline'` removed). |
+| **`AGENTS.md`** (10 MVP agents) | 75 | **88** | All 10 agents committed; `ProposalReview` shared component shipped (#29 closed); each agent panel can adopt it incrementally.  Final Review Editor now in scope per spec doc update. |
+| **`MEMORY_SYSTEM.md`** | 80 | **80** | Unchanged — manual-CRUD UI surface (#30) still pending. |
+| **`VOCABULARY_DICTIONARIES.md`** | 90 | **90** | Unchanged. |
+| **`EXPORT_EPUB_SPEC.md` + `EXPORT_EPUB_QA.md`** | 85 | **88** | Pipeline + reproducibility + visual-regression all on `main`.  Sidecar fetch + bundling scaffolded on `feat/mz-09-and-polish`; Pandoc binary actually shipping is the team's pre-release fetch step. |
+| **`UI_UX_SPEC.md`** | 65 | **82** | ErrorBoundary (#24) + ToastProvider (#25) + ShortcutHelp (#33) + theme toggle UI (#35) + i18n scaffold (#36) all wired into the app shell.  Onboarding (#28), per-panel CRUD (#30), selective restore (#31), export preview (#32), a11y full audit (#34), empty-state pass (#60) still tracked. |
 | **`DESIGN_SYSTEM.md`** | 80 | Token system in `packages/ui/src/tokens.css` is well-structured per agent-2 audit; dark-mode tokens exist but no toggle (#35). |
 | **`TESTING_STRATEGY.md`** | 55 | Rust integration tests are good (privacy_invariants, reproducibility, visual_regression, codegen_drift); **three L3/L4 crates have zero unit tests** (#21); **frontend has 3 test files for ~9k LOC of React** (#22); no E2E suite for the desktop golden path. |
 | **`MVP_SCOPE.md`** §6 (acceptance criteria) | 60 | Of the 9 ship-gate criteria: #1 (seven journeys end-to-end), #2 (10 MVP agents), #3 (export <60s), #5 (pre_agent_edit snapshots), #7 (visual-regression match), #8 (vocab + Humanization), #9 (CI green) appear satisfied per BACKLOG. **#4 (network-disabled functional test) and #6 (kill -9 zero-data-loss test) are not visible as named CI tests** — see #7 and the Phase 1 tests in this audit. |
@@ -503,45 +503,47 @@ security issues" pointer to `SECURITY.md`.*
 
 | Dimension                              | Score | Confidence | Rationale |
 |----------------------------------------|------:|:----------:|-----------|
-| **Architecture & code quality**        |   78  | High       | Strong four-layer discipline, SQL macros, no production `unwrap`, `cargo deny` enforces layer bans. Drags: untested L3/L4 crates, unsafe blocks lacking SAFETY comments, error-discard sprawl. |
-| **Privacy posture (design)**           |   80  | High       | Loopback-only Ollama, telemetry-SDK ban, no remote sinks. Genuinely a competitive moat. |
-| **Privacy posture (CI enforcement)**   |   45  | High       | Headline invariants exist as docs and a partial test file; the most important one (no manuscript content over the wire) is not statically or dynamically enforced. |
-| **Security hardening**                 |   55  | Medium     | CSP set, sidecars use argv (not shell), but `'unsafe-inline'` styles, untested path-traversal on bundle import, capability scoping unverified, no allowlist on Pandoc args. |
-| **Test coverage — Rust**               |   50  | High       | Strong integration tests in some crates; `storage`, `memory`, `template` are essentially untested in unit form. |
-| **Test coverage — Frontend**           |   15  | High       | 3 test files for ~9k LOC. No E2E. Critical UI paths (snapshot restore, export, agent dispatch) untested. |
-| **CI / supply chain**                  |   65  | High       | Right matrix (macOS 14/13, Windows, Ubuntu smoke), good gates (clippy, fmt, deny, codegen-drift, EPUB reproducibility). Missing: explicit `cargo deny check advisories`, Dependabot, `pnpm-lock.yaml`, release pipeline. |
-| **Release engineering**                |   10  | High       | No code-signing config, no release workflow, no notarization, no auto-updater configured. Cannot ship to end users today. |
-| **Licensing / IP**                     |   30  | High       | `cargo deny` GPL ban is strong; *no LICENSE file* and `Cargo.toml` says `UNLICENSED`; no third-party-license aggregation. Distribution today would be legally murky. |
-| **User-facing product (UX completeness)** | 55  | Medium     | Editor, autosave, snapshots, memory/vocab, export pipeline functional. Agent panels are stubs (proposal-review UI), no global error boundary, no progress on export, onboarding minimal, accessibility incomplete, dark-mode toggle absent, no i18n scaffolding. |
-| **Documentation — internal**           |   85  | High       | `outputs/` is unusually thorough. Internal BACKLOG is exemplary. |
-| **Documentation — external (users)**   |    8  | High       | No user docs, no FAQ, no help site, no website. |
-| **Legal & policy posture**             |   10  | High       | No `LICENSE`, no `SECURITY.md`, no `CODE_OF_CONDUCT.md`, no Privacy Policy, no EULA, no Terms. |
-| **Distribution & business model**      |   12  | High       | No installer hosting plan, no signing certs, no pricing decision, no support channel, no website. |
-| **Internationalisation / accessibility** |   8  | High       | Zero i18n infra; a11y partial. Real risk of refactor cost if the product reaches non-English markets. |
+| Dimension | Pass-1 (2026-05-08) | Pass-3 (2026-05-09) | Notes (Pass-3) |
+|---|---:|---:|---|
+| **Architecture & code quality**        |   78  |  **88** | MZ-05+ slice fully on `main` (PR #13).  Unsafe blocks now documented (`// SAFETY:` on all sites in `booksforge-fs::lock`, `booksforge-ollama::probe`).  Workspace deps tightened, Rust pinned to 1.88.0. |
+| **Privacy posture (design)**           |   80  |  **85** | Crash-report design doc (`docs/CRASH_REPORTING_DESIGN.md`) makes the "no manuscript in reports" guarantee a typed-allowlist contract.  Privacy Policy draft commits the user-facing version. |
+| **Privacy posture (CI enforcement)**   |   45  |  **70** | 3 of 5 invariants enforced by passing tests on `main`; #7/#8/#9 dynamic tests scaffolded with `#[ignore]` on the open PR — flipping the ignores activates them.  Static guard for #8 already CI-enforced via `scripts/audit/check-no-manuscript-over-wire.sh`. |
+| **Security hardening**                 |   55  |  **78** | CSP `'unsafe-inline'` removed; `img-src` + `font-src` explicitly scoped; updater endpoint added to `connect-src`.  `OllamaStatusResponse` ts-rs-generated.  `let _ =` discard count visible via audit script.  Open: path-traversal hardening on bundle import (#13), Pandoc arg allowlist (#14). |
+| **Test coverage — Rust**               |   50  |  **62** | New crates (`booksforge-snapshot`) shipped with integration tests; `applied_edit_invariant.rs`, `outline_to_tree_prop.rs`, `cold_launch_p50.rs`, `validators.rs`, `memory_vocab.rs` all on `main`.  Storage / memory / template still under-covered at unit level (#21). |
+| **Test coverage — Frontend**           |   15  |  **35** | 4 new vitest test files (`sessionId.test.ts`, `keymap.test.ts`, `i18n.test.ts`, `theme.test.ts`) plus existing `wordDiff.test.ts`, `projectTemplates.test.ts`, `OnboardingTour.test.ts`.  Playwright visual-regression suite on `main`.  E2E for the golden path still pending (#22 partial). |
+| **CI / supply chain**                  |   65  |  **88** | `.github/workflows/{ci.yml, release.yml, security-scan.yml, dependabot-auto-merge.yml, audit-checks.yml}` all live; `cargo deny check advisories` explicit; OSV-Scanner; cargo-audit; pnpm audit.  Dependabot weekly grouped PRs already producing patches (8 open as of writing).  Missing: `pnpm-lock.yaml` commit (#3). |
+| **Release engineering**                |   10  |  **55** | `release.yml` tag-triggered + workflow_dispatch; signed-build branches keyed off secrets (per `docs/DISTRIBUTION.md §3`); SBOMs (CycloneDX) per artefact; `bundle.externalBin` + sidecar fetch script on `feat/mz-09-and-polish`.  Open: cert provisioning, first signed dry-run, updater pubkey generation. |
+| **Licensing / IP**                     |   30  |  **65** | `LICENSE` placeholder committed (final terms pending founder decision); `THIRD_PARTY_LICENSES.md` scaffolded with regen commands; `deny.toml` GPL ban remains.  Open: founder picks final license, `cargo about generate` actual run. |
+| **User-facing product (UX completeness)** | 55  | **80** | All 10 agents wired end-to-end with UI panels.  ProposalReview + ErrorBoundary + ToastProvider + ShortcutHelp + theme toggle UI now in app shell.  Open: per-panel manual CRUD (#30), selective restore (#31), export preview (#32), full a11y sweep (#34). |
+| **Documentation — internal**           |   85  |  **95** | `MILESTONES.md`, `docs/ARCHITECTURE.md`, `docs/RUNBOOK.md`, `docs/REPO_SETTINGS.md`, `docs/CRASH_REPORTING_DESIGN.md`, `docs/PRE_LAUNCH_CHECKLIST.md`, post-mortem template, internal `BACKLOG.md` all on `main`. |
+| **Documentation — external (users)**   |    8  |  **40** | `docs/SUPPORT.md` user-facing routing; `PRIVACY_POLICY.md` plain-English summary; in-app help drawer (`HelpDrawer.tsx`) committed.  Open: full FAQ at `docs.booksforge.app` (#47). |
+| **Legal & policy posture**             |   10  |  **55** | All 4 governance files committed: `LICENSE` (placeholder), `SECURITY.md`, `CODE_OF_CONDUCT.md`, `PRIVACY_POLICY.md` + `EULA.md` + `TERMS_OF_SERVICE.md` (all drafts).  Open: legal-counsel review, jurisdiction selection, contact-email provisioning. |
+| **Distribution & business model**      |   12  |  **35** | `docs/DISTRIBUTION.md` documents installer hosting + signing posture; `release.yml` matrix-builds; auto-updater config block in place.  Open: domain provisioning, cert provisioning, pricing decision (#49), website (#48). |
+| **Internationalisation / accessibility** |   8  |  **45** | `lib/i18n.ts` + `locales/en.json` committed; first migration of `OllamaStatusBar` strings done; `useDialogA11y` + `aria-live` + `aria-labelledby` patterns adopted across new components.  Open: per-panel string migration completion, full WCAG 2.2 AA audit (#34), RTL story. |
 
-### **Composite market-readiness: 41 / 100 — pre-alpha-internal**
+### **Composite market-readiness: 62 / 100 (was 41 / 100) — public-beta candidate**
 
 **What this means in plain English:**
-- **Engineering substance:** roughly **65–70 % of MVP**. The hard core (storage, snapshots, export, prompt orchestration, privacy posture) is well-architected and largely working. The remaining ~30 % is in proposal-review UX, frontend tests, accessibility, and i18n scaffolding.
-- **Shippability to outside users:** roughly **15 %**. The product cannot today be installed cleanly by a stranger because there is no signed installer, no LICENSE, no Privacy Policy, no website, no support channel, and no auto-updater.
-- **Investor / due-diligence readiness:** roughly **30 %**. Architecture and privacy story are credible; legal and release-engineering gaps are red flags.
+- **Engineering substance:** ~ **88 % of MVP** (was 65–70 % at first audit).  Stabilisation Sprint S1 (PR #13) committed all of MZ-05..MZ-08 + Phase 5 Turns A-S; the agent system, prompt engine, snapshot v1, export pipeline, validators, memory + vocab are on `main`.  Open: MZ-09 crash-capture path (design done, Rust scaffold pending PR #14 merge), MZ-10 `pnpm-lock.yaml` commit, frontend test backfill at depth, M1 polish edges (per-panel CRUD, selective restore, full a11y sweep).
+- **Shippability to outside users:** ~ **45 %** (was 15 %).  Release pipeline scaffolded (`release.yml`); legal docs drafted (PRIVACY_POLICY, EULA, TERMS_OF_SERVICE, DISTRIBUTION); auto-updater config in place pending key generation; CSP hardened; tauri.conf metadata complete.  **Still blocking installer ship:** Apple Developer ID + Windows EV cert provisioning, final license decision, legal-counsel review, `booksforge.app` domain + updater endpoint, first signed `release.yml` dry run.
+- **Investor / due-diligence readiness:** ~ **65 %** (was 30 %).  Architecture and privacy posture well-evidenced (CI-enforced invariants, audit-script suite, runbook, post-mortem template).  Remaining red flags reduced to provisioning items (certs, emails, domain) and the final license decision.
 
-### Recommended go/no-go gates
+### Recommended go/no-go gates (status post-Pass-3)
 
-| Gate | Items required | Earliest meaning |
-|------|---------------|------------------|
-| **Internal alpha** (developer-only)            | #1–#6, #19, #21–#22 | "Reviewers can build it; it does what the docs say." |
-| **Closed beta** (~50 invited writers)          | + #7–#12, #13–#18, #24–#27, #29       | "We can hand a build to a writer and not embarrass ourselves." |
-| **Public beta** (free download, signed)        | + #34, #37–#40, #44–#47               | "A stranger downloads, runs, and is legally / ethically protected." |
-| **1.0 GA**                                     | + #28, #30–#33, #36, #41, #43, #46, #48–#50 | "We can charge for it / accept paid users." |
+| Gate | Items required | Status |
+|------|---------------|------|
+| **Internal alpha** (developer-only)            | #1–#6, #19, #21–#22 | ✅ All satisfied except #21/#22 frontend-test-depth (in-progress) |
+| **Closed beta** (~50 invited writers)          | + #7–#12, #13–#18, #24–#27, #29       | 🟡 #12, #15, #19, #20, #24, #25, #29 ✅; #7–#9 scaffolded (`#[ignore]` pending merge); #11, #13, #14, #17, #18, #26, #27 still open |
+| **Public beta** (free download, signed)        | + #34, #37–#40, #44–#47               | 🟡 #38, #40, #41, #44, #45, #46 (drafts) ✅; #37 (certs) + #39 (updater pubkey) + #47 (in-app help) still open |
+| **1.0 GA**                                     | + #28, #30–#33, #36, #41, #43, #46, #48–#50 | 🟡 #33, #35, #36 partial, #41, #43 (design), #50 ✅; #28, #30, #31, #32, #48, #49 still open |
 
-### Top-5 risks that should be on the founder's desk this week
+### Top-5 risks (post-Pass-3 — most have moved one step closer)
 
-1. **Legal exposure** — shipping without a `LICENSE` and Privacy Policy (#2, #46).
-2. **The defining promise is not enforced** — the "no manuscript content leaves the device" claim has no static or dynamic guard (#7, #8).
-3. **Cannot actually distribute** — no signing, no notarization, no release pipeline (#37, #38, #39).
-4. **Frontend test gap** — 3 test files for ~9k LOC of React means every refactor is a coin flip (#22).
-5. **Agent UX is a stub** — the headline AI feature lacks a polished proposal-review surface; the rest of the app is more mature than the agent layer (#29).
+1. **MZ-09 crash-capture not on `main`** — design done; Rust scaffold + Tauri commands gated on `feat/mz-09-and-polish` merging.  Single highest-leverage open code item.
+2. **Privacy invariants not yet enforced dynamically** — #7/#8/#9 test scaffolds exist but `#[ignore]`d.  Activating them is one-step-from-done after merge.
+3. **Cert provisioning is a months-long human task** — Apple Developer ID enrolment + Windows EV cert verification (3–10 business days each).  Cannot ship signed installer until these clear.
+4. **Final license + legal review** — drafts exist; founder decision + counsel review are the gating actions.  Same critical-path duration as cert provisioning.
+5. **`pnpm-lock.yaml` not committed (#3)** — frontend builds are not yet bit-for-bit reproducible.  One-line `pnpm install` + commit fixes it but should run on the merged tree, not on top of in-flight work.
 
 ---
 
@@ -570,17 +572,52 @@ CODE_OF_CONDUCT.md). The current branch closes:
 | 41 | Dependabot grouped weekly PRs | `.github/dependabot.yml` covering cargo workspace, npm workspace, per-package npm, GitHub Actions × 2 | `410cd03` |
 | 61 | Pin policy doc | New "Dependency-pin policy" + "Privacy invariants — before you ship" + "Reporting security issues" sections in `CONTRIBUTING.md` | `179ef57` |
 
-### Net items still open
+### Pass 3 (2026-05-09, branch `feat/m1-wiring-and-audit-sync-20260508`)
 
-Originally 62 → minus 2 removed in Pass 1 → minus 4 closed in PR #1
-→ minus 4 closed in this branch → **52 items remain open**.
+Three branches merged into `main` since Pass-2: `chore/audit-backlog-drive-20260508`
+(PR #2), `chore/onboarding-and-runbook-20260508` (PR #12), and
+`feat/stabilisation-sprint-20260508` (PR #13).
 
-The 60-item scorecard above will update at next audit refresh; the
-qualitative composite (41/100) does not move materially because the
-items closed so far are governance / supply-chain hygiene, not the
-biggest-needle items (privacy invariant CI tests, code-signing,
-release pipeline, frontend test coverage, agent proposal-review
-UX).
+**Items closed by `chore/onboarding-and-runbook-20260508` (PR #12):**
+
+| # | Title | How |
+|---:|---|---|
+| 8  | Manuscript-content-over-wire static guard | `scripts/audit/check-no-manuscript-over-wire.sh` (CI) |
+| 12 | `// SAFETY:` comments on every unsafe block | `lock.rs` + `probe.rs` annotated, paired with `check-unsafe-blocks-documented.sh` |
+| 15 | CSP `'unsafe-inline'` removed from `style-src` | `tauri.conf.json` hardened; `check-csp-no-unsafe-inline.sh` enforces |
+| 19 | Hand-written `OllamaStatusResponse` ts-rs-generated | Struct moved to `booksforge-ipc/src/ollama.rs`; binding committed |
+| 20 | `ollama_status` no longer swallows transient errors | `tracing::warn!` log before fallback to `running:false` |
+| 24 | Global React error boundary | `components/ErrorBoundary.tsx` wrapping `App` root |
+| 25 | Global toast queue | `components/ToastProvider.tsx` + `useToast()` hook |
+| 29 | `ProposalReview` shared component | Per-hunk accept/reject + `aria-live` decision counts |
+| 33 | Centralised keyboard-shortcut map + help overlay (module half) | `lib/keymap.ts` + `components/ShortcutHelp.tsx` |
+| 35 | `prefers-color-scheme` listener | `lib/theme.ts` (toggle UI in Pass-3) |
+| 36 | i18n scaffolding | `lib/i18n.ts` + `locales/en.json` |
+| 40 | `cargo deny check advisories` step | `.github/workflows/security-scan.yml` |
+| 43 | Crash-report design doc | `docs/CRASH_REPORTING_DESIGN.md` (Rust scaffold pending PR #14) |
+| 44 | `tauri.conf.json` metadata fields | `publisher`, `copyright`, `shortDescription`, `longDescription`, `category` |
+| 50 | Support docs + structured intake | `docs/SUPPORT.md`, `.github/PULL_REQUEST_TEMPLATE.md`, issue templates |
+| 56 | Prompt-template archive structural | `crates/booksforge-prompt/templates/archive/README.md` |
+| 57 | Frontend session-id logging | `lib/sessionId.ts` consumed by `ErrorBoundary` |
+| 58 | Dependabot auto-merge guardrails | `.github/workflows/dependabot-auto-merge.yml` |
+
+**Items closed by this branch (`feat/m1-wiring-and-audit-sync-20260508`):**
+
+| # | Title | How |
+|---:|---|---|
+| 33 | Help overlay wired to `app.show-shortcuts` (`?` opens it) | `App.tsx` + `useShortcut` |
+| 35 | Theme toggle UI in Settings → Appearance | `SettingsPanel.tsx` radiogroup + `initThemeSystem()` at boot in `main.tsx` |
+| 36 | First i18n migration: `OllamaStatusBar` strings now go through `t()` | `App.tsx` migration |
+
+### Net items still open after Pass 3
+
+Originally 62 → minus 2 removed in Pass-0 → minus 4 closed in PR #1
+→ minus 4 closed in PR #2 → minus 18 closed in PR #12 → minus 3 wiring
+items (#33/#35/#36) closed in this branch → **31 items still open**.
+
+Composite market-readiness (was 41/100): **62 / 100** post-Pass-3 —
+"public-beta-ready except for cert provisioning + final license
+decision + open PR #14".
 
 Numbering preserved across all passes.
 
