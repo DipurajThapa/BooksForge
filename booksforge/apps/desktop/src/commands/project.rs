@@ -11,7 +11,8 @@ use booksforge_ipc::{
     project::{CreateProjectInput, OpenProjectInput, OpenProjectResult, RecentProjectEntry},
     BooksForgeError,
 };
-use booksforge_storage::{open_pool, run_migrations, SqliteStorage};
+use booksforge_storage::{open_pool, run_migrations, SqliteStorage, StorageRepository};
+use booksforge_vocab::all_starter_entries;
 use chrono::Utc;
 use tauri::State;
 
@@ -70,6 +71,14 @@ pub async fn project_create(
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
 
     let storage = Arc::new(SqliteStorage::new(pool));
+
+    // Seed the shipped vocabulary dictionaries (Phase 3).  This is an
+    // idempotent upsert keyed by `(layer, term, kind)` — re-opening an
+    // existing project re-runs it harmlessly so future template updates
+    // can land on top of older bundles.
+    if let Ok(starters) = all_starter_entries() {
+        let _ = storage.vocab_seed_starters(&starters).await;
+    }
 
     // Update recent projects list.
     let mut settings = settings::load_settings()

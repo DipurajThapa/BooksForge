@@ -1,5 +1,6 @@
 import React from "react";
 import type { RecoveryStatus } from "@booksforge/shared-types";
+import { useDialogA11y } from "../lib/useDialogA11y";
 
 interface Props {
   status: RecoveryStatus;
@@ -8,15 +9,23 @@ interface Props {
 }
 
 export default function RecoveryDialog({ status, onRestore, onDiscard }: Props) {
+  // Discard is the safe default for ESC on an alertdialog: it
+  // dismisses the recovery prompt and leaves the user with the
+  // last-saved state (no destructive action without explicit
+  // Restore-then-Save).
+  const { dialogProps, titleId } = useDialogA11y(onDiscard);
   const date = status.pending_at
     ? new Date(status.pending_at).toLocaleString()
     : "unknown time";
 
   return (
-    <div style={s.overlay}>
-      <div style={s.dialog} role="alertdialog" aria-modal="true">
+    <div style={s.overlay} role="presentation">
+      {/* `useDialogA11y` provides the aria-modal/labelledby + ESC + focus
+          plumbing; we override role to `alertdialog` because this is a
+          destructive-choice prompt (per WAI-ARIA 1.2 guidance). */}
+      <div {...dialogProps} role="alertdialog" style={s.dialog}>
         <div style={s.icon}>⚠️</div>
-        <h2 style={s.title}>Unsaved changes found</h2>
+        <h2 id={titleId} style={s.title}>Unsaved changes found</h2>
         <p style={s.body}>
           BooksForge found an unsaved scene from a previous session (
           {date}). This may have been caused by an unexpected quit.

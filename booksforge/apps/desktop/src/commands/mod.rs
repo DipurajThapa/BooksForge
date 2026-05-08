@@ -1,4 +1,11 @@
+pub mod agents;
+pub mod ai;
+pub mod diagnostics;
 pub mod editor;
+pub mod export;
+pub mod memory_vocab;
 pub mod ollama;
 pub mod project;
+pub mod snapshot;
 pub mod system;
+pub mod validators;

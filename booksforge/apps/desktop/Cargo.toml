@@ -18,7 +18,15 @@ booksforge-storage      = { path = "../../crates/booksforge-storage" }
 booksforge-fs           = { path = "../../crates/booksforge-fs" }
 booksforge-ollama       = { path = "../../crates/booksforge-ollama" }
 booksforge-orchestrator = { path = "../../crates/booksforge-orchestrator" }
+booksforge-snapshot     = { path = "../../crates/booksforge-snapshot" }
+booksforge-export       = { path = "../../crates/booksforge-export" }
+booksforge-export-epub  = { path = "../../crates/booksforge-export-epub" }
+booksforge-export-pandoc = { path = "../../crates/booksforge-export-pandoc" }
+booksforge-epubcheck    = { path = "../../crates/booksforge-epubcheck" }
+booksforge-vocab        = { path = "../../crates/booksforge-vocab" }
+booksforge-validator    = { path = "../../crates/booksforge-validator" }
 booksforge-agents       = { path = "../../crates/booksforge-agents" }
+ulid.workspace          = true
 
 tauri.workspace               = true
 tauri-plugin-dialog.workspace = true
@@ -30,3 +38,10 @@ thiserror.workspace          = true
 tokio.workspace              = true
 tracing.workspace            = true
 tracing-subscriber.workspace = true
+tracing-appender.workspace   = true
+dirs.workspace               = true
+zip.workspace                = true
+ts-rs.workspace              = true
+
+[lints]
+workspace = true
