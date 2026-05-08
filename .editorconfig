@@ -1,0 +1,53 @@
+# EditorConfig — keeps formatting consistent across editors and OSes.
+# https://editorconfig.org/
+#
+# Pairs with .gitattributes (which enforces line endings at git level)
+# to make a fresh clone produce sane defaults regardless of editor or
+# platform.  Refs: EXTERNAL_AUDIT_BACKLOG.md (root governance hygiene).
+
+root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+max_line_length = 100
+
+# Rust uses 4-space indent.
+[*.rs]
+indent_size = 4
+max_line_length = 100
+
+# TOML, JSON, YAML — 2-space.
+[*.{toml,json,yaml,yml}]
+indent_size = 2
+
+# Markdown — preserve trailing whitespace (used for hard line breaks).
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
+
+# Shell scripts.
+[*.sh]
+indent_size = 2
+
+# Windows scripts — must use CRLF.
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+# Makefiles require tabs.
+[Makefile]
+indent_style = tab
+
+# Generated TS bindings — keep machine output untouched.
+[booksforge/packages/shared-types/src/bindings/**]
+trim_trailing_whitespace = false
+insert_final_newline = false
+
+# sqlx offline cache — machine-generated.
+[booksforge/.sqlx/**]
+trim_trailing_whitespace = false
+insert_final_newline = false

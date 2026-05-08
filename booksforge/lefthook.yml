@@ -1,0 +1,99 @@
+# Lefthook config — pre-commit and pre-push gates for BooksForge.
+#
+# Run these locally so PRs do not get sent back for the same trivial
+# fmt / clippy / typecheck failures CI would catch.
+#
+# Setup:
+#   cargo install lefthook
+#   lefthook install
+#
+# Skip a single hook in an emergency:
+#   LEFTHOOK_EXCLUDE=clippy git commit
+# Skip all hooks (loud — only for true emergencies):
+#   git commit --no-verify
+#
+# Refs: EXTERNAL_AUDIT_BACKLOG.md #59, CONTRIBUTING.md "PR checklist".
+
+# Run hooks for staged files only by default; speeds up incremental
+# work. Hooks marked `run_only_changed: false` always run on the
+# whole workspace.
+
+pre-commit:
+  parallel: true
+  commands:
+    fmt-rust:
+      glob: "**/*.rs"
+      run: cargo fmt --all -- --check
+      stage_fixed: false
+      tags: rust fmt
+    clippy:
+      glob: "**/*.rs"
+      run: cargo clippy --workspace --all-targets -- -D warnings
+      tags: rust lint
+    typecheck-ts:
+      glob: "**/*.{ts,tsx}"
+      run: pnpm --silent typecheck
+      tags: ts lint
+    lint-ts:
+      glob: "**/*.{ts,tsx}"
+      run: pnpm --silent lint
+      tags: ts lint
+    deny-licenses-bans:
+      glob: "Cargo.{toml,lock}"
+      run: cargo deny check licenses bans
+      tags: rust supply-chain
+    no-debug-leftovers:
+      glob: "**/*.{ts,tsx,js,jsx}"
+      run: |
+        if grep -nE '(^|[^a-zA-Z_])(debugger|console\.(log|debug))[^a-zA-Z_]?' {staged_files}; then
+          echo ""
+          echo "❌ Debug-only statements detected. Remove them or convert to a proper log."
+          exit 1
+        fi
+      tags: ts hygiene
+    no-merge-markers:
+      glob: "**/*"
+      run: |
+        if grep -nE '^(<<<<<<<|=======|>>>>>>>)' {staged_files} 2>/dev/null; then
+          echo "❌ Unresolved merge-conflict markers in staged files."
+          exit 1
+        fi
+      tags: hygiene
+
+pre-push:
+  parallel: false
+  commands:
+    test-rust:
+      run: cargo test --workspace --all-targets
+      tags: rust test
+    test-ipc-codegen-drift:
+      run: cargo test -p booksforge-ipc --test codegen_drift
+      tags: ipc codegen
+    test-privacy-invariants:
+      run: cargo test -p booksforge-orchestrator --test privacy_invariants
+      tags: privacy
+    deny-advisories:
+      run: cargo deny check advisories
+      tags: rust supply-chain
+
+# Convenience hooks that are not auto-triggered but can be invoked
+# manually with `lefthook run <name>`.
+release-preflight:
+  parallel: false
+  commands:
+    fmt:
+      run: cargo fmt --all -- --check
+    clippy:
+      run: cargo clippy --workspace --all-targets -- -D warnings
+    deny:
+      run: cargo deny check licenses bans advisories sources
+    test:
+      run: cargo test --workspace --all-targets
+    test-reproducibility:
+      run: cargo test -p booksforge-export-epub --test reproducibility
+    typecheck:
+      run: pnpm typecheck
+    lint:
+      run: pnpm lint
+    test-frontend:
+      run: pnpm test
