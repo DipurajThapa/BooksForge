@@ -1,0 +1,63 @@
+# Workspace-scoped git attributes for the booksforge/ Cargo + pnpm
+# workspace.  Mirrors the repo-root .gitattributes so contributors who
+# scope clones to this directory still get sane defaults.
+#
+# Refs: ../.gitattributes (canonical), ../.editorconfig (editor-level
+# pairing), CONTRIBUTING.md (Pin policy section).
+
+* text=auto eol=lf
+
+# Rust / TOML / Cargo
+*.rs    text eol=lf
+*.toml  text eol=lf
+
+# JS / TS / JSON / YAML / Markdown / CSS
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+
+# Shell scripts must stay LF on Linux/macOS runners.
+*.sh    text eol=lf
+
+# Windows scripts must keep CRLF.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Binary assets — never normalise.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.icns  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.pdf   binary
+*.zip   binary
+*.epub  binary
+*.docx  binary
+*.dmg   binary
+*.msi   binary
+
+# Generated TS bindings — diffable but linguist marks them as
+# generated so they stay out of language stats and review noise.
+packages/shared-types/src/bindings/** text eol=lf merge=union linguist-generated=true
+
+# sqlx offline cache — machine-generated.
+.sqlx/**.json text eol=lf linguist-generated=true
+
+# Migration files: forward-only invariant — flag them in diffs.
+crates/booksforge-storage/migrations/*.sql text eol=lf
+
+# Prompt templates — Jinja-flavoured TOML; keep diffable.
+crates/booksforge-prompt/templates/**/*.toml text eol=lf

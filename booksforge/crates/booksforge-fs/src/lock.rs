@@ -100,7 +100,14 @@ fn try_create_lock(path: &PathBuf) -> Result<(), LockError> {
 fn pid_is_alive(pid: u32) -> bool {
     #[cfg(unix)]
     {
-        // Safety: signal 0 never kills — it just checks process existence.
+        // SAFETY: `libc::kill` with signal 0 is the documented POSIX way to
+        // probe whether a process exists.  It never delivers a signal to the
+        // target.  The only state observed is the kernel's process table, which
+        // is independent of any Rust invariant.  The cast `pid as libc::pid_t`
+        // is safe because PIDs are conventionally non-negative and our `pid:
+        // u32` argument cannot exceed `pid_t::MAX` on any supported platform
+        // (POSIX guarantees `pid_t` is a signed integer at least 16 bits wide;
+        // in practice 32 bits everywhere we ship).
         let result = unsafe { libc::kill(pid as libc::pid_t, 0) };
         result == 0
     }
@@ -109,9 +116,21 @@ fn pid_is_alive(pid: u32) -> bool {
     {
         use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
         use windows::Win32::Foundation::CloseHandle;
+        // SAFETY: `OpenProcess` with `PROCESS_QUERY_LIMITED_INFORMATION` is the
+        // minimum-privilege handle that lets us test process existence on
+        // Windows.  We immediately close the handle (or never receive one) so
+        // it cannot leak.  The `bInheritHandle = false` argument prevents the
+        // handle from being inherited by child processes.  All inputs are
+        // primitive types; no Rust borrow invariants are involved.
         unsafe {
             let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
             if let Ok(h) = handle {
+                // SAFETY: `h` is a valid HANDLE returned by `OpenProcess`
+                // above.  `CloseHandle` is the documented release for it; we
+                // hold the only reference, so no other code can use it
+                // concurrently.  Failure of `CloseHandle` is non-fatal here
+                // because the kernel reclaims the handle on process exit; we
+                // ignore the result deliberately.
                 let _ = CloseHandle(h);
                 true
             } else {

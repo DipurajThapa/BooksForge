@@ -5,6 +5,8 @@ import ProjectPicker from "./components/ProjectPicker";
 import NewProjectWizard from "./components/NewProjectWizard";
 import EditorShell from "./components/EditorShell";
 import OllamaWizard from "./components/OllamaWizard";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ToastProvider } from "./components/ToastProvider";
 
 type AppView =
   | { tag: "picker" }
@@ -12,6 +14,22 @@ type AppView =
   | { tag: "editor"; project: OpenProjectResult };
 
 export default function App() {
+  // Top-level providers wrap the whole tree:
+  //   - ErrorBoundary catches any render-time exception below.  See
+  //     EXTERNAL_AUDIT_BACKLOG.md #24.
+  //   - ToastProvider exposes a global queue via `useToast()` so
+  //     components no longer need `.catch(() => null)` to swallow
+  //     errors silently.  See EXTERNAL_AUDIT_BACKLOG.md #25.
+  return (
+    <ErrorBoundary>
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
+    </ErrorBoundary>
+  );
+}
+
+function AppContent() {
   const [view, setView] = useState<AppView>({ tag: "picker" });
   const [ollama, setOllama] = useState<OllamaStatusResponse | null>(null);
   const [version, setVersion] = useState<AppVersion | null>(null);

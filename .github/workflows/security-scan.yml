@@ -1,0 +1,138 @@
+# Standalone supply-chain advisory scan.
+#
+# Lives separately from the gating ci.yml so:
+#   - Advisory failures are visible at-a-glance without scrolling
+#     through the main CI summary.
+#   - We can run it on a schedule (catches RUSTSEC advisories that
+#     drop after a quiet PR week).
+#   - Adding a new scanner (OSV, Trivy, npm audit) here doesn't risk
+#     the main ci.yml flow.
+#
+# Refs: EXTERNAL_AUDIT_BACKLOG.md #40 (cargo audit / cargo deny check
+# advisories), CONTRIBUTING.md "PR checklist".
+
+name: Security scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "booksforge/Cargo.toml"
+      - "booksforge/Cargo.lock"
+      - "booksforge/deny.toml"
+      - "booksforge/**/Cargo.toml"
+      - "booksforge/**/package.json"
+      - "booksforge/pnpm-lock.yaml"
+      - ".github/workflows/security-scan.yml"
+  schedule:
+    # Daily at 06:00 UTC. New advisories from the previous day are
+    # caught before the team starts work.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write   # for SARIF upload to Code Scanning
+
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cargo-deny:
+    name: cargo deny check (advisories + bans + licenses + sources)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            booksforge/target
+          key: cargo-deny-${{ runner.os }}-${{ hashFiles('booksforge/Cargo.lock') }}
+          restore-keys: |
+            cargo-deny-${{ runner.os }}-
+
+      - name: Install cargo-deny
+        run: cargo install --locked cargo-deny || true
+
+      - name: Run cargo deny — licenses + bans
+        run: cd booksforge && cargo deny check licenses bans sources
+
+      - name: Run cargo deny — advisories (FAIL on findings)
+        run: cd booksforge && cargo deny check advisories
+        # Note: a yanked-crate or RUSTSEC advisory fails this step.
+        # Exceptions belong in deny.toml [advisories].ignore with a
+        # date-stamped justification.
+
+  cargo-audit:
+    name: cargo audit (independent verification)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit || true
+
+      - name: Run cargo audit
+        run: cd booksforge && cargo audit --deny warnings
+        # Independent of cargo-deny so a misconfigured deny.toml that
+        # silently ignores an advisory still fails THIS job.
+
+  npm-audit:
+    name: pnpm audit (frontend supply chain)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.11.0"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "9.12.3"
+          run_install: false
+
+      - name: pnpm audit (high + critical)
+        run: |
+          cd booksforge
+          pnpm audit --audit-level=high
+        # Lower severities surface as warnings but don't fail the
+        # build — the npm ecosystem produces too many low-severity
+        # transitive advisories to gate releases on them.
+
+  osv-scanner:
+    name: OSV-Scanner (cross-ecosystem CVE scan)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run OSV-Scanner
+        uses: google/osv-scanner-action/osv-scanner-action@v1.9.1
+        with:
+          scan-args: |-
+            -r
+            --skip-git
+            booksforge/
+        continue-on-error: true   # don't block PRs while we tune.
+
+      - name: Upload OSV-Scanner report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: osv-scanner-report
+          path: osv-scanner-results.json
+          if-no-files-found: ignore

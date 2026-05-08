@@ -168,8 +168,20 @@ pub fn available_ram_gb() -> Option<u32> {
         extern "system" {
             fn GlobalMemoryStatusEx(lp_buffer: *mut MemoryStatusEx) -> i32;
         }
+        // SAFETY: `MemoryStatusEx` is a `#[repr(C)]` plain-old-data struct;
+        // every field is an integer with a defined zero representation, so
+        // `mem::zeroed()` produces a valid (if uninitialised-meaningful) value.
+        // We immediately overwrite `dw_length` below before passing the struct
+        // to the kernel, which is the only field the API requires us to set.
         let mut status: MemoryStatusEx = unsafe { mem::zeroed() };
         status.dw_length = mem::size_of::<MemoryStatusEx>() as u32;
+        // SAFETY: `&mut status` is a valid, exclusive pointer to the
+        // `MemoryStatusEx` struct above.  `GlobalMemoryStatusEx` is documented
+        // to write only to the buffer we pass and only up to `dw_length`
+        // bytes (which we set to `size_of::<MemoryStatusEx>()`), so the call
+        // cannot overrun.  No Rust borrow invariant is violated because
+        // `status` is not borrowed elsewhere while the FFI call holds the
+        // pointer.  The function takes care of its own thread-safety.
         let ok = unsafe { GlobalMemoryStatusEx(&mut status) };
         if ok != 0 {
             Some((status.ull_total_phys / 1_073_741_824) as u32)
