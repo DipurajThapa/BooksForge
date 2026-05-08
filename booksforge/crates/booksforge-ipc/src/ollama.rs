@@ -17,6 +17,21 @@ pub struct OllamaProbeResult {
     pub ram_gb: Option<u32>,
 }
 
+/// Result of `ollama_status` — minimal Ollama health check.
+///
+/// Distinct from `OllamaProbeResult`: the *probe* command also detects
+/// the binary on disk and the system RAM, while *status* is the
+/// fast/cheap path used by the always-visible status indicator.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../packages/shared-types/src/bindings/")]
+pub struct OllamaStatusResponse {
+    /// Whether the Ollama HTTP API is currently reachable on the
+    /// configured loopback host.
+    pub running: bool,
+    /// Ollama server version, if reachable.
+    pub version: Option<String>,
+}
+
 /// One entry in the model list returned by `ollama_list_models`.
 /// Merges the curated registry entry with local availability information.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
