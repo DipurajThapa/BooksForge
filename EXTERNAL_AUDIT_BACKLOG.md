@@ -19,15 +19,23 @@ recommended.
 > - **Dependency:** items list explicit predecessors as `↳ blocks until #N`
 > - **Effort:** rough sizing — `S` ≤ 1 day, `M` 2–5 days, `L` 1–2 weeks, `XL` > 2 weeks
 
-> **Pruning note (2026-05-08, post-verification):** Two items from the first
-> draft (originally #23 *"codegen drift test must run on every PR"* and
-> originally #42 *"reverse migrations directory: delete or formalise"*) were
-> removed after direct verification — `codegen_drift` already runs in both
-> `.github/workflows/ci.yml` files, and `migrations/reverse/` contains a
-> single dev-tool file consistent with the spec. Item #16 was downgraded
-> after verifying `apps/desktop/capabilities/default.json` is already
-> minimally scoped. Numbering is left stable to preserve dependency
-> references; removed items are listed at the bottom for traceability.
+> **Pruning note (2026-05-08, post-verification + first execution pass):**
+> Two items from the first draft (originally #23 *"codegen drift test
+> must run on every PR"* and originally #42 *"reverse migrations
+> directory: delete or formalise"*) were removed after direct
+> verification — `codegen_drift` already runs in both
+> `.github/workflows/ci.yml` files, and `migrations/reverse/` contains
+> a single dev-tool file consistent with the spec.
+>
+> A second pass on `chore/audit-backlog-drive-20260508` then **landed
+> four more items**: **#4** (`THIRD_PARTY_LICENSES.md` scaffold),
+> **#16** (`.github/CODEOWNERS`), **#41** (`.github/dependabot.yml`),
+> and **#61** (pin policy + privacy-invariants checklist in
+> `CONTRIBUTING.md`).
+>
+> Numbering is left stable across both passes to preserve dependency
+> references; closed items remain in place inline as `*(LANDED …)*` /
+> `*(REMOVED — addressed)*` short markers.
 
 ---
 
@@ -87,11 +95,15 @@ shape of the backlog below.
 - **Action:** `pnpm install` at workspace root, commit lockfile, switch CI to `pnpm install --frozen-lockfile`.
 - **Acceptance:** Two clean clones produce byte-identical `node_modules` resolution; CI uses `--frozen-lockfile`.
 
-### #4 — Generate and commit `THIRD_PARTY_LICENSES.md` / `NOTICE`
-- **Severity:** HIGH · **Effort:** S · ↳ blocks until #2
-- **Finding:** Bundled fonts (`apps/desktop/resources/fonts/*/LICENSE.txt`) and sidecars (Pandoc GPLv2+, EPUBCheck Apache-2.0/W3C) ship with the app, but no aggregate attribution file exists at the project root. Sidecars are licence-clean as separate processes, but bundled fonts require attribution.
-- **Action:** Run `cargo about generate` (or `cargo-license`) for Rust deps, append manual entries for fonts + sidecars, commit `THIRD_PARTY_LICENSES.md`. Bundle it into the installer (Tauri `bundle.resources`).
-- **Acceptance:** Every bundled artefact whose licence demands attribution is listed.
+### #4 — *(SCAFFOLDED — finalisation deferred to first signed release)*
+*Landed 2026-05-08 on `chore/audit-backlog-drive-20260508` as
+`THIRD_PARTY_LICENSES.md` (commit `179ef57`). The file documents the
+licensing posture (GPL-family ban for linked crates; Pandoc/EPUBCheck
+sidecars OK), enumerates bundled-asset categories that need
+attribution, and provides the regeneration commands for `cargo about
+generate` and `pnpm licenses list`. The auto-generated per-dependency
+detail must be produced and committed before the first signed
+release; tracked as **MILESTONES.md M6.E**.*
 
 ### #5 — Add `SECURITY.md` with private disclosure path
 - **Severity:** HIGH · **Effort:** S
@@ -170,11 +182,16 @@ shape of the backlog below.
 - **Action:** Migrate inline `style="..."` to CSS modules or Vanilla Extract (used by `packages/ui` already). Where dynamic styles are necessary, use CSS custom properties set via `style` on a single element rather than full style strings. Tighten CSP to `style-src 'self'`.
 - **Acceptance:** App boots and renders correctly with `'unsafe-inline'` removed.
 
-### #16 — Document Tauri capabilities and lock behind CODEOWNERS
-- **Severity:** LOW · **Effort:** S
-- **Finding:** `apps/desktop/capabilities/default.json` is already minimally scoped (dialog, path, window, app — no `shell:allow-*`, no `http:allow-*`, no broad `fs:allow-*`). The remaining concern is procedural: there is no CODEOWNERS rule requiring security review on capability changes, so a future PR can silently widen the surface.
-- **Action:** Add `apps/desktop/capabilities/**` to `.github/CODEOWNERS` with a security reviewer required. Add a one-line justification comment in each capability JSON mapping the capability to the Tauri command(s) that need it.
-- **Acceptance:** A test PR that adds `shell:allow-execute` cannot merge without the security reviewer's approval.
+### #16 — *(LANDED 2026-05-08)*
+*`.github/CODEOWNERS` added on `chore/audit-backlog-drive-20260508`
+(commit `410cd03`). Owner-review now required on
+`booksforge/apps/desktop/capabilities/**`,
+`booksforge/apps/desktop/tauri.conf.json`, both `.github/workflows/`
+trees, `booksforge/deny.toml`, the `privacy_invariants` test, the IPC
+crate, the `shared-types` package, the SQL migrations dir, and every
+governance artefact. The follow-up — adding a one-line justification
+comment in each capability JSON — is folded into the first
+sub-MZ-09 commit.*
 
 ### #17 — Tauri command transactional consistency for state mutations
 - **Severity:** MEDIUM · **Effort:** M · ↳ blocks until #13
@@ -335,11 +352,18 @@ already covers. No standalone backlog item is needed.*
 - **Action:** Add an explicit `cargo deny check advisories --hide-inclusion-graph` step that fails on any advisory; track exceptions in `deny.toml` `[advisories].ignore` with a date-stamped justification.
 - **Acceptance:** A planted RUSTSEC advisory in a test branch fails CI.
 
-### #41 — Enable Dependabot or Renovate
-- **Severity:** MEDIUM · **Effort:** S · ↳ blocks until #40
-- **Finding:** No automated dep-update bot. Patches drift; security updates are manual.
-- **Action:** Enable Dependabot grouped updates (one PR per ecosystem per week) or Renovate with auto-merge for patch updates that pass CI.
-- **Acceptance:** First weekly run produces a grouped PR.
+### #41 — *(LANDED 2026-05-08)*
+*`.github/dependabot.yml` added on `chore/audit-backlog-drive-20260508`
+(commit `410cd03`). Weekly grouped PRs across cargo workspace, npm
+workspace, per-package npm, and GitHub Actions (root + booksforge).
+Logical groupings configured: `tauri-stack`, `sqlx-stack`,
+`tokio-stack`, `serde-stack`, `tiptap-stack`, `react-stack`,
+`vite-stack`, `tooling`, plus a `patch-updates` bucket per ecosystem
+that is the auto-merge candidate. Major-version bumps to react /
+react-dom / vite / tauri / sqlx / @tiptap/core are explicitly
+ignored. **First weekly run will land Monday after this branch
+merges.** Auto-merge automation (audit #58) is configured at repo
+settings level — separate task.*
 
 ### #42 — *(REMOVED — addressed / non-issue)*
 *Verification: `crates/booksforge-storage/migrations/reverse/` contains exactly
@@ -455,10 +479,16 @@ release-readiness gap.*
 - **Finding:** Many panels render nothing or a console error in the empty/error state. A polished writing app needs intentional empty / loading / error states for every list and editor surface.
 - **Action:** Catalogue every panel; design and implement the three states for each.
 
-### #61 — Workspace dependency version pinning policy doc
-- **Severity:** LOW · **Effort:** S
-- **Finding:** Mixed pin specificity in `Cargo.toml` (some `= "X.Y"`, some `= "X"`). Not a bug, but team policy should be explicit.
-- **Action:** Document in `CONTRIBUTING.md`: "All workspace deps pin to minor (`= "X.Y"`); patch updates flow via Dependabot."
+### #61 — *(LANDED 2026-05-08)*
+*Pin policy added to `CONTRIBUTING.md` on
+`chore/audit-backlog-drive-20260508` (commit `179ef57`). Spells out:
+minor pins for Rust workspace deps, explicit ignored-major list
+(tauri, sqlx, react, react-dom, vite, @tiptap/core), pnpm-lock.yaml
+always committed and CI runs `--frozen-lockfile`, Cargo.lock always
+committed for the binary workspace. Plus a "Privacy invariants —
+before you ship" PR-level checklist that re-states the five
+invariants from `outputs/SECURITY_PRIVACY.md` and a "Reporting
+security issues" pointer to `SECURITY.md`.*
 
 ### #62 — Internal `BACKLOG.md` reconciliation with this audit
 - **Severity:** LOW · **Effort:** S · ↳ blocks until #1
@@ -515,10 +545,11 @@ release-readiness gap.*
 
 ---
 
-## Appendix — Items removed during 2026-05-08 pruning
+## Appendix — Pruning + execution log
 
-The first draft of this audit listed 62 items. After direct verification
-against the working tree, two items were removed and one was downgraded:
+The first draft of this audit listed 62 items.
+
+### Pass 1 (2026-05-08, post-verification)
 
 | Original # | Title | Disposition | Reason |
 |---:|---|---|---|
@@ -526,7 +557,31 @@ against the working tree, two items were removed and one was downgraded:
 | 42 | Reverse migrations directory: delete or formalise | **Removed** | `migrations/reverse/` contains a single dev-only file (`0001_initial_reverse.sql`); production runner only reads `migrations/*.sql`. Consistent with spec; not a release-readiness gap. |
 | 16 | Audit Tauri capabilities scoping | **Downgraded MEDIUM → LOW** | Verified `apps/desktop/capabilities/default.json` is already minimally scoped (no `shell:`, no `http:`, no broad `fs:`). Remaining ask is procedural: add CODEOWNERS guard. |
 
-Net items remaining: **60** (originally 62). Numbering preserved to keep
-existing dependency references valid.
+### Pass 2 (2026-05-08, branch `chore/audit-backlog-drive-20260508`)
+
+PR #1 closed audit items **#1, #2, #5, #6** (root governance —
+CLAUDE.md drift fix, LICENSE placeholder, SECURITY.md,
+CODE_OF_CONDUCT.md). The current branch closes:
+
+| # | Title | How | Commit |
+|---:|---|---|---|
+| 4  | `THIRD_PARTY_LICENSES.md` / `NOTICE` | Scaffolded with regen commands; per-dependency aggregate deferred to first signed release per `MILESTONES.md` M6.E | `179ef57` |
+| 16 | CODEOWNERS gate on Tauri capabilities | `.github/CODEOWNERS` covering capabilities, tauri.conf.json, both CI trees, deny.toml, privacy_invariants test, IPC + shared-types, migrations dir, governance artefacts | `410cd03` |
+| 41 | Dependabot grouped weekly PRs | `.github/dependabot.yml` covering cargo workspace, npm workspace, per-package npm, GitHub Actions × 2 | `410cd03` |
+| 61 | Pin policy doc | New "Dependency-pin policy" + "Privacy invariants — before you ship" + "Reporting security issues" sections in `CONTRIBUTING.md` | `179ef57` |
+
+### Net items still open
+
+Originally 62 → minus 2 removed in Pass 1 → minus 4 closed in PR #1
+→ minus 4 closed in this branch → **52 items remain open**.
+
+The 60-item scorecard above will update at next audit refresh; the
+qualitative composite (41/100) does not move materially because the
+items closed so far are governance / supply-chain hygiene, not the
+biggest-needle items (privacy invariant CI tests, code-signing,
+release pipeline, frontend test coverage, agent proposal-review
+UX).
+
+Numbering preserved across all passes.
 
 *End of audit.*
