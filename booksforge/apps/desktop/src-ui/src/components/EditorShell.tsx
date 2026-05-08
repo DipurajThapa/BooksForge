@@ -36,6 +36,11 @@ interface Props {
 
 export default function EditorShell({ project, onClose }: Props) {
   const [nodes, setNodes] = useState<NodeInfo[]>([]);
+  // Node-list fetch states drive the Binder's empty / loading / error UI
+  // (audit #60).  We start in `loading` so a slow IPC round-trip doesn't
+  // briefly flash the "No scenes yet" empty state.
+  const [nodesLoading, setNodesLoading] = useState(true);
+  const [nodesError,   setNodesError]   = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<NodeInfo | null>(null);
   const [sceneContent, setSceneContent] = useState<SceneLoadResult | null>(null);
   const [recovery, setRecovery] = useState<RecoveryStatus | null>(null);
@@ -128,17 +133,27 @@ export default function EditorShell({ project, onClose }: Props) {
     }
   }, [exporting, project.title]);
 
-  // Load node list.
+  // Load node list.  Errors are surfaced to the Binder so the user can
+  // see what failed and retry — the previous behaviour silently swallowed
+  // them and rendered the empty state, which masked outages.
   const refreshNodes = useCallback(async () => {
-    const list = await ipc.nodeList().catch(() => [] as NodeInfo[]);
-    setNodes(list);
-    // Capture the project word count once on first successful load — that
-    // becomes the "today" baseline so the status bar can show session delta.
-    if (sessionBaselineRef.current === null) {
-      const total = list
-        .filter((n) => !n.parent_id || n.kind === "project")
-        .reduce((sum, n) => sum + n.word_count, 0);
-      sessionBaselineRef.current = total;
+    setNodesLoading(true);
+    try {
+      const list = await ipc.nodeList();
+      setNodes(list);
+      setNodesError(null);
+      // Capture the project word count once on first successful load — that
+      // becomes the "today" baseline so the status bar can show session delta.
+      if (sessionBaselineRef.current === null) {
+        const total = list
+          .filter((n) => !n.parent_id || n.kind === "project")
+          .reduce((sum, n) => sum + n.word_count, 0);
+        sessionBaselineRef.current = total;
+      }
+    } catch (e) {
+      setNodesError(String(e));
+    } finally {
+      setNodesLoading(false);
     }
   }, []);
 
@@ -331,6 +346,9 @@ export default function EditorShell({ project, onClose }: Props) {
             selectedId={selectedNode?.id ?? null}
             onSelect={setSelectedNode}
             onNodesChanged={refreshNodes}
+            loading={nodesLoading}
+            error={nodesError}
+            onRetry={refreshNodes}
           />
         )}
 

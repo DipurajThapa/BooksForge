@@ -7,6 +7,20 @@ interface Props {
   selectedId: string | null;
   onSelect: (node: NodeInfo) => void;
   onNodesChanged: () => void;
+  /**
+   * Audit #60 — explicit empty / loading / error states so the binder
+   * never renders a silent void on transient IPC failures.
+   *
+   * `loading` covers the first node-list fetch + any user-triggered
+   * retries; `error` is set when the IPC layer throws.  When `error`
+   * is non-null, the binder shows a recoverable error UI with a
+   * retry button wired to `onRetry`.  All three are optional so
+   * callers that don't care can still mount a Binder with just the
+   * core props.
+   */
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -62,7 +76,7 @@ function formatRank(value: number): string {
   return `${LEXORANK_PREFIX}${rank}:`;
 }
 
-export default function Binder({ nodes, selectedId, onSelect, onNodesChanged }: Props) {
+export default function Binder({ nodes, selectedId, onSelect, onNodesChanged, loading, error, onRetry }: Props) {
   const [creating, setCreating] = useState<string | null>(null); // parent_id being created under
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -139,6 +153,52 @@ export default function Binder({ nodes, selectedId, onSelect, onNodesChanged }: 
     }
   }
 
+  // Error takes precedence over loading and over empty — the user has
+  // to know we couldn't reach the storage layer rather than silently
+  // showing them an empty binder and a "+ New Scene" button that will
+  // also fail.
+  if (error) {
+    return (
+      <nav style={s.root} aria-label="Manuscript binder">
+        <div style={s.header}>
+          <span style={s.headerLabel}>Binder</span>
+        </div>
+        <div style={s.errorBox} role="alert">
+          <p style={s.errorTitle}>Couldn't load the binder.</p>
+          <p style={s.errorMsg}>{error}</p>
+          {onRetry && (
+            <button
+              type="button"
+              style={s.errorRetry}
+              onClick={onRetry}
+            >
+              Retry
+            </button>
+          )}
+        </div>
+      </nav>
+    );
+  }
+
+  // Loading skeleton: show only on the first ever load (when we don't
+  // yet have any nodes).  If a refresh races with already-loaded data,
+  // we keep the existing tree visible rather than blanking it.
+  if (loading && nodes.length === 0) {
+    return (
+      <nav style={s.root} aria-label="Manuscript binder">
+        <div style={s.header}>
+          <span style={s.headerLabel}>Binder</span>
+        </div>
+        <div style={s.loadingBox} role="status" aria-live="polite">
+          <div style={s.skelRow} aria-hidden="true" />
+          <div style={s.skelRow} aria-hidden="true" />
+          <div style={s.skelRow} aria-hidden="true" />
+          <span style={s.srOnly}>Loading binder…</span>
+        </div>
+      </nav>
+    );
+  }
+
   if (nodes.length === 0) {
     return (
       <nav style={s.root} aria-label="Manuscript binder">
@@ -147,6 +207,10 @@ export default function Binder({ nodes, selectedId, onSelect, onNodesChanged }: 
         </div>
         <div style={s.empty}>
           <p style={s.emptyText}>No scenes yet.</p>
+          <p style={s.emptyHint}>
+            Start writing by creating your first scene.  You can add
+            chapters and parts later from the same menu.
+          </p>
           <button style={s.addBtn} onClick={() => handleAddScene(null)} aria-label="Create first scene">
             + New Scene
           </button>
@@ -346,6 +410,71 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 13,
     margin: 0,
     textAlign: "center",
+  },
+  emptyHint: {
+    color: "var(--color-text-tertiary)",
+    fontSize: 12,
+    margin: 0,
+    textAlign: "center",
+    lineHeight: 1.5,
+    maxWidth: 240,
+  },
+  loadingBox: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    padding: "var(--space-4)",
+    position: "relative",
+  },
+  skelRow: {
+    height: 14,
+    width: "85%",
+    borderRadius: 4,
+    background: "linear-gradient(90deg, var(--color-bg) 0%, var(--color-border) 50%, var(--color-bg) 100%)",
+    backgroundSize: "200% 100%",
+    opacity: 0.6,
+  },
+  srOnly: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    border: 0,
+    overflow: "hidden",
+    clip: "rect(0 0 0 0)",
+    whiteSpace: "nowrap",
+  },
+  errorBox: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    padding: "var(--space-4)",
+    color: "var(--color-error, #c62828)",
+  },
+  errorTitle: {
+    margin: 0,
+    fontSize: 13,
+    fontWeight: 600,
+  },
+  errorMsg: {
+    margin: 0,
+    fontSize: 12,
+    lineHeight: 1.4,
+    color: "var(--color-text-secondary, var(--color-text-tertiary))",
+    wordBreak: "break-word",
+  },
+  errorRetry: {
+    alignSelf: "flex-start",
+    padding: "4px 12px",
+    border: "1px solid currentColor",
+    borderRadius: 3,
+    background: "transparent",
+    color: "inherit",
+    cursor: "pointer",
+    fontSize: 12,
   },
   row: {
     display: "flex",
