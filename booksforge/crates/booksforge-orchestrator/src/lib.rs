@@ -8,13 +8,32 @@
 //! invoked (in that case the orchestrator suspends and emits a `RunEvent`).
 
 #![forbid(unsafe_code)]
+// BACKLOG §C4: tests freely use `.unwrap()` / `.expect()` against canned
+// fixtures; the workspace-level clippy lints fire only on shipped code.
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
+pub mod apply;
+pub mod apply_continuity;
+pub mod apply_copyedit;
 pub mod config;
+pub mod context_builder;
+pub mod council;
+pub mod cross_cutting;
+pub mod originality_provider;
+pub mod proposal_validator;
+pub mod prompt_guard;
+pub mod quick_action;
 pub mod run;
+pub mod runner;
+pub mod voice_pipeline;
 pub mod event;
 
+pub use apply::ApplyOutlineResult;
+pub use apply_continuity::ApplyContinuityResult;
+pub use apply_copyedit::ApplyCopyeditResult;
 pub use config::OrchestratorConfig;
-pub use run::{RunHandle, WorkflowTrigger};
+pub use quick_action::{ApplyOp, ApplyQuickActionResult, QuickActionOptions, QuickActionOutcome};
+pub use run::{Orchestrator, OutlineRunResult, RunHandle, WorkflowTrigger};
 pub use event::RunEvent;
 
 #[derive(Debug, thiserror::Error)]
@@ -39,4 +58,14 @@ pub enum OrchestratorError {
 
     #[error("storage error: {0}")]
     Storage(String),
+
+    /// MZ-07: outline-to-tree validation failure.
+    #[error("outline apply error: {0}")]
+    OutlineApply(String),
+
+    /// MZ-07: idempotency guard — re-applying a task that already has
+    /// `agent_applied_edits` rows is refused so we never double-create the
+    /// document tree.
+    #[error("outline already applied for task {task_id}")]
+    AlreadyApplied { task_id: ulid::Ulid },
 }

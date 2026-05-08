@@ -5,7 +5,12 @@ edition.workspace     = true
 rust-version.workspace = true
 
 [dependencies]
-serde.workspace     = true
+serde.workspace      = true
 serde_json.workspace = true
 thiserror.workspace  = true
 blake3.workspace     = true
+minijinja.workspace  = true
+toml.workspace       = true
+
+[lints]
+workspace = true

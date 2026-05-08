@@ -45,6 +45,17 @@ pub trait BundleFilesystem: Send + Sync {
         bundle: &BundlePath,
         content: &[u8],
     ) -> Result<String, FsError>;
+
+    /// Read a content-addressed snapshot object, verifying its hash on read.
+    ///
+    /// Returns `FsError::Io` if the object does not exist.  Returns
+    /// `FsError::Serialization` if the bytes do not hash to `hash_hex` —
+    /// the object was corrupted or tampered with.
+    async fn read_snapshot_object(
+        &self,
+        bundle: &BundlePath,
+        hash_hex: &str,
+    ) -> Result<Vec<u8>, FsError>;
 }
 
 /// Production OS-backed implementation of `BundleFilesystem`.
@@ -102,12 +113,53 @@ impl BundleFilesystem for OsFilesystem {
             })?;
         }
         // Only write if not already present (content-addressed dedup).
+        // Atomic: write to a sibling tmp file, then rename — readers never
+        // observe a half-written object.
         if !dest.exists() {
-            tokio::fs::write(&dest, content).await.map_err(|e| FsError::Io {
-                path: dest.display().to_string(),
+            let tmp_name = format!(
+                "{}.{}.tmp",
+                dest.file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| hash.clone()),
+                ulid::Ulid::new(),
+            );
+            let tmp = dest.with_file_name(tmp_name);
+            tokio::fs::write(&tmp, content).await.map_err(|e| FsError::Io {
+                path: tmp.display().to_string(),
                 source: e,
             })?;
+            // If a concurrent writer beat us to it, the rename is still safe —
+            // both objects have the same content (same hash).
+            if let Err(e) = std::fs::rename(&tmp, &dest) {
+                // Tolerate "destination already exists" races; clean tmp.
+                let _ = std::fs::remove_file(&tmp);
+                if !dest.exists() {
+                    return Err(FsError::Io {
+                        path: format!("{} → {}", tmp.display(), dest.display()),
+                        source: e,
+                    });
+                }
+            }
         }
         Ok(hash)
+    }
+
+    async fn read_snapshot_object(
+        &self,
+        bundle: &BundlePath,
+        hash_hex: &str,
+    ) -> Result<Vec<u8>, FsError> {
+        let path = bundle.snapshot_object(hash_hex);
+        let bytes = tokio::fs::read(&path).await.map_err(|e| FsError::Io {
+            path: path.display().to_string(),
+            source: e,
+        })?;
+        let actual = blake3::hash(&bytes).to_hex().to_string();
+        if actual != hash_hex {
+            return Err(FsError::Serialization(format!(
+                "snapshot object {hash_hex} hash mismatch (got {actual})"
+            )));
+        }
+        Ok(bytes)
     }
 }

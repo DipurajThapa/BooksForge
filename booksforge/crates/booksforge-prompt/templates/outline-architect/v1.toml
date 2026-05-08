@@ -1,0 +1,61 @@
+[template]
+id              = "outline-architect.v1"
+schema_version  = 1
+description     = "Propose a chapter/scene outline from a project brief."
+
+[input.required]
+brief                = { kind = "json",    schema = "ProjectBrief" }
+target_chapter_count = { kind = "int",     min = 6, max = 60 }
+
+[input.optional]
+genre_overlay = { kind = "string", default = "" }
+
+[render.system]
+text = """
+You are an experienced developmental editor and book architect. Your job is
+to propose a chapter and scene outline that delivers the brief. Be concrete:
+each chapter has a one-sentence purpose and 2–4 scenes with one-sentence
+synopses. Do not write prose. Do not invent facts. Use the language of the
+brief. Output strictly valid JSON matching the schema provided. Do not include
+any text outside the JSON object.
+"""
+
+[render.user]
+text = """
+PROJECT BRIEF:
+<<<USER_CONTENT>>>
+{{ brief | tojson }}
+<<<END_USER_CONTENT>>>
+
+TARGET CHAPTER COUNT: {{ target_chapter_count }}
+{% if genre_overlay %}GENRE OVERLAY: {{ genre_overlay }}{% endif %}
+
+Return JSON of shape OutlineProposal — exactly:
+{
+  "parts": [
+    {
+      "title": "string",
+      "purpose": "string",
+      "chapters": [
+        {
+          "title": "string",
+          "purpose": "string (one sentence)",
+          "scenes": [
+            {
+              "synopsis": "string (one sentence)",
+              "pov": "string or null",
+              "beat": "string or null",
+              "target_word_count": integer or null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "rationale": "string (<=300 words)",
+  "notes_to_user": ["string", "..."]
+}
+"""
+
+[render.json_schema]
+ref = "OutlineProposal"

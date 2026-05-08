@@ -19,19 +19,26 @@ use booksforge_ollama::{
     client::OllamaClient,
     types::{
         CancelToken, ChatMessage, ChatOutcome, ChatRequest, GenerateOutcome, GenerateRequest,
-        LocalModel, OllamaVersion, ProgressSink, TokenSink,
+        LocalModel, OllamaVersion, ProgressSink, PullProgress, TokenSink,
     },
     OllamaError,
 };
 
 /// Configurable canned responses for all `OllamaClient` methods.
-#[derive(Debug, Clone, Default)]
+///
+/// **Default behaviour (BACKLOG §L1):** `MockConfig::default()` returns
+/// `pull_ok = true` so calls to `pull()` succeed without requiring the
+/// test author to remember to call `set_pull_ok(true)`.  Tests that
+/// want to exercise the failure path explicitly set
+/// `set_pull_ok(false)` or pass a custom `MockConfig`.
+#[derive(Debug, Clone)]
 pub struct MockConfig {
     /// Response returned by `version()`.  `None` → return a default version.
     pub version:           Option<Result<OllamaVersion, MockError>>,
     /// Models returned by `list_local_models()`.
     pub local_models:      Option<Result<Vec<LocalModel>, MockError>>,
-    /// Whether `pull()` should succeed.
+    /// Whether `pull()` should succeed.  Defaults to `true` so the
+    /// happy path needs no extra setup.
     pub pull_ok:           bool,
     /// Text returned as the `response` field of `GenerateOutcome`.
     pub generate_response: Option<String>,
@@ -41,6 +48,20 @@ pub struct MockConfig {
     pub chat_response:     Option<String>,
     /// Whether `chat()` should fail.
     pub chat_error:        Option<MockError>,
+}
+
+impl Default for MockConfig {
+    fn default() -> Self {
+        Self {
+            version:           None,
+            local_models:      None,
+            pull_ok:           true,
+            generate_response: None,
+            generate_error:    None,
+            chat_response:     None,
+            chat_error:        None,
+        }
+    }
 }
 
 /// Simplified error type for configuring mock failures.
@@ -243,6 +264,13 @@ impl OllamaClient for MockOllamaClient {
 mod tests {
     use super::*;
 
+    /// `TokenSink`/`ProgressSink` are both `'static` `Box<dyn …>` aliases, so
+    /// closures must own their captured state.  We share an `Arc<Mutex<Vec<_>>>`
+    /// between the closure and the assertion site.
+    fn shared_vec<T>() -> Arc<Mutex<Vec<T>>> {
+        Arc::new(Mutex::new(Vec::new()))
+    }
+
     #[tokio::test]
     async fn mock_generate_returns_canned_response() {
         let mock = MockOllamaClient::default();
@@ -256,12 +284,16 @@ mod tests {
             options: None,
         };
 
-        let mut tokens = vec![];
-        let sink: TokenSink = Box::new(|t: &str| tokens.push(t.to_owned()));
+        let tokens = shared_vec::<String>();
+        let tokens_clone = Arc::clone(&tokens);
+        let sink: TokenSink = Box::new(move |t: &str| {
+            tokens_clone.lock().unwrap().push(t.to_owned());
+        });
         let outcome = mock.generate(req, sink, CancelToken::new()).await.unwrap();
 
         assert_eq!(outcome.response, "Test output");
         assert_eq!(mock.generate_count(), 1);
+        assert_eq!(*tokens.lock().unwrap(), vec!["Test output".to_owned()]);
     }
 
     #[tokio::test]
@@ -290,11 +322,14 @@ mod tests {
         let mock = MockOllamaClient::default();
         mock.set_pull_ok(true);
 
-        let mut events = vec![];
-        let sink: ProgressSink = Box::new(|p| events.push(p.status.clone()));
+        let events = shared_vec::<String>();
+        let events_clone = Arc::clone(&events);
+        let sink: ProgressSink = Box::new(move |p: PullProgress| {
+            events_clone.lock().unwrap().push(p.status);
+        });
         mock.pull("qwen2.5:7b-instruct-q4_K_M", sink).await.unwrap();
 
         assert_eq!(mock.pull_count(), 1);
-        assert!(events.contains(&"success".to_owned()));
+        assert!(events.lock().unwrap().contains(&"success".to_owned()));
     }
 }

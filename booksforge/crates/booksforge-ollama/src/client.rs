@@ -56,12 +56,17 @@ pub struct HttpOllamaClient {
 
 impl HttpOllamaClient {
     /// Create with default base URL (`http://127.0.0.1:11434`).
+    ///
+    /// `Client::builder().build()` only fails on TLS init / DNS resolver
+    /// init errors that don't apply to our localhost-only HTTP setup;
+    /// we fall back to `Client::new()` rather than panicking at boot.
+    #[allow(clippy::expect_used)]
     pub fn new() -> Self {
         Self {
             http: Client::builder()
                 .timeout(std::time::Duration::from_secs(600))
                 .build()
-                .expect("reqwest client build should not fail"),
+                .unwrap_or_else(|_| Client::new()),
             base_url: BASE_URL.to_owned(),
         }
     }
@@ -216,10 +221,10 @@ impl OllamaClient for HttpOllamaClient {
         use tokio::io::AsyncBufReadExt as _;
         let stream = resp.bytes_stream();
         let reader = tokio_util::io::StreamReader::new(
-            stream.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
+            stream.map_err(std::io::Error::other),
         );
         let mut lines = reader.lines();
-        while let Some(line) = lines.next_line().await.map_err(|e| OllamaError::Io(e))? {
+        while let Some(line) = lines.next_line().await.map_err(OllamaError::Io)? {
             if line.trim().is_empty() { continue; }
             if let Ok(p) = serde_json::from_str::<PullLine>(&line) {
                 progress(PullProgress {
@@ -275,13 +280,13 @@ impl OllamaClient for HttpOllamaClient {
         use tokio::io::AsyncBufReadExt as _;
         let stream = resp.bytes_stream();
         let reader = tokio_util::io::StreamReader::new(
-            stream.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
+            stream.map_err(std::io::Error::other),
         );
         let mut lines = reader.lines();
         let mut full_response = String::new();
         let mut final_chunk: Option<StreamChunk> = None;
 
-        while let Some(line) = lines.next_line().await.map_err(|e| OllamaError::Io(e))? {
+        while let Some(line) = lines.next_line().await.map_err(OllamaError::Io)? {
             if cancel.is_cancelled() {
                 return Err(OllamaError::Cancelled);
             }
@@ -355,13 +360,13 @@ impl OllamaClient for HttpOllamaClient {
         use tokio::io::AsyncBufReadExt as _;
         let stream = resp.bytes_stream();
         let reader = tokio_util::io::StreamReader::new(
-            stream.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
+            stream.map_err(std::io::Error::other),
         );
         let mut lines = reader.lines();
         let mut full_content = String::new();
         let mut final_chunk: Option<StreamChunk> = None;
 
-        while let Some(line) = lines.next_line().await.map_err(|e| OllamaError::Io(e))? {
+        while let Some(line) = lines.next_line().await.map_err(OllamaError::Io)? {
             if cancel.is_cancelled() {
                 return Err(OllamaError::Cancelled);
             }

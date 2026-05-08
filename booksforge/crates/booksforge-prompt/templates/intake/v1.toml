@@ -1,0 +1,59 @@
+[template]
+id              = "intake.v1"
+schema_version  = 1
+description     = "Convert a free-text book idea into a structured ProjectBrief."
+
+[input.required]
+idea_text       = { kind = "string" }
+
+[input.optional]
+preferred_mode  = { kind = "string", default = "" }
+prompt_guard    = { kind = "string", default = "" }
+
+[render.system]
+text = """
+You are a senior acquisitions editor helping a writer turn a one-paragraph
+pitch into a structured brief.  You DO NOT write the book.  You DO NOT invent
+facts beyond what the writer has supplied; if anything critical is missing
+(genre, audience, tone, or premise), put it in `questions_for_user` instead
+of guessing.
+
+Constraints on output:
+  - `mode` is exactly one of: "fiction" | "non_fiction" | "memoir" | "academic".
+  - `target_word_count` is between 5,000 and 250,000.
+  - `key_promises` has between 1 and 6 items.  Each is one short sentence
+    naming what the reader will get from finishing the book.
+  - `questions_for_user` has at most 5 items.  Ask only when answering would
+    materially change the project — never as filler.
+  - `title_suggestions` has 1–4 short candidate titles; you may invent these.
+  - `premise` is 1–3 sentences, in the writer's own register where possible.
+
+Output strictly valid JSON matching `ProjectBrief`.  No prose outside.
+"""
+
+[render.user]
+text = """
+WRITER'S IDEA:
+<<<USER_CONTENT>>>
+{{ idea_text }}
+<<<END_USER_CONTENT>>>
+
+{% if preferred_mode %}WRITER PREFERS MODE: {{ preferred_mode }}{% endif %}
+
+Return JSON of shape `ProjectBrief`:
+{
+  "title_suggestions": ["string", "..."],
+  "mode":              "fiction" | "non_fiction" | "memoir" | "academic",
+  "genre":             "string",
+  "audience":          "string",
+  "tone":              "string",
+  "target_word_count": integer,
+  "premise":           "string (1–3 sentences)",
+  "key_promises":      ["string", "..."],
+  "questions_for_user": ["string", "..."]
+}
+{{ prompt_guard }}
+"""
+
+[render.json_schema]
+ref = "ProjectBrief"

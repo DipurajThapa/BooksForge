@@ -16,3 +16,8 @@ chrono.workspace     = true
 
 [dev-dependencies]
 proptest.workspace = true
+
+# Opt in to workspace-level lints (BACKLOG §C4).  Domain is pure logic
+# — no I/O, no panics permitted in shipped code.
+[lints]
+workspace = true

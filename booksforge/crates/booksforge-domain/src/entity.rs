@@ -62,7 +62,7 @@ mod tests {
             id:          Ulid::new(),
             kind:        EntityKind::Character,
             name:        name.to_owned(),
-            aliases:     aliases.iter().map(|s| s.to_string()).collect(),
+            aliases:     aliases.iter().map(|s| (*s).to_string()).collect(),
             fields_json: serde_json::json!({}),
             notes:       String::new(),
             created_at:  Utc::now(),

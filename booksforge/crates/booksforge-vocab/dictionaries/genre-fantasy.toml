@@ -1,0 +1,57 @@
+# Fantasy starter dictionary — genre baseline.
+# Layer: `genre:fantasy`.
+
+[[entries]]
+term        = "magick"
+kind        = "avoid"
+rationale   = "Affected spelling. Use 'magic' unless the world deliberately distinguishes."
+
+[[entries]]
+term        = "ye olde"
+kind        = "avoid"
+rationale   = "Cliché faux-medieval phrasing."
+
+[[entries]]
+term        = "thee"
+kind        = "avoid"
+rationale   = "Stylised second person. Reserve for carefully-built archaic voice."
+
+[[entries]]
+term        = "hath"
+kind        = "avoid"
+rationale   = "Archaic verb form — easy to overuse."
+
+[[entries]]
+term        = "verily"
+kind        = "avoid"
+rationale   = "Archaic intensifier — pulls modern readers out."
+
+[[entries]]
+term        = "quoth"
+kind        = "avoid"
+rationale   = "Archaic dialogue tag."
+
+[[entries]]
+term        = "spell"
+kind        = "prefer"
+rationale   = "Concrete genre-noun; better than 'sorcery' / 'enchantment' for everyday casting."
+
+[[entries]]
+term        = "sword"
+kind        = "prefer"
+rationale   = "Use the specific weapon — long-, broad-, short-, sabre — when register allows."
+
+[[entries]]
+term        = "epic journey"
+kind        = "avoid"
+rationale   = "Marketing-speak. Show the journey."
+
+[[entries]]
+term        = "ancient evil"
+kind        = "avoid"
+rationale   = "Cliché. Name it."
+
+[[entries]]
+term        = "dark forces"
+kind        = "avoid"
+rationale   = "Cliché. Name them."

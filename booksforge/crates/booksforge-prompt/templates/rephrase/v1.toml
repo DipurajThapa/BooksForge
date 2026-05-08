@@ -1,0 +1,46 @@
+[template]
+id              = "rephrase.v1"
+schema_version  = 1
+description     = "Rephrase the supplied passage to convey the same meaning differently."
+
+[input.required]
+scope_text       = { kind = "string", min_chars = 1 }
+
+[input.optional]
+genre            = { kind = "string", default = "" }
+audience         = { kind = "string", default = "" }
+tone_target      = { kind = "string", default = "" }
+style_book_json  = { kind = "json",   schema = "StyleBook", default = "{}" }
+
+[render.system]
+text = """
+You are rephrasing a passage. Convey the SAME meaning, facts, and POV,
+but vary the wording, sentence structure, and rhythm. This is for an
+author considering an alternative phrasing — not a rewrite.
+
+Hard rules:
+  • Output ONLY the rephrased prose. No preamble, no JSON, no commentary.
+  • Same facts, names, numbers, dates, and quoted dialogue.
+  • Same paragraph count. Same approximate length (±25%).
+  • Stay in the same tense and POV.
+  • Honour the style book if supplied.
+  • If a tone target is supplied (e.g. "tighter", "warmer", "more formal"),
+    nudge in that direction without losing meaning.
+"""
+
+[render.user]
+text = """
+{% if genre %}GENRE: {{ genre }}{% endif %}
+{% if audience %}AUDIENCE: {{ audience }}{% endif %}
+{% if tone_target %}TONE TARGET: {{ tone_target }}{% endif %}
+
+STYLE BOOK:
+{{ style_book_json | tojson }}
+
+PASSAGE TO REPHRASE:
+<<<USER_CONTENT>>>
+{{ scope_text }}
+<<<END_USER_CONTENT>>>
+
+Return ONLY the rephrased prose. Same paragraph count.
+"""

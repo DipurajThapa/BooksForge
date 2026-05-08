@@ -160,21 +160,20 @@ CREATE TABLE IF NOT EXISTS model_settings (
 CREATE TABLE IF NOT EXISTS agent_runs (
     id             TEXT PRIMARY KEY NOT NULL,
     workflow_id    TEXT NOT NULL,
-    scope          TEXT NOT NULL CHECK (scope IN ('project','part','chapter','scene')),
-    scope_id       TEXT,
+    project_id     TEXT NOT NULL,
     status         TEXT NOT NULL CHECK (status IN (
                        'running','awaiting_user','completed',
                        'cancelled','error','invalid')),
     started_at     TEXT NOT NULL,
     completed_at   TEXT,
-    cancel_reason  TEXT,
-    caps_json      TEXT NOT NULL,
-    totals_json    TEXT,
+    total_tokens   INTEGER,
+    error_message  TEXT,
     ollama_version TEXT,
     user_initiated INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE INDEX IF NOT EXISTS idx_agent_runs_workflow ON agent_runs(workflow_id, started_at);
+CREATE INDEX IF NOT EXISTS idx_agent_runs_project  ON agent_runs(project_id, started_at);
 
 CREATE TABLE IF NOT EXISTS agent_tasks (
     id                   TEXT PRIMARY KEY NOT NULL,

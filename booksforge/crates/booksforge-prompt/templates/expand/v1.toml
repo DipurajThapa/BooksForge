@@ -1,0 +1,53 @@
+[template]
+id              = "expand.v1"
+schema_version  = 1
+description     = "Expand the supplied passage with grounded sensory and interior detail — no new facts."
+
+[input.required]
+scope_text       = { kind = "string", min_chars = 1 }
+
+[input.optional]
+genre            = { kind = "string", default = "" }
+audience         = { kind = "string", default = "" }
+target_ratio     = { kind = "float",  default = 1.6 }
+focus            = { kind = "string", default = "" }
+style_book_json  = { kind = "json",   schema = "StyleBook", default = "{}" }
+
+[render.system]
+text = """
+You are expanding a passage of prose.  Your goal is to flesh out the
+SAME scene — adding sensory grounding, interior reaction, and beat
+transitions — without inventing new facts, characters, or events.
+
+Hard rules:
+  • Output ONLY the expanded prose.  No JSON, no preamble, no commentary.
+  • Preserve POV, tense, voice, and every fact already present.
+  • Do NOT introduce new characters, places, or world-facts.
+  • Do NOT resolve the scene — extend the moment, don't advance it.
+  • Keep the same paragraph order; you may add paragraphs.
+  • Honour the project style book if supplied.
+  • Aim for roughly the requested target length.
+
+What you may add:
+  • Sensory detail (sight, sound, smell, touch, temperature) consistent
+    with the supplied context.
+  • Interior reaction, body language, and short reflective beats.
+  • Transitional connective tissue between paragraphs.
+"""
+
+[render.user]
+text = """
+{% if genre %}GENRE: {{ genre }}{% endif %}
+{% if audience %}AUDIENCE: {{ audience }}{% endif %}
+{% if focus %}EXPANSION FOCUS: {{ focus }}{% endif %}
+
+STYLE BOOK:
+{{ style_book_json | tojson }}
+
+PASSAGE TO EXPAND (target length ≈ {{ target_ratio }} × original):
+<<<USER_CONTENT>>>
+{{ scope_text }}
+<<<END_USER_CONTENT>>>
+
+Return ONLY the expanded prose.
+"""

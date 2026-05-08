@@ -1,0 +1,26 @@
+[package]
+name        = "booksforge-snapshot"
+version.workspace     = true
+edition.workspace     = true
+rust-version.workspace = true
+
+[dependencies]
+booksforge-domain  = { path = "../booksforge-domain" }
+booksforge-storage = { path = "../booksforge-storage" }
+booksforge-fs      = { path = "../booksforge-fs" }
+async-trait.workspace = true
+blake3.workspace      = true
+chrono.workspace      = true
+serde.workspace       = true
+serde_json.workspace  = true
+thiserror.workspace   = true
+tokio.workspace       = true
+tracing.workspace     = true
+ulid.workspace        = true
+
+[dev-dependencies]
+proptest.workspace = true
+tempfile           = "3"
+
+[lints]
+workspace = true

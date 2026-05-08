@@ -29,6 +29,23 @@ notes            = "Strong all-rounder; excellent for multilingual fiction."
 default_for_modes = ["fiction", "memoir"]
 official         = true
 
+# Opt-in upgrade for high-RAM machines.  Surfaced in the model picker as
+# "Better quality" but never auto-selected, since it requires 32+ GB RAM and
+# a ~24 GB download — incompatible with BooksForge's 8 GB RAM MVP target.
+[[model]]
+id               = "qwen3.6:latest"
+display_name     = "Qwen 3.6 (36B MoE, Q4) — high-end"
+family           = "qwen35moe"
+size_bytes       = 23_900_000_000
+ram_min_gb       = 32
+context_window   = 32768
+chat_format      = "chatml"
+recommended_for  = ["fiction", "non_fiction", "memoir", "academic"]
+strengths        = ["long-form-prose", "instruction-following", "multilingual", "reasoning"]
+notes            = "Large MoE model with strong narrative coherence; requires 32+ GB RAM."
+default_for_modes = []
+official         = true
+
 [[model]]
 id               = "llama3.1:8b-instruct-q4_K_M"
 display_name     = "Llama 3.1 8B Instruct (Q4)"

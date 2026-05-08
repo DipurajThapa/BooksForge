@@ -1,0 +1,78 @@
+# Non-fiction starter dictionary — mode baseline.
+# Layer: `mode:non_fiction`.
+
+[[entries]]
+term        = "i think"
+kind        = "avoid"
+rationale   = "Hedge. State the claim directly; reserve hedges for genuine uncertainty."
+
+[[entries]]
+term        = "i believe"
+kind        = "avoid"
+rationale   = "Hedge. State the claim."
+
+[[entries]]
+term        = "in my opinion"
+kind        = "avoid"
+rationale   = "Filler. The reader already knows whose book it is."
+
+[[entries]]
+term        = "very"
+kind        = "avoid"
+rationale   = "Almost always cuttable. Pick a stronger noun."
+
+[[entries]]
+term        = "really"
+kind        = "avoid"
+rationale   = "Filler intensifier."
+
+[[entries]]
+term        = "things"
+kind        = "avoid"
+rationale   = "Vague. Specify."
+
+[[entries]]
+term        = "stuff"
+kind        = "avoid"
+rationale   = "Vague. Specify."
+
+[[entries]]
+term        = "interesting"
+kind        = "avoid"
+rationale   = "Show why it's interesting."
+
+[[entries]]
+term        = "obviously"
+kind        = "avoid"
+rationale   = "Talks down to the reader. Cut or replace with a concrete reason."
+
+[[entries]]
+term        = "clearly"
+kind        = "avoid"
+rationale   = "Talks down to the reader. Show, don't claim."
+
+[[entries]]
+term        = "leverage"
+kind        = "avoid"
+rationale   = "Corporate-speak. Use 'use', 'apply', or a precise verb."
+
+[[entries]]
+term        = "synergy"
+kind        = "avoid"
+rationale   = "Empty business jargon."
+
+[[entries]]
+term        = "going forward"
+kind        = "replace"
+replacement = "from now on"
+rationale   = "Corporate filler."
+
+[[entries]]
+term        = "at the end of the day"
+kind        = "avoid"
+rationale   = "Cliché. Cut or rephrase precisely."
+
+[[entries]]
+term        = "circle back"
+kind        = "avoid"
+rationale   = "Corporate-speak."

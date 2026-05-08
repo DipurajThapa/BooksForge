@@ -14,3 +14,8 @@ thiserror.workspace  = true
 tokio.workspace      = true
 tracing.workspace    = true
 blake3.workspace     = true
+zip.workspace        = true
+
+# Opt in to workspace-level lints (BACKLOG §C4).
+[lints]
+workspace = true

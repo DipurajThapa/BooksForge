@@ -8,6 +8,7 @@ rust-version.workspace = true
 booksforge-domain = { path = "../booksforge-domain" }
 async-trait.workspace = true
 blake3.workspace      = true
+chrono.workspace      = true
 serde.workspace       = true
 serde_json.workspace  = true
 thiserror.workspace   = true
@@ -18,3 +19,10 @@ ulid.workspace        = true
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+
+# BACKLOG §C4: this crate cannot inherit `[lints] workspace = true`
+# because workspace policy forbids `unsafe_code` and this crate's
+# `lock.rs::pid_is_alive` requires `unsafe` (libc::kill on Unix,
+# OpenProcess on Windows).  Tracked under C4-cleanup as a per-crate
+# follow-up; the strict policy lints (unwrap/expect/panic/dbg) still
+# apply via the inner attributes in `lib.rs`.

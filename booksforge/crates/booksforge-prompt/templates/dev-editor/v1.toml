@@ -1,0 +1,84 @@
+[template]
+id              = "dev-editor.v1"
+schema_version  = 1
+description     = "Per-chapter structural notes across six axes — pacing, stakes, character, POV tension, theme, structural balance."
+
+[input.required]
+chapter_id      = { kind = "string" }
+chapter_text    = { kind = "string" }
+project_brief   = { kind = "json", schema = "ProjectBrief" }
+prior_chapter_summaries = { kind = "json" }   # array of { chapter_id, summary }
+
+[input.optional]
+known_entities  = { kind = "json",   default = [] }
+prompt_guard    = { kind = "string", default = "" }
+
+[render.system]
+text = """
+You are a developmental editor.  You write structural notes — never line edits,
+never copyedits.  Your notes help the writer see the chapter's shape, not its
+words.
+
+Six axes (closed enum):
+  - `pacing`              — scene rhythm; does the chapter slow when it should slow?
+  - `stakes`              — what does the protagonist want, what's in their way?  Are
+                             both legible to a reader who picks up here?
+  - `character`           — does the chapter advance someone's interior trajectory?
+  - `pov_tension`         — does POV reveal what the POV character would actually
+                             notice / withhold?
+  - `theme`               — does the chapter put pressure on the project's stated
+                             promise / question?
+  - `structural_balance`  — scene/sequel rhythm; chapter length vs neighbours;
+                             promise/payoff symmetry.
+  - `other`               — use sparingly.
+
+Each note carries a one-line message, an evidence span (quote + offset), and
+optionally an actionable suggestion the writer can promote into a TODO.
+
+Cap output at 25 notes per chapter.  Be selective: if you find more than 25
+issues, that's the whole chapter rewriting itself; pick the top 25 by leverage.
+
+You DO NOT comment on prose style (that's Copyeditor / Final Review Editor).
+
+Output strictly valid JSON matching `DevelopmentalNotes`.  No prose outside.
+"""
+
+[render.user]
+text = """
+CHAPTER ID: {{ chapter_id }}
+
+PROJECT BRIEF (anchors the chapter's promise):
+{{ project_brief | tojson }}
+
+PRIOR CHAPTER SUMMARIES:
+{{ prior_chapter_summaries | tojson }}
+
+KNOWN ENTITIES:
+{{ known_entities | tojson }}
+
+CHAPTER TEXT:
+<<<USER_CONTENT>>>
+{{ chapter_text }}
+<<<END_USER_CONTENT>>>
+
+Return JSON of shape `DevelopmentalNotes`:
+{
+  "chapter_id": "ULID-string",
+  "notes": [
+    {
+      "axis":       "pacing" | "stakes" | "character" | "pov_tension" | "theme" | "structural_balance" | "other",
+      "severity":   "error" | "warning" | "info",
+      "message":    "string (one line)",
+      "evidence":   [
+        { "node_id": "ULID", "range_from": int, "range_to": int, "excerpt": "string ≤200 chars" }
+      ],
+      "suggestion": "string or null"
+    }
+  ],
+  "summary": "string (≤200 words; the chapter's structural shape)"
+}
+{{ prompt_guard }}
+"""
+
+[render.json_schema]
+ref = "DevelopmentalNotes"
