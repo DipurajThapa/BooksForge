@@ -1,0 +1,34 @@
+BooksForge — Provisional License Notice (placeholder)
+======================================================
+
+Copyright (c) 2026 BooksForge contributors. All rights reserved.
+
+This placeholder file is intentionally NOT a permissive open-source
+license. The final license under which BooksForge will ship has not
+been chosen yet. Until that decision is recorded by replacing this
+file:
+
+  - The source code in this repository is shared with collaborators
+    and contributors for the purpose of building BooksForge.
+  - You may NOT redistribute, sublicense, or use this code in another
+    product, commercial or otherwise.
+  - Contributions are accepted under the assumption that the project
+    will adopt an OSI-approved license (e.g. MIT, Apache-2.0, MPL-2.0,
+    or a dual-license such as Apache-2.0 + a commercial EULA for the
+    shipped desktop binary). Contributors agree to relicense their
+    contributions under whichever OSI-approved license the project
+    adopts.
+
+To replace this file with the final terms:
+
+  1. Choose a license (recommend dual MIT/Apache-2.0 for the SDK-style
+     crates, plus a separate proprietary EULA for the bundled desktop
+     binary if a commercial release model is chosen).
+  2. Replace the contents of this file with the canonical license text.
+  3. Update the `license = "UNLICENSED"` field in `booksforge/Cargo.toml`
+     and every member crate's `Cargo.toml` to match.
+  4. Add a `THIRD_PARTY_LICENSES.md` aggregating bundled font / sidecar
+     attributions (see EXTERNAL_AUDIT_BACKLOG.md #4).
+  5. Update `README.md` and `CONTRIBUTING.md` license references.
+
+Refs: EXTERNAL_AUDIT_BACKLOG.md #2 (LICENSE missing).
