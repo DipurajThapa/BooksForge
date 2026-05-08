@@ -1,0 +1,85 @@
+# Static audit-backlog checks.
+#
+# Runs the scripts under scripts/audit/ on every PR and on push to
+# main.  Currently NOT a required status check — the team has a
+# known list of open audit items and we don't want every PR red
+# until they're closed.  Once an item closes, its check is promoted
+# to required via docs/REPO_SETTINGS.md §1.
+#
+# Refs: scripts/audit/README.md, EXTERNAL_AUDIT_BACKLOG.md.
+
+name: Audit checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write   # for the summary comment
+
+concurrency:
+  group: audit-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Audit backlog
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run all audit scripts
+        id: audit
+        continue-on-error: true   # informational, not gating (yet).
+        run: |
+          set +e
+          ./scripts/audit/run-all.sh > audit-output.txt 2>&1
+          rc=$?
+          set -e
+          echo "exit_code=${rc}" >> "$GITHUB_OUTPUT"
+          cat audit-output.txt
+
+      - name: Capture summary
+        id: summary
+        run: |
+          tail -n 12 audit-output.txt > audit-summary.txt
+          echo "summary<<EOF" >> "$GITHUB_OUTPUT"
+          cat audit-summary.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Comment summary on PR
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: audit-checks
+          message: |
+            ## Audit-backlog status
+
+            ```
+            ${{ steps.summary.outputs.summary }}
+            ```
+
+            Run `./scripts/audit/run-all.sh` locally for full output, or
+            see `EXTERNAL_AUDIT_BACKLOG.md` for resolution steps. This
+            check is informational while the team works the open items
+            down — it will be promoted to a required status check per
+            `docs/REPO_SETTINGS.md §1` once the failure count reaches
+            zero.
+
+      - name: Upload full output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-output
+          path: audit-output.txt
+
+      # The job ALWAYS succeeds today, but the audit-output artefact
+      # records the actual exit code so the team can see the trend.
+      # Promote to "fail on non-zero" when individual scripts go green.
+      - name: Final status
+        run: |
+          echo "Audit script exit code: ${{ steps.audit.outputs.exit_code }}"
+          echo "(informational — does not fail the workflow yet.)"
