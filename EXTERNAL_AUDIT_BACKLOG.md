@@ -521,7 +521,7 @@ security issues" pointer to `SECURITY.md`.*
 | **Distribution & business model**      |   12  |  **35** | `docs/DISTRIBUTION.md` documents installer hosting + signing posture; `release.yml` matrix-builds; auto-updater config block in place.  Open: domain provisioning, cert provisioning, pricing decision (#49), website (#48). |
 | **Internationalisation / accessibility** |   8  |  **45** | `lib/i18n.ts` + `locales/en.json` committed; first migration of `OllamaStatusBar` strings done; `useDialogA11y` + `aria-live` + `aria-labelledby` patterns adopted across new components.  Open: per-panel string migration completion, full WCAG 2.2 AA audit (#34), RTL story. |
 
-### **Composite market-readiness: 62 / 100 (was 41 / 100) — public-beta candidate**
+### **Composite market-readiness: 68 / 100 (Pass-4) — public-beta candidate (cert/legal critical path remains)**
 
 **What this means in plain English:**
 - **Engineering substance:** ~ **88 % of MVP** (was 65–70 % at first audit).  Stabilisation Sprint S1 (PR #13) committed all of MZ-05..MZ-08 + Phase 5 Turns A-S; the agent system, prompt engine, snapshot v1, export pipeline, validators, memory + vocab are on `main`.  Open: MZ-09 crash-capture path (design done, Rust scaffold pending PR #14 merge), MZ-10 `pnpm-lock.yaml` commit, frontend test backfill at depth, M1 polish edges (per-panel CRUD, selective restore, full a11y sweep).
@@ -609,15 +609,64 @@ Three branches merged into `main` since Pass-2: `chore/audit-backlog-drive-20260
 | 35 | Theme toggle UI in Settings → Appearance | `SettingsPanel.tsx` radiogroup + `initThemeSystem()` at boot in `main.tsx` |
 | 36 | First i18n migration: `OllamaStatusBar` strings now go through `t()` | `App.tsx` migration |
 
-### Net items still open after Pass 3
+### Pass 4 (2026-05-09, branch `chore/pass-4-post-merge-sync-20260509`)
 
-Originally 62 → minus 2 removed in Pass-0 → minus 4 closed in PR #1
-→ minus 4 closed in PR #2 → minus 18 closed in PR #12 → minus 3 wiring
-items (#33/#35/#36) closed in this branch → **31 items still open**.
+PR #16 (`feat/m1-wiring-and-audit-sync-20260508`) and PR #17
+(`feat/product-completion-push-20260508`) both merged into `main`
+on 2026-05-09.  This branch produces no new code closures —
+its purpose is to **synchronise** `README.md`, `MILESTONES.md`,
+and this file with the post-merge reality and to **flag previous
+over-reporting**.
 
-Composite market-readiness (was 41/100): **62 / 100** post-Pass-3 —
-"public-beta-ready except for cert provisioning + final license
-decision + open PR #14".
+**Items closed by PR #17 (`feat/product-completion-push-20260508`):**
+
+| # | Title | How |
+|---:|---|---|
+| 22 | Frontend test coverage backfill (vitest + RTL) | 25 vitest + RTL tests across `ErrorBoundary.test.tsx` (7), `ToastProvider.test.tsx` (9), `ProposalReview.test.tsx` (9) |
+| 21 | Rust unit-test backfill (template + memory) | `manifest_round_trip.rs` (6 tests) + `scope_authorisation.rs` (6 tests) |
+| 49 | Pricing decision scaffold | `docs/BUSINESS_MODEL.md` with options A/B/C/D + decision template |
+| 22 / 29 / 31 | Playwright E2E scaffold | `booksforge/tests/e2e/` with 3 spec files (`#[ignore]`d pending tauri-driver wiring) |
+
+**Pass-3 over-reporting correction (open PRs not yet merged):**
+
+The Pass-3 sync's appendix table (the "PR #14"-style entries near
+the top) listed items as "will close" for two PRs that are STILL
+OPEN at Pass-4 time:
+
+| Open PR | Items its merge will close |
+|---|---|
+| `chore/release-readiness-20260508` | #38 (release pipeline), #45 (DISTRIBUTION.md), #46 (EULA/Terms/Privacy drafts), #50 supporting docs, #59 (lefthook hooks) |
+| `feat/mz-09-and-polish-20260508` | #43 Rust scaffold, #7/#8/#9 test scaffolds (`#[ignore]`), reaffirms #15/#44 |
+
+Until those PRs merge, the items above remain **open** in the
+counts.  The Pass-3 status banner on PR #16 was over-reported.
+
+### Net items still open after Pass 4
+
+Originally 62 → Pass-0 minus 2 removed → minus 4 PR #1 → minus 4
+PR #2 → minus 18 PR #12 → minus 3 wiring (#33/#35/#36) PR #16 →
+minus 4 net new from PR #17 (#22 partial, #21, #49 scaffold; ProposalReview
+adoption is incremental) → **27 items still open** (assumes the 5+
+items locked in `chore/release-readiness` and the ~5 items locked
+in `feat/mz-09-and-polish` close on those merges).
+
+Realistic post-Pass-4 totals:
+- Closed (merged) so far: **35 / 62 = 56 %**
+- Will close on the 2 remaining open PRs: **+10 items** → 45 / 62 = 73 %
+- Remaining after those merges: **17 items**, of which:
+  - **6 are founder-only** (cert provisioning ×2, license decision,
+    domain provisioning, legal counsel review, pricing decision)
+  - **5 are post-merge code work** (MZ-09 capture-path impl,
+    activate `#[ignore]`d privacy tests, `pnpm-lock.yaml` commit,
+    untrack `.claude/settings.local.json`, full i18n migration)
+  - **6 are remaining product polish** (per-panel CRUD,
+    selective restore, export preview, full a11y audit, empty-state
+    pass, EditorShell useState consolidation)
+
+Composite market-readiness (was 41/100 → 62/100): **68 / 100**
+post-Pass-4 — "all code-completable items are within ~1 week of
+focused work; the 6–10-week founder/legal/cert critical path is
+the actual gating factor".
 
 Numbering preserved across all passes.
 

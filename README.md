@@ -58,13 +58,25 @@ The team's engineering-task list lives at [`booksforge/BACKLOG.md`](booksforge/B
 
 | Milestone | Status |
 |-----------|--------|
-| MZ-01 — Bootstrap workspace | ✅ Shipped |
-| MZ-02 — Project bundle creation and opening | ✅ Shipped |
-| MZ-03 — Single-scene editor (autosave + crash recovery) | ✅ Shipped |
-| MZ-04 — Ollama HTTP client + Setup Wizard | ✅ Shipped |
-| MZ-05 → MZ-09 partial + Phase 1–6 | 🟡 Landed (uncommitted in working tree) |
-| Stabilisation Sprint | 🟡 Pending — split working tree into milestone commits |
-| Public-beta gate | ⬜ All `CRITICAL`/`HIGH` audit items closed |
+| MZ-01 — Bootstrap workspace                                                | ✅ Shipped |
+| MZ-02 — Project bundle creation and opening                                | ✅ Shipped |
+| MZ-03 — Single-scene editor (autosave + crash recovery)                    | ✅ Shipped |
+| MZ-04 — Ollama HTTP client + Setup Wizard                                  | ✅ Shipped |
+| MZ-05 — Prompt template engine + Outline Architect                         | ✅ Shipped (PR #13) |
+| MZ-06 — Snapshots v1 (manual + pre-agent-edit + scheduled hourly)          | ✅ Shipped (PR #13) |
+| MZ-07 — Outline Architect → document-tree creation                         | ✅ Shipped (PR #13) |
+| MZ-08 — Quick-action presets (Sharpen / Continue / Rephrase / Shorten / Expand) | ✅ Shipped (PR #13) |
+| MZ-09 — Telemetry / logging / crash reports (opt-in)                       | 🟡 Tracing + diagnostic-bundle shipped; crash-capture pending merge of `feat/mz-09-and-polish` |
+| MZ-10 — CI gates + reproducibility seed                                    | 🟡 Most gates shipped (clippy, fmt, deny, drift, repro, advisories, Dependabot); `pnpm-lock.yaml` not yet committed |
+| Stabilisation Sprint S1                                                    | ✅ Shipped (PR #13 — committed the team's MZ-05+ slice) |
+| M1 — Project & editor polish                                               | 🟡 ErrorBoundary + ToastProvider + ShortcutHelp + theme toggle UI + i18n scaffold wired; per-panel CRUD, selective restore, full a11y sweep, full string migration still open |
+| M2 — First three agent workflows + Phase 5 (10 agents end-to-end)          | ✅ Shipped (PR #13) |
+| M3 — Developmental + continuity                                            | ✅ Shipped (PR #13) |
+| M4 — Templates + validators                                                | ✅ Shipped (PR #13) |
+| M5 — Export pipeline (DOCX / PDF / EPUB-3 + reproducibility + visual-regression) | 🟡 Pipeline shipped; sidecar binary actual fetch + bundling pending merge of `feat/mz-09-and-polish` |
+| M6 — MVP polish (release-readiness)                                        | ⬜ `release.yml` scaffold + auto-updater config + legal drafts pending merge of `chore/release-readiness` + `feat/mz-09-and-polish`; Apple Developer ID + Windows EV cert + final license + legal review + `booksforge.app` domain are founder/legal action |
+| Public-beta gate                                                           | ⬜ All `CRITICAL`/`HIGH` audit items closed + cert provisioning + first signed `release.yml` dry-run |
+| 1.0 GA gate                                                                | ⬜ Pricing decision (`docs/BUSINESS_MODEL.md`) + legal-counsel review + accessibility audit + remaining polish items |
 
 ## Privacy
 
