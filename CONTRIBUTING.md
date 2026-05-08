@@ -46,3 +46,39 @@ cargo test -p booksforge-domain entity_matches_name
 # TypeScript
 cd booksforge && pnpm --filter @booksforge/shared-types typecheck
 ```
+
+## Dependency-pin policy
+
+| Layer | Pin specificity | Update path |
+|-------|-----------------|-------------|
+| Rust workspace deps in `booksforge/Cargo.toml` | Pin to **minor** (e.g. `= "1.5"`, never `= "1"`). | Patch: Dependabot auto-PR, auto-merge if CI green. Minor: Dependabot PR, manual review. Major: human-authored PR with justification + spec / ADR update if it crosses the layer boundary. |
+| `tauri`, `sqlx`, `react`, `react-dom`, `vite`, `@tiptap/core` | Major bumps explicitly **ignored** by Dependabot — they are deliberate human decisions. | Open a tracking issue, then a feature branch named `feat/upgrade-<dep>-<major>`. Update the spec entry in `outputs/TOOLCHAIN.md` in the same PR. |
+| `pnpm-lock.yaml` | Always committed. CI runs `pnpm install --frozen-lockfile`. | Re-run `pnpm install` locally, commit the lockfile change in the same commit as the `package.json` change. |
+| `Cargo.lock` | Always committed (binary workspace). | Touch only when a `Cargo.toml` dep changes; never edit by hand. |
+
+Dependabot configuration lives at `.github/dependabot.yml`. CODEOWNERS
+review is required for any change to that file.
+
+## Privacy invariants — "before you ship"
+
+These are checked in CI by `cargo test -p booksforge-orchestrator --test
+privacy_invariants`. Before opening a PR that touches networking, IPC,
+agent dispatch, or settings, sanity-check yourself:
+
+- [ ] No outbound network call at app startup. Only `OllamaSetup → Install`,
+      `Ollama.pull`, and the opt-out `Update.check` may make outbound calls.
+- [ ] No manuscript content ever reaches a remote endpoint. Scene text,
+      outlines, memory entries, and vocabulary entries all stay local.
+- [ ] Ollama traffic stays on `127.0.0.1`. A non-loopback host requires
+      an explicit user-facing consent dialog (`OllamaSetup`).
+- [ ] AI capability is **off per project** until the user enables it
+      with an explicit one-time consent prompt. Default state on parse
+      failure is "off", not "on".
+- [ ] No GPL / AGPL / LGPL crate is statically linked. `cargo deny`
+      enforces; Pandoc and EPUBCheck run as external sidecar
+      processes, not linked in.
+
+## Reporting security issues
+
+See `SECURITY.md`. Do **not** open a public GitHub issue for security
+or privacy bugs.
