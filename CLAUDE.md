@@ -4,11 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
-## Current state (2026-05-06)
+## Current state (2026-05-08)
 
-This workspace is **documentation-only**. No source code exists yet. The first coding task is **MZ-01 — Bootstrap workspace** (see `outputs/IMPLEMENTATION_PLAN.md §3`).
+Code lives in [`booksforge/`](booksforge/) (Cargo + pnpm workspace). MZ-01 → MZ-04 plus the Phase 1–4 follow-ups have landed; further milestones (MZ-05 → MZ-10) are tracked in [`booksforge/BACKLOG.md`](booksforge/BACKLOG.md) and [`outputs/IMPLEMENTATION_PLAN.md`](outputs/IMPLEMENTATION_PLAN.md).
 
-All specification and planning documents live under `outputs/`. When MZ-01 completes and a `booksforge/` repo is initialised, copy `outputs/CLAUDE.md` to the repo root as `CLAUDE.md` — that file becomes the primary operating contract for all coding work.
+When working in this repository, the **operating contract for coding work is [`booksforge/CLAUDE.md`](booksforge/CLAUDE.md)** — read that one first. The file you are reading now (the root `CLAUDE.md`) is a thin map: it points to the spec archive in `outputs/` and the code in `booksforge/`, summarises the product, and lists the hard rules that apply across the whole repo.
+
+The independent release-readiness audit lives in [`EXTERNAL_AUDIT_BACKLOG.md`](EXTERNAL_AUDIT_BACKLOG.md). Treat that file as the gating list before any external beta or public release.
 
 ---
 
@@ -20,7 +22,7 @@ All specification and planning documents live under `outputs/`. When MZ-01 compl
 
 ---
 
-## Tech stack (to be built at MZ-01+)
+## Tech stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -36,7 +38,7 @@ Exact pins and seed config files are in `outputs/TOOLCHAIN.md` (authoritative).
 
 ---
 
-## Build commands (once code exists at `booksforge/`)
+## Build commands (run from `booksforge/`)
 
 ```bash
 # Rust
