@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO agent_runs\n                (id, workflow_id, project_id, status, started_at,\n                 completed_at, total_tokens, error_message, ollama_version, user_initiated)\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "8886f994e4126e2f5231648cfd19e219bd74d224ca417f4ea6fc492504787167"
+}

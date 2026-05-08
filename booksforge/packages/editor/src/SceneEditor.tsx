@@ -1,8 +1,23 @@
-import React, { useCallback, useEffect, useRef } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
+import React, { useCallback, useEffect, useImperativeHandle, useRef, forwardRef } from "react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import type { JSONContent } from "@tiptap/core";
 import { editorExtensions } from "./extensions";
 import { countChars, countWords } from "./wordcount";
+
+/**
+ * Imperative handle exposed to wrapper components.  MZ-08 quick-actions use
+ * `getSelectionText` to read the highlighted passage (or the current
+ * paragraph when nothing is highlighted) and `replaceSelection` to swap in
+ * an accepted suggestion without round-tripping through `initialDoc`.
+ */
+export interface SceneEditorHandle {
+  /** Returns highlighted text, or the surrounding paragraph if no selection. */
+  getSelectionText(): string;
+  /** Returns the full plaintext of the document. */
+  getPlainText(): string;
+  /** Returns the underlying TipTap editor (for advanced use). */
+  getEditor(): Editor | null;
+}
 
 export interface SceneEditorProps {
   /** ProseMirror JSON document loaded from storage.  Pass `null` for a new scene. */
@@ -13,19 +28,26 @@ export interface SceneEditorProps {
   saveDelay?: number;
   /** Whether the editor is read-only. */
   readOnly?: boolean;
+  /** Fired once when the underlying TipTap editor instance is ready, and
+   *  again with `null` when it is being torn down.  Lets the parent
+   *  surface a formatting toolbar without owning the editor. */
+  onEditorReady?: (editor: import("@tiptap/react").Editor | null) => void;
 }
 
 const EMPTY_DOC: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
 
-export function SceneEditor({
+export const SceneEditor = forwardRef<SceneEditorHandle, SceneEditorProps>(function SceneEditor({
   initialDoc,
   onSave,
   saveDelay = 5000,
   readOnly = false,
-}: SceneEditorProps) {
+  onEditorReady,
+}, ref) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
+  const onReadyRef = useRef(onEditorReady);
+  onReadyRef.current = onEditorReady;
 
   const editor = useEditor({
     extensions: editorExtensions,
@@ -67,6 +89,38 @@ export function SceneEditor({
   const editorRef = useRef(editor);
   editorRef.current = editor;
 
+  // Notify the parent once the editor instance is ready (and again with
+  // `null` on teardown) so it can render a formatting toolbar.
+  useEffect(() => {
+    onReadyRef.current?.(editor ?? null);
+    return () => {
+      onReadyRef.current?.(null);
+    };
+  }, [editor]);
+
+  // Imperative handle: lets the wrapper read the current selection without
+  // owning the TipTap editor instance directly.
+  useImperativeHandle(ref, () => ({
+    getSelectionText() {
+      const ed = editorRef.current;
+      if (!ed) return "";
+      const { from, to, $from } = ed.state.selection;
+      if (from !== to) {
+        return ed.state.doc.textBetween(from, to, "\n");
+      }
+      // No selection — fall back to the surrounding paragraph.
+      const start = $from.before($from.depth);
+      const end   = $from.after($from.depth);
+      return ed.state.doc.textBetween(start, end, "\n").trim();
+    },
+    getPlainText() {
+      return editorRef.current?.getText() ?? "";
+    },
+    getEditor() {
+      return editorRef.current;
+    },
+  }), []);
+
   useEffect(() => {
     return () => {
       if (saveTimer.current) {
@@ -87,7 +141,7 @@ export function SceneEditor({
       <EditorContent editor={editor} style={s.content} />
     </div>
   );
-}
+});
 
 const s: Record<string, React.CSSProperties> = {
   root: {

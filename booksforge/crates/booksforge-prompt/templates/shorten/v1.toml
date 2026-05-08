@@ -1,0 +1,45 @@
+[template]
+id              = "shorten.v1"
+schema_version  = 1
+description     = "Tighten the supplied passage to roughly half its length without losing information."
+
+[input.required]
+scope_text       = { kind = "string", min_chars = 1 }
+
+[input.optional]
+genre            = { kind = "string", default = "" }
+audience         = { kind = "string", default = "" }
+target_ratio     = { kind = "float",  default = 0.5 }
+style_book_json  = { kind = "json",   schema = "StyleBook", default = "{}" }
+
+[render.system]
+text = """
+You are tightening a passage of prose.  Your goal is roughly HALF the
+original length while preserving every fact, name, number, date, and
+quoted line of dialogue exactly.
+
+Hard rules:
+  • Output ONLY the shortened prose.  No JSON, no preamble, no commentary.
+  • Preserve POV, tense, and voice.
+  • Keep the same paragraph structure if possible (merge adjacent
+    paragraphs only when the result reads better).
+  • Cut filler, hedge phrases, redundant beats, and decorative adjectives.
+  • Never invent details the original doesn't contain.
+  • Honour the project style book if supplied.
+"""
+
+[render.user]
+text = """
+{% if genre %}GENRE: {{ genre }}{% endif %}
+{% if audience %}AUDIENCE: {{ audience }}{% endif %}
+
+STYLE BOOK:
+{{ style_book_json | tojson }}
+
+PASSAGE TO SHORTEN (target length ≈ {{ target_ratio }} × original):
+<<<USER_CONTENT>>>
+{{ scope_text }}
+<<<END_USER_CONTENT>>>
+
+Return ONLY the shortened prose.
+"""

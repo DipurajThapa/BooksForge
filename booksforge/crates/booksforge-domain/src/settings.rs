@@ -57,11 +57,18 @@ pub struct OllamaSettings {
     pub default_model: String,
 }
 
+impl OllamaSettings {
+    /// BooksForge's recommended default model.  Matches the curated registry
+    /// entry whose `default_for_modes` list contains `"fiction"` — kept in
+    /// sync with `models.toml`.  Chosen to fit the MVP's 8 GB RAM target.
+    pub const DEFAULT_MODEL: &'static str = "qwen2.5:7b-instruct-q4_K_M";
+}
+
 impl Default for OllamaSettings {
     fn default() -> Self {
         Self {
             host:          "http://127.0.0.1:11434".to_owned(),
-            default_model: String::new(),
+            default_model: Self::DEFAULT_MODEL.to_owned(),
         }
     }
 }

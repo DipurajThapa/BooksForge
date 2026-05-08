@@ -15,3 +15,11 @@ async-trait.workspace = true
 tracing.workspace    = true
 ulid.workspace       = true
 chrono.workspace     = true
+
+[dev-dependencies]
+booksforge-vocab = { path = "../booksforge-vocab" }
+tempfile         = "3"
+blake3           = "1"
+
+[lints]
+workspace = true

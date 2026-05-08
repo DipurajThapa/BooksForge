@@ -9,6 +9,13 @@
 // probe.rs uses `unsafe` for the Windows GlobalMemoryStatusEx API.
 // All other modules are safe.
 #![cfg_attr(not(target_os = "windows"), forbid(unsafe_code))]
+// BACKLOG §C4: enforce policy clippy lints by hand since this crate
+// cannot inherit `[lints] workspace = true` (Windows unsafe-code
+// conflict — see Cargo.toml).
+#![warn(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![warn(clippy::print_stdout, clippy::print_stderr)]
+#![deny(clippy::dbg_macro, clippy::mem_forget)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub mod client;
 pub mod probe;

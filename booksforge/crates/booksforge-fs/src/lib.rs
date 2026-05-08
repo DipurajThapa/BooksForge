@@ -24,20 +24,31 @@
 
 // unsafe_code is permitted in this crate: `pid_is_alive` in lock.rs uses
 // `libc::kill(pid, 0)` on Unix and `OpenProcess` on Windows — both require
-// unsafe blocks that are tightly scoped and well-justified.
+// unsafe blocks that are tightly scoped and well-justified.  See the
+// `[lints]` comment in `Cargo.toml` for why this crate cannot inherit
+// the workspace `unsafe_code = forbid` policy.
+
+// BACKLOG §C4: enforce the policy clippy lints by hand here since the
+// crate cannot inherit `[lints] workspace = true` (unsafe-code conflict).
+#![warn(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![warn(clippy::print_stdout, clippy::print_stderr)]
+#![deny(clippy::dbg_macro, clippy::mem_forget)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub mod atomic;
 pub mod bundle;
 pub mod lock;
 pub mod manifest;
 pub mod markdown_mirror;
+pub mod memory_mirror;
 pub mod recovery;
 pub mod settings;
 pub mod traits;
 
-pub use bundle::{create_bundle, validate_bundle};
+pub use bundle::{cleanup_orphan_temp_dirs, create_bundle, validate_bundle};
 pub use lock::{BundleLock, LockError};
 pub use manifest::BundleManifest;
+pub use memory_mirror::{delete_memory_mirror, memory_path, write_memory_mirror};
 pub use settings::{load_settings, save_settings, settings_path};
 pub use traits::{BundleFilesystem, OsFilesystem};
 

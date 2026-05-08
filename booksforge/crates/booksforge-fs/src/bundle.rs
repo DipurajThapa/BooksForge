@@ -104,19 +104,21 @@ where
     // ── Step 2: write files ──────────────────────────────────────────────
     let bp = BundlePath::new(&temp_path);
 
-    let write_str = |path: PathBuf, content: &str| async move {
+    // Owned-content closure — taking `&str` triggers an async-closure
+    // lifetime issue under newer Rust, so we copy into a String per write.
+    let write_str = |path: PathBuf, content: String| async move {
         tokio::fs::write(&path, content).await.map_err(|e| FsError::Io {
             path: path.display().to_string(),
             source: e,
         })
     };
 
-    if let Err(e) = write_str(bp.manifest(), manifest_toml).await {
+    if let Err(e) = write_str(bp.manifest(), manifest_toml.to_owned()).await {
         cleanup();
         return Err(e);
     }
 
-    if let Err(e) = write_str(bp.version_file(), MIN_APP_VERSION).await {
+    if let Err(e) = write_str(bp.version_file(), MIN_APP_VERSION.to_owned()).await {
         cleanup();
         return Err(e);
     }

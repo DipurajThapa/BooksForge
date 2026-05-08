@@ -14,8 +14,6 @@
 //! later timestamp follows it.  The newest unresolved pending entry is what
 //! we surface as the crash recovery candidate.
 
-use std::path::Path;
-
 use crate::{bundle::BundlePath, FsError};
 
 const LOG_FILENAME: &str = ".recovery.log";
@@ -74,17 +72,13 @@ pub async fn check(bundle: &BundlePath) -> Result<Option<(String, String)>, FsEr
             match entry {
                 RecoveryEntry::Committed { ts } => {
                     // Keep the newest committed ts seen.
-                    if last_committed_ts.is_none()
-                        || ts > *last_committed_ts.as_ref().unwrap()
-                    {
+                    if last_committed_ts.as_ref().is_none_or(|prev| &ts > prev) {
                         last_committed_ts = Some(ts);
                     }
                 }
                 RecoveryEntry::Pending { node_id, ts } => {
                     // Keep the newest pending entry seen.
-                    if last_pending.is_none()
-                        || ts > last_pending.as_ref().unwrap().1
-                    {
+                    if last_pending.as_ref().is_none_or(|(_, prev)| &ts > prev) {
                         last_pending = Some((node_id, ts));
                     }
                 }
@@ -93,7 +87,7 @@ pub async fn check(bundle: &BundlePath) -> Result<Option<(String, String)>, FsEr
     }
 
     match (last_pending, last_committed_ts) {
-        (Some((node_id, ts)), Some(committed_ts)) if ts <= committed_ts => Ok(None),
+        (Some((_node_id, ts)), Some(committed_ts)) if ts <= committed_ts => Ok(None),
         (Some(pending), _) => Ok(Some(pending)),
         _ => Ok(None),
     }

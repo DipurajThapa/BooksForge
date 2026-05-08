@@ -11,6 +11,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { ModelListEntry, OllamaProbeResult, PullProgressPayload } from "@booksforge/shared-types";
+import { useDialogA11y } from "../lib/useDialogA11y";
 import { ipc } from "../lib/ipc";
 
 interface Props {
@@ -43,6 +44,7 @@ function pullPercent(p: PullState): number | null {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function OllamaWizard({ onClose, onComplete }: Props) {
+  const { dialogProps, titleId } = useDialogA11y(onClose);
   const [step, setStep] = useState<Step>("detect");
   const [probe, setProbe] = useState<OllamaProbeResult | null>(null);
   const [models, setModels] = useState<ModelListEntry[]>([]);
@@ -195,11 +197,11 @@ export default function OllamaWizard({ onClose, onComplete }: Props) {
   const displayModels = filteredModels.length > 0 ? filteredModels : models;
 
   return (
-    <div style={s.overlay}>
-      <div style={s.dialog} role="dialog" aria-modal="true" aria-label="AI Setup Wizard">
+    <div style={s.overlay} role="presentation">
+      <div {...dialogProps} style={s.dialog}>
         {/* Header */}
         <div style={s.header}>
-          <span style={s.title}>AI Setup</span>
+          <span id={titleId} style={s.title}>AI Setup</span>
           <button style={s.closeBtn} onClick={onClose} aria-label="Close">×</button>
         </div>
 

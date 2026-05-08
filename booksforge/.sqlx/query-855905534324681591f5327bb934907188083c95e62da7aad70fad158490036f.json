@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE nodes\n            SET title = ?, position = ?, status = ?,\n                pov = ?, beat = ?, target_words = ?,\n                updated_at = ?\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "855905534324681591f5327bb934907188083c95e62da7aad70fad158490036f"
+}

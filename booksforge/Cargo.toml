@@ -15,6 +15,7 @@ members = [
     "crates/booksforge-fs",
     "crates/booksforge-ollama",
     "crates/booksforge-orchestrator",
+    "crates/booksforge-snapshot",
     "crates/booksforge-export-epub",
     "crates/booksforge-export-pandoc",
     "crates/booksforge-epubcheck",
@@ -24,17 +25,79 @@ members = [
 [workspace.package]
 version      = "0.0.1"
 edition      = "2021"
-rust-version = "1.82"
+# MSRV — see rust-toolchain.toml for the rationale (Tauri 2.x transitive
+# deps push the floor up from the spec's 1.82).
+rust-version = "1.88"
 authors      = ["BooksForge Contributors"]
 license      = "UNLICENSED"
+
+# ── workspace-level lints (BACKLOG §C4) ─────────────────────────────────────
+#
+# Crates inherit these via `[lints] workspace = true` in their own
+# Cargo.toml.  CI runs `cargo clippy --workspace --all-targets -- -D warnings`
+# which promotes everything below to a hard error.
+#
+# Rationale: BooksForge handles user manuscripts.  Silent panics, ignored
+# errors, and cargo-cult `unwrap`s are the bugs we cannot afford.  Clippy's
+# stricter rules catch them at compile time.
+[workspace.lints.clippy]
+# Block obvious foot-guns.  These are denials, not warnings.
+unwrap_used     = "warn"
+expect_used     = "warn"
+panic           = "warn"
+todo            = "warn"
+unimplemented   = "warn"
+dbg_macro       = "deny"
+print_stdout    = "warn"
+print_stderr    = "warn"
+mem_forget      = "deny"
+exit            = "deny"
+
+# Quality-of-implementation lints — kept at warn so they're visible
+# without breaking incremental work.
+needless_pass_by_value     = "warn"
+redundant_clone            = "warn"
+inefficient_to_string      = "warn"
+implicit_clone             = "warn"
+match_same_arms            = "warn"
+single_match_else          = "allow"
+too_many_arguments         = "allow"
+module_name_repetitions    = "allow"
+
+# Documentation indentation styles vary within the codebase; clippy
+# flags any list item indented past 2 spaces.  Our docs deliberately
+# use 4-space hanging indents for readability — accepted as policy.
+doc_overindented_list_items = "allow"
+doc_lazy_continuation       = "allow"
+
+# `RunInput` and a handful of orchestrator types carry closure fields
+# whose types are inherently complex (multi-arg async fn pointers).
+# Factoring these into type aliases hides more than it reveals; we
+# accept the warning as policy.
+type_complexity             = "allow"
+
+[workspace.lints.rust]
+unsafe_code                = "forbid"
+unreachable_pub            = "warn"
+unused_lifetimes           = "warn"
 
 # ── shared dependencies ─────────────────────────────────────────────────────
 [workspace.dependencies]
 
-# Tauri — exact pins per TOOLCHAIN.md
-tauri               = { version = "=2.2.3", features = ["protocol-asset"] }
-tauri-build         = { version = "=2.2.3" }
-tauri-plugin-dialog = "2"
+# Tauri — semver-compatible 2.x.
+#
+# History (BACKLOG §M1):
+#   - TOOLCHAIN.md spec target: 2.2.3.
+#   - Why we deviated: 2.2.x has been yanked from crates.io.  We pin to
+#     the major + minor and rely on `Cargo.lock` to lock the patch
+#     version across all environments.  Update procedure:
+#       1. Run `cargo update -p tauri` and verify the patch bump.
+#       2. Run `cargo build --workspace --all-targets`.
+#       3. Run `cargo deny check`.
+#       4. Commit the updated `Cargo.lock`.
+tauri               = { version = "2.11" }
+tauri-build         = { version = "2.4" }
+tauri-plugin-dialog = "2.3"
 
 # Async runtime
 tokio       = { version = "1", features = ["full"] }
@@ -66,11 +129,14 @@ reqwest = { version = "0.12", default-features = false, features = [
 ] }
 
 # IPC type codegen: Rust → TypeScript
-ts-rs = "10"
+ts-rs = { version = "10" }
 
 # Logging
 tracing            = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "registry"] }
+tracing-appender   = "0.2"
+# Cross-platform application data / log directories.
+dirs               = "5"
 
 # ID generation (ULID)
 ulid   = { version = "1", features = ["serde"] }
@@ -79,8 +145,16 @@ chrono = { version = "0.4", features = ["serde"] }
 # Hashing (content-addressed snapshots and prompt-template pins)
 blake3 = "1"
 
+# Template rendering — used by booksforge-prompt
+minijinja = { version = "2", features = ["loader"] }
+
 # Property-based testing
 proptest = "1.5"
+
+# EPUB packaging — deterministic ZIP construction.  No additional features
+# beyond the defaults; we want reproducible builds so we control the
+# datetime + compression manually.
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 # ── profile tweaks ───────────────────────────────────────────────────────────
 [profile.dev]

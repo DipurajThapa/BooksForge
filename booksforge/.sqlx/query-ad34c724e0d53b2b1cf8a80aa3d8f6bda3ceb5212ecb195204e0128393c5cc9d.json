@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO validator_runs\n                (id, validator_id, ran_at, status, duration_ms, scope_hash)\n            VALUES (?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "ad34c724e0d53b2b1cf8a80aa3d8f6bda3ceb5212ecb195204e0128393c5cc9d"
+}

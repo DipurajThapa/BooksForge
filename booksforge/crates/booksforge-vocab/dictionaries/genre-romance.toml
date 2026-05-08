@@ -1,0 +1,62 @@
+# Romance starter dictionary — genre baseline.
+# Layer: `genre:romance`.
+
+[[entries]]
+term        = "throbbing"
+kind        = "avoid"
+rationale   = "Cliché. Use a sharper sensory verb."
+
+[[entries]]
+term        = "heaving bosom"
+kind        = "avoid"
+rationale   = "Parodic. Reach for breath, posture, the actual gesture."
+
+[[entries]]
+term        = "molten gaze"
+kind        = "avoid"
+rationale   = "Romance cliché."
+
+[[entries]]
+term        = "smouldering eyes"
+kind        = "avoid"
+rationale   = "Romance cliché."
+
+[[entries]]
+term        = "smoldering eyes"
+kind        = "avoid"
+rationale   = "Romance cliché (US spelling)."
+
+[[entries]]
+term        = "rippling muscles"
+kind        = "avoid"
+rationale   = "Cliché. Pick the actual movement or texture."
+
+[[entries]]
+term        = "stomach flipped"
+kind        = "avoid"
+rationale   = "Overused interior reaction."
+
+[[entries]]
+term        = "heart skipped a beat"
+kind        = "avoid"
+rationale   = "Overused interior reaction."
+
+[[entries]]
+term        = "butterflies in"
+kind        = "avoid"
+rationale   = "Cliché. Use a fresher physical detail."
+
+[[entries]]
+term        = "drank in"
+kind        = "avoid"
+rationale   = "Cliché way to describe looking at someone."
+
+[[entries]]
+term        = "tension"
+kind        = "prefer"
+rationale   = "Tension is the genre's heartbeat — name it specifically (sexual, emotional, unspoken)."
+
+[[entries]]
+term        = "yearning"
+kind        = "prefer"
+rationale   = "Useful genre noun when grounded in a concrete object of desire."

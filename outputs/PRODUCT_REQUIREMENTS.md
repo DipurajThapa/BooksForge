@@ -90,7 +90,7 @@ The MVP is the **smallest end-to-end product that is honestly useful for one per
 
 **Agentic swarm (MVP set)**
 
-The MVP includes **nine LLM agents** plus the always-present Orchestrator (controller). Defined fully in `AGENTS.md`.
+The MVP includes **ten LLM agents** plus the always-present Orchestrator (controller): the nine functional agents (intake, outline-architect, memory-curator, vocab-dictionary, chapter-drafter, dev-editor, continuity, copyeditor, humanization) plus the Final Review Editor for world-class final-pass polish. An eleventh agent — the Proposal Validator — is registered as orchestrator-grade and is excluded from the user-visible catalog. Defined fully in `AGENTS.md`.
 
 1. **Project Intake Agent** — turns a free-text idea into a structured project brief (mode, genre, audience, target word count, tone).
 2. **Outline Architect Agent** — proposes a chapter/scene outline from a brief.
@@ -184,7 +184,7 @@ The "out of scope" list from `01-BRD §14` stays in force: hosted publication or
 The MVP ships when:
 
 1. The seven journeys in §4 work end-to-end on macOS and Windows for a fiction project of 60k–120k words.
-2. The **nine MVP agents** in §5.1 run successfully on a clean install with a freshly pulled `qwen2.5:7b-instruct-q4_K_M` model on the reference hardware, and produce non-empty, schema-valid outputs.
+2. The **ten MVP agents** in §5.1 run successfully on a clean install with a freshly pulled `qwen2.5:7b-instruct-q4_K_M` (plus `qwen3.6:latest` for the Final Review Editor when opted in) on the reference hardware, and produce non-empty, schema-valid outputs.
 3. A 100k-word manuscript exports to DOCX, PDF, and KDP-eBook EPUB-3 in under 60 seconds and passes the bundled KDP validator.
 4. Privacy invariant test: with the network disabled, every MVP feature except update check, Ollama install, and Ollama model pull works.
 5. Snapshot invariant test: every accepted agent edit produced a `pre_agent_edit` snapshot before applying.

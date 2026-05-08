@@ -1,0 +1,54 @@
+[template]
+id              = "continue-paragraph.v1"
+schema_version  = 1
+description     = "Continue the supplied passage by 1–3 paragraphs in the same voice and tense."
+
+[input.required]
+scope_text       = { kind = "string", min_chars = 1 }
+
+[input.optional]
+genre              = { kind = "string", default = "" }
+audience           = { kind = "string", default = "" }
+preceding_context  = { kind = "string", default = "" }
+scene_synopsis     = { kind = "string", default = "" }
+beat               = { kind = "string", default = "" }
+pov                = { kind = "string", default = "" }
+
+[render.system]
+text = """
+You are continuing a draft in the author's voice. Read the most recent
+prose and write the NEXT 1–3 paragraphs that follow naturally.
+
+Hard rules:
+  • Output ONLY the new paragraphs. Do not repeat the input.
+  • Match the existing tense, POV, voice, and register exactly.
+  • Stay consistent with established names, places, and facts.
+  • Do not resolve the scene; advance it incrementally.
+  • Do not invent characters, locations, or world facts not implied by
+    the supplied context.
+  • If you cannot continue without inventing, write a single placeholder
+    paragraph that stays grounded.
+"""
+
+[render.user]
+text = """
+{% if genre %}GENRE: {{ genre }}{% endif %}
+{% if audience %}AUDIENCE: {{ audience }}{% endif %}
+{% if pov %}POV: {{ pov }}{% endif %}
+{% if beat %}STORY BEAT: {{ beat }}{% endif %}
+{% if scene_synopsis %}SCENE SYNOPSIS: {{ scene_synopsis }}{% endif %}
+
+{% if preceding_context %}
+EARLIER IN THIS SCENE (for context — do not repeat):
+<<<USER_CONTENT>>>
+{{ preceding_context }}
+<<<END_USER_CONTENT>>>
+{% endif %}
+
+PASSAGE TO CONTINUE FROM (this is the most recent prose):
+<<<USER_CONTENT>>>
+{{ scope_text }}
+<<<END_USER_CONTENT>>>
+
+Write the next 1–3 paragraphs only.
+"""

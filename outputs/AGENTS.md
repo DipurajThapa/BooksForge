@@ -18,7 +18,7 @@ The swarm is intentionally small, bounded, and explicit. Five rules govern every
 
 ## 2. Agent catalog
 
-The agent catalog is hard-coded in `booksforge-agents/src/registry.rs` — agents cannot be added by configuration alone. The MVP runs nine LLM agents plus the always-present Orchestrator. The remaining nine agents are V1.0+.
+The agent catalog is hard-coded in `booksforge-agents/src/registry.rs` — agents cannot be added by configuration alone. The MVP runs **ten user-visible LLM agents** plus the always-present Orchestrator: the nine listed below (`intake` through `humanization`) plus the **Final Review Editor** (project addition introduced for world-class final-pass polish; see §4.11). One additional **internal** agent — the **Proposal Validator** (§4.12) — is registered in the same file but excluded from `mvp_agents()` because it runs as an orchestrator-grade verifier, never as a user-selectable workflow target. The remaining nine agents are V1.0+.
 
 | Phase | ID | Name | Purpose |
 |-------|----|------|---------|
@@ -60,17 +60,25 @@ pub struct AgentSpec {
     pub id: &'static str,                  // stable identifier
     pub name: &'static str,                // human-readable name
     pub purpose: &'static str,             // one sentence
-    pub input_schema: SchemaRef,           // JSON Schema, validated at boundary
-    pub output_schema: SchemaRef,          // JSON Schema, validated at boundary
-    pub prompt_template: PromptTemplateId, // versioned, hash-pinned
-    pub model_preference: ModelPreference, // family preference + size hint
-    pub context_budget: ContextBudget,     // token caps per slot
-    pub validators: Vec<OutputValidator>,  // semantic checks beyond schema
+    pub input_schema_id:  &'static str,    // name of the input type (lives in booksforge-domain)
+    pub output_schema_id: &'static str,    // name of the output type
+    pub prompt_template:  PromptTemplateId,  // versioned, hash-pinned
+    pub model_preference: ModelPreference,   // family preference + size hint
+    pub pinned_model: Option<&'static str>,  // optional exact-tag pin (e.g. "qwen3.6:latest" for FRE)
+    pub context_budget: ContextBudget,       // token caps per slot
+    pub validators: &'static [CrossCuttingValidator],  // bound at orchestrator-binding time
     pub failure_modes: &'static [FailureMode],
-    pub when_to_run: WhenToRun,            // automatic | on_demand | scheduled
-    pub user_gate: UserGate,               // required | not_required
+    pub when_to_run: WhenToRun,             // automatic | on_demand | scheduled
+    pub user_gate: UserGate,                // required | not_required
 }
 ```
+
+The implementation carries **12 canonical fields plus `pinned_model`** (project addition for high-end agents like the Final Review Editor).
+
+**Validation** runs in two stages:
+
+1. **Structural.** `serde_json::from_str::<OutputType>(raw)` against the type named by `output_schema_id`. The Rust types live in `booksforge-domain::agent_io` and are the source of truth; JSON Schemas are derivable from them.
+2. **Semantic.** Per-type `validate()` (e.g. `CopyeditProposals::validate(source_text)` enforces `before`-matches-source and the ≤10 % word-count rule) plus the cross-cutting validators declared on the agent's `validators` slice (`Schema`, `Redaction`, `Length`, optionally `EntitySanity` and `MemoryScope`).
 
 `PromptTemplateId` resolves to a TOML template under `booksforge-prompt/templates/<id>/<version>.toml` and a hash that is recorded on every run.
 
@@ -277,7 +285,7 @@ The following specifications are the contract. Claude Code implements one agent 
 
 **Inputs.** `{ "project_view": ProjectView, "deterministic_findings": ContinuityFinding[] }`.
 
-The orchestrator runs the deterministic continuity linter first (a Rust function in `booksforge-validator`), then sends only ambiguous findings to the LLM adjudicator. This keeps token use small.
+The orchestrator runs the deterministic continuity linter first (in `booksforge-validator::continuity` — `lint_scene` plus per-kind detectors `detect_name_drift`, `detect_pov_drift`, `detect_tense_drift`, `detect_timeline`), then sends only **ambiguous** findings (`ContinuityFinding.ambiguous == true`) to this LLM adjudicator. High-confidence findings (e.g. a proper noun within Levenshtein-distance 2 of a known alias) skip the LLM entirely. This keeps token use small.
 
 **Outputs.** `ContinuityReport`:
 
@@ -479,6 +487,93 @@ The Orchestrator is the runtime that runs workflows. It is fully specified in `A
 
 Listed in the catalog for completeness because the user's brief explicitly listed it.
 
+### 4.11 Final Review Editor Agent (`final-review-editor`)
+
+**Purpose.** Polish prose to a publishable, world-class standard while preserving the author's voice and established facts. Runs **last** in the publish pipeline — after copyedit / continuity / humanization / dev-edit are settled. Distinct from the Copyeditor (mechanical) and the Humanization agent (anti-AI-tells): this is the qualitative "is this prose good?" pass.
+
+**Inputs.** `{ scene_text, style_book_json, vocab_json, memory_excerpt, genre, audience }`.
+
+**Outputs.** `FinalReviewOutput`:
+
+```json
+{
+  "revised_text": "string — the polished prose",
+  "changes": [
+    { "kind": "rewrite|tighten|reorder|word_swap|cut",
+      "before": "string", "after": "string", "rationale": "string" }
+  ],
+  "summary": "string (≤120 words)",
+  "confidence": "high|medium|low",
+  "warnings": ["string", "..."]
+}
+```
+
+**Validation.** No fact invention against `memory_excerpt`; cross-cutting `EntitySanityCheck` catches drifted proper nouns; `confidence` in enum.
+
+**Model preference.** `qwen3.6:latest` pinned (36B MoE, Q4) — the highest-quality local option. Pin is advisory; if the model isn't pulled the orchestrator falls back to the largest official model that fits RAM and emits a `low_confidence` warning.
+
+**Context budget.** Scene/chapter prose + style/vocab/memory ≤ 24,000 tokens; output ≤ 8,000 tokens.
+
+**When to run.** On demand. Heavy — the writer opts in per session.
+
+**User gate.** Required. The diff is shown change-by-change with rationale.
+
+**Failure modes.** Voice drift, fact invention (terminal), pinned model not pulled (terminal). The first two trigger one retry with the offending evidence appended; the third surfaces a setup hint.
+
+### 4.12 Proposal Validator Agent (`proposal-validator`) — *internal, not user-visible*
+
+**Purpose.** 360° review of another agent's proposal before it surfaces to the user. Runs in two tiers; Tier 1 is deterministic (always on), Tier 2 is LLM-backed (opt-in per project).
+
+**Why it's internal.** This agent is not selectable from a workflow UI. It is an orchestrator-grade verifier: the orchestrator dispatches it after every primary agent's parse succeeds, and routes its `verdict ∈ {pass, warn, block}` into the retry / surface decision. It lives in `booksforge-agents/src/proposal_validator.rs` and is **excluded from `mvp_agents()`** so the user-visible catalog stays at ten.
+
+**Inputs.** `ProposalValidationInput`:
+
+```json
+{
+  "primary_agent_id": "string",
+  "primary_output":   "any (the proposal under review)",
+  "context_excerpt":  "string (relevant slice of what the primary saw)",
+  "tier_1_findings":  "ProposalValidation (the deterministic pass)"
+}
+```
+
+**Outputs.** `ProposalValidation`:
+
+```json
+{
+  "verdict": "pass|warn|block",
+  "checks": [
+    { "axis":        "schema|contract|range|redaction|length|entity_sanity|memory_scope|idempotent|faithfulness|style|coherence|self_consistency",
+      "outcome":     "pass|warn|fail",
+      "evidence":    "string",
+      "remediation": "string (optional)" }
+  ],
+  "summary":   "string (≤140 words)",
+  "tier_2_ran": "bool"
+}
+```
+
+**Validation tiers.**
+
+| Tier | Where it runs | Axes | Cost |
+|---|---|---|---|
+| **1 (deterministic)** | `booksforge-orchestrator::cross_cutting` + `proposal_validator::run_tier1` | `schema`, `redaction`, `length`, `entity_sanity`, `memory_scope`, `idempotent`, `range`, `contract` | Free; always on |
+| **2 (LLM)** | This agent's prompt template | `faithfulness`, `style`, `coherence`, `self_consistency` | One model call; opt-in |
+
+**Tier 1** runs every cross-cutting validator declared on the primary agent's `AgentSpec.validators` slice. **Tier 2** runs only after Tier 1 passes and only when the project has the `validators.tier_2_enabled` flag on. Verdict aggregation is conservative: any `Fail` → `Block`; any `Warn` (and no `Fail`) → `Warn`; otherwise `Pass`. A `Block` triggers exactly one retry of the *primary* agent with the validator's evidence appended as a reminder; a second `Block` aborts the run with `proposal_invalid`.
+
+**Model preference.** Small/fast (3B+ acceptable). The validator runs frequently, so cheap-model bias is correct.
+
+**Context budget.** ≤ 6,000 tokens input; ≤ 1,500 output. Larger primary outputs are excerpted.
+
+**When to run.** Automatic — orchestrator-driven, not user-initiated.
+
+**User gate.** Not required (it gates other agents' user gates).
+
+**Failure modes.** `verdict-out-of-enum`, `axis-out-of-enum`, `no-evidence`, `loops-back-to-self` (terminal — the validator hallucinates that it itself is wrong). On terminal failure the orchestrator falls back to Tier-1-only and surfaces a warning.
+
+**Memory writes.** None.
+
 ## 5. Context selection
 
 Every agent run is preceded by a context-build step. The orchestrator's `ContextBuilder`:
@@ -492,18 +587,70 @@ Every agent run is preceded by a context-build step. The orchestrator's `Context
 
 The user can preview the assembled context in the UI before running an on-demand agent. Sending equals previewing — there are no hidden additions. (This is the same invariant as `08-ai-integration §6`.)
 
+## 5.1 Voice fingerprint — the project's prose voice
+
+Every project carries a `VoiceFingerprint` (in `booksforge-domain::voice`) that captures how the author writes — independent of *what* they write. It is recomputed on each chapter finalise from the corpus of accepted prose. Six structural signals:
+
+| Signal | What it captures | LLM bias |
+|---|---|---|
+| `sentence_words_mean` / `_stddev` | Sentence-length cadence | LLMs prefer uniform mid-length sentences |
+| `em_dash_per_1000` | Em-dash density | LLMs over-use them (3–5× human rate) |
+| `ly_adverb_per_1000` | `-ly` adverb density | LLMs lean on adverbs |
+| `ai_tell_triad_per_1000` | `delve` / `tapestry` / `intricate` rate | Spike-on-LLM signal; should be near-zero in human prose |
+| `discourse_marker_per_1000` | `indeed` / `moreover` / `furthermore` / `thus` rate | LLMs love these |
+| `type_token_ratio` | Vocabulary richness | LLM prose clusters at 0.35–0.42; human voice 0.45+ |
+
+The fingerprint is rendered into every prose-emitting agent's prompt via the orchestrator's **prompt-guard** layer (see §6.5) so the agent matches the project's voice rather than a model-default register.
+
 ## 6. Failure modes and validation
 
 Every agent run goes through the same lifecycle:
 
-1. **Schema validation** of the raw output against the agent's JSON Schema.
-2. **Semantic validators** declared by the agent (e.g., "ranges must be valid").
-3. **Cross-cutting validators** applied to all agents:
-   - `RedactionCheck` — output does not contain anything that looks like a system prompt or chain-of-thought leak.
-   - `EntitySanityCheck` — proper nouns in the output are in the entity bible plus an allowlist.
-   - `LengthCheck` — output not absurdly long or empty.
+1. **Schema validation** of the raw output against the agent's typed Rust output (deserialization-as-validation).
+2. **Semantic validators** declared on the type itself (e.g. `CopyeditProposals::validate(source_text)` enforces `before`-text-matches-source-at-range, ≤10 % word-count change, no-overlap; `ContinuityReport::validate()` enforces ULID node_ids and rename-target completeness).
+3. **Cross-cutting validators** applied via the agent's `AgentSpec.validators` slice (live in `booksforge-orchestrator::cross_cutting`, dispatched by `proposal_validator::run_tier1`):
+   - `Schema`        — output parses as JSON object.
+   - `Redaction`     — output does not contain anything that looks like a system prompt or chain-of-thought leak (suspicious-phrase scan).
+   - `Length`        — output not absurdly long or empty (4 B ≤ size ≤ 64 KiB).
+   - `EntitySanity`  — proper nouns in output prose fields are in the entity bible plus an allowlist (added for prose-emitting agents only).
+   - `MemoryScope`   — proposed memory writes are within `allowed_write_scopes(agent_id)` (added for memory-touching agents).
+4. **Proposal Validator (Tier 2)**, if enabled — see §4.12. LLM-backed review for `faithfulness`, `style`, `coherence`, `self_consistency`. Runs only after Tier 1 passes.
 
-If validation fails, the orchestrator retries up to 2 times with an appended reminder ("Output must strictly conform to the schema. Previous output was rejected because: …"). After two retries, the run is marked `proposal_invalid` and the raw output is preserved as an inspectable artifact under `agent_runs/<run_id>/<task_id>.json`. **Failed proposals are never silently retried beyond the cap and are never partially applied.**
+If any tier returns `Block`, the orchestrator retries up to 2 times with an appended reminder ("Output must strictly conform to the schema. Previous output was rejected because: …"). After two retries, the run is marked `proposal_invalid` and the raw output is preserved as an inspectable artifact under `agent_runs/<run_id>/<task_id>.json`. **Failed proposals are never silently retried beyond the cap and are never partially applied.**
+
+## 6.5 Cross-verification council and prompt-guard layer
+
+Two systems sit between the primary agent's parse and the user gate, both orchestrator-mediated (agents remain stateless prompt-in/schema-out units; they never call each other).
+
+### 6.5.1 Cross-verification council
+
+Per `booksforge-domain::council` and `booksforge-orchestrator::council`. After Tier-1 + (opt-in) Tier-2 ProposalValidator pass, the council can dispatch **peer reviewers** — other MVP agents reviewing the primary's proposal from their own perspective. Each pairing carries a `PeerReviewFocus` (`fact_fidelity` / `voice_preservation` / `ai_tell_residue` / `name_pov_preservation` / `structural_purpose` / `memory_consistency` / `emotional_clarity`) and a `default_on` flag.
+
+| Primary agent | Default-on reviewers | Opt-in reviewers (high-confidence mode) |
+|---|---|---|
+| `intake` | — | — |
+| `outline-architect` | — | `memory-curator` (fact_fidelity) |
+| `chapter-drafter` | `memory-curator` (memory_consistency), `continuity` (name_pov_preservation), `humanization` (ai_tell_residue) | `dev-editor` (structural_purpose) |
+| `dev-editor` | — | `memory-curator` (memory_consistency) |
+| `continuity` | `memory-curator` (memory_consistency) | — |
+| `copyeditor` | `continuity` (name_pov_preservation) | — |
+| `humanization` | `memory-curator` (fact_fidelity) | `final-review-editor` (voice_preservation) |
+| `final-review-editor` | `humanization` (ai_tell_residue), `memory-curator` (fact_fidelity) | `continuity` (name_pov_preservation) |
+| `memory-curator`, `vocab-dictionary` | — (Tier-1 + MemoryScope check is enough) | — |
+
+**Bounds.** Peer reviews count toward the workflow's ≤ 8-call cap. The council is non-recursive: a reviewer cannot trigger its own peer reviewers. The verdict aggregator is conservative: any `Block` from any source escalates the council verdict to `Block`; any `Warn` (no `Block`) → `Warn`; otherwise `Pass`. A `Block` triggers exactly one retry of the *primary* with the council's evidence appended. The full audit trail (`agent_runs` + `agent_tasks` rows tied via `parent_task_id` in `caps_json`) makes every cross-verification traceable.
+
+The aggregated `VerificationReport` (Tier-1 + optional Tier-2 + peer reviews + final verdict) travels with the proposal to the user gate so the writer sees who validated what.
+
+### 6.5.2 Prompt-guard layer
+
+Per `booksforge-orchestrator::prompt_guard`. Every prose-emitting agent's rendered prompt is appended with an **always-observe constraints** block composed of three parts:
+
+1. **Humanity & empathy** (static) — six rules covering specific-over-abstract language, sensory grounding, behavioural interiority, subtext over explanation, legible stakes, and "empathy is witnessing, not narrating."
+2. **Voice fingerprint** (per-project) — concrete cadence / em-dash / discourse-marker / triad-avoidance targets derived from the project's `VoiceFingerprint` (§5.1). When the fingerprint isn't yet established (corpus < 2 000 tokens), generic anti-uniform-cadence advice is used instead.
+3. **Avoid-rules** (per-project) — the active-layer vocabulary `avoid` and `replace` entries, formatted as a numbered watch-list with rationale.
+
+This guard is *additive*: the agent's primary template owns the task; the guard adds project-wide humanity / voice / vocabulary constraints uniformly.
 
 ## 7. Workflows (MVP)
 

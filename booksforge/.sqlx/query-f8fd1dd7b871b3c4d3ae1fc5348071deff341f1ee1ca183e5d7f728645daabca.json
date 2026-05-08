@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT node_id, severity, code, message, offset_from, offset_to,\n                   auto_fixable\n            FROM validator_issues\n            WHERE run_id = ?\n            ORDER BY severity DESC, code ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "node_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "severity",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "code",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "message",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "offset_from",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "offset_to",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "auto_fixable",
+        "ordinal": 6,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "f8fd1dd7b871b3c4d3ae1fc5348071deff341f1ee1ca183e5d7f728645daabca"
+}

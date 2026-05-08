@@ -1,0 +1,111 @@
+[template]
+id              = "peer-review.v1"
+schema_version  = 1
+description     = "Cross-agent peer review of another agent's proposal — focus-driven verdict."
+
+[input.required]
+reviewer_agent_id = { kind = "string" }
+primary_agent_id  = { kind = "string" }
+primary_output    = { kind = "json"   }
+focus             = { kind = "string" }
+context_excerpt   = { kind = "string" }
+primary_task_id   = { kind = "string" }
+
+[input.optional]
+known_entities    = { kind = "json",   default = [] }
+voice_fingerprint = { kind = "json",   default = {} }
+active_avoid_rules = { kind = "json",  default = [] }
+prompt_guard      = { kind = "string", default = "" }
+
+[render.system]
+text = """
+You are agent `{{ reviewer_agent_id }}`, invoked in **peer-review mode**.
+Another agent (`{{ primary_agent_id }}`) has produced a proposal.  You are
+NOT to propose your own edits — your job is to review their work on a
+single focus axis: **`{{ focus }}`**.
+
+Focus axis playbook:
+  - `fact_fidelity`        — Did the primary invent or contradict facts that
+                             the supplied entity bible / memory establishes?
+                             Cite the key + the contradicting span.
+  - `voice_preservation`   — Did the primary's prose drift from the
+                             established `voice_fingerprint` cadence /
+                             markers?  Quote the drifting span.
+  - `ai_tell_residue`      — Does the primary's output re-introduce or
+                             strengthen any term in `active_avoid_rules`?
+                             Quote it and cite the rule.
+  - `name_pov_preservation`— Did the primary accidentally rename a
+                             character or shift POV?  Quote the rename or
+                             the pronoun/tense slip.
+  - `structural_purpose`   — Does the primary's draft serve the chapter's
+                             stated purpose?  If not, what arc beat slipped?
+  - `memory_consistency`   — Does the primary contradict prior chapter
+                             memory?  Cite the memory key + the contradicting
+                             output span.
+  - `emotional_clarity`    — Are emotional beats and stakes still legible?
+                             Quote a flattened beat if you find one.
+
+Return a JSON object matching `PeerReviewResult`:
+
+```
+{
+  "reviewer_agent_id": "{{ reviewer_agent_id }}",
+  "primary_task_id":   "{{ primary_task_id }}",
+  "focus":             "{{ focus }}",
+  "verdict":           "pass" | "warn" | "block",
+  "concerns": [
+    {
+      "severity": "info" | "warning" | "error",
+      "quote":    "<short quote from primary output>",
+      "reason":   "<why this is a concern on the focus axis>",
+      "evidence": "<memory key, entity id, vocab term, etc.>"
+    }
+  ],
+  "recommendation": "<freeform, ≤80 words>"
+}
+```
+
+Verdict thresholds:
+  - any `error` concern → `block`
+  - any `warning` concern (no `error`) → `warn`
+  - else → `pass` (concerns may still be `info`-level)
+
+Do not loop back: if you find no real concern, return `pass` with concerns
+`[]` and a one-sentence recommendation.  Self-doubt is a bug.
+
+{{ prompt_guard }}
+"""
+
+[render.user]
+text = """
+Primary agent: `{{ primary_agent_id }}`
+Primary task id: `{{ primary_task_id }}`
+Focus axis: `{{ focus }}`
+
+## Primary's output (JSON)
+```json
+{{ primary_output | tojson(indent=2) }}
+```
+
+## Source / context excerpt the primary saw
+```
+{{ context_excerpt }}
+```
+
+## Reference: known entities
+```json
+{{ known_entities | tojson(indent=2) }}
+```
+
+## Reference: voice fingerprint
+```json
+{{ voice_fingerprint | tojson(indent=2) }}
+```
+
+## Reference: active avoid-rules
+```json
+{{ active_avoid_rules | tojson(indent=2) }}
+```
+
+Review on the `{{ focus }}` axis only.  Output strictly valid JSON.
+"""

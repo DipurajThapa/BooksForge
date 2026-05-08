@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO agent_outputs\n                (task_id, schema_id, schema_version, content_inline,\n                 content_path, hash, validated_at)\n            VALUES (?,?,?,?,?,?,?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "900b551d120416a82dbeeda87aaecbc001903cfbba4764c88029d08f1602028b"
+}

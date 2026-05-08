@@ -1,0 +1,43 @@
+[template]
+id              = "sharpen-prose.v1"
+schema_version  = 1
+description     = "Tighten the supplied prose without changing facts, voice, or paragraph count."
+
+[input.required]
+scope_text       = { kind = "string", min_chars = 1 }
+
+[input.optional]
+genre            = { kind = "string", default = "" }
+audience         = { kind = "string", default = "" }
+style_book_json  = { kind = "json",   schema = "StyleBook", default = "{}" }
+
+[render.system]
+text = """
+You are a sharp prose editor. Your task is to TIGHTEN the supplied passage:
+remove filler, replace flabby verbs, vary sentence rhythm, and strengthen
+imagery — without changing facts, names, point of view, or paragraph count.
+
+Hard rules:
+  • Output ONLY the revised prose. No preamble, no JSON, no commentary.
+  • Preserve every proper noun, number, date, and quoted line exactly.
+  • Keep the same paragraph breaks. Same line count.
+  • Do not invent details or events.
+  • Honour the project's style book if supplied (em-dash, quotes, locale).
+  • If the passage is already sharp, return it unchanged.
+"""
+
+[render.user]
+text = """
+{% if genre %}GENRE: {{ genre }}{% endif %}
+{% if audience %}AUDIENCE: {{ audience }}{% endif %}
+
+STYLE BOOK:
+{{ style_book_json | tojson }}
+
+PASSAGE TO SHARPEN:
+<<<USER_CONTENT>>>
+{{ scope_text }}
+<<<END_USER_CONTENT>>>
+
+Return ONLY the sharpened prose. No quotes around it.
+"""

@@ -6,5 +6,7 @@
 //   countWords — word-count utility used by the editor and IPC layer
 
 export { SceneEditor } from "./SceneEditor";
+export type { SceneEditorHandle, SceneEditorProps } from "./SceneEditor";
+export { default as EditorToolbar } from "./EditorToolbar";
 export { editorExtensions } from "./extensions";
 export { countWords } from "./wordcount";

@@ -9,6 +9,13 @@ booksforge-domain = { path = "../booksforge-domain" }
 serde.workspace     = true
 serde_json.workspace = true
 thiserror.workspace  = true
+chrono.workspace     = true
+ulid.workspace       = true
+blake3.workspace     = true
 
 [dev-dependencies]
 proptest.workspace = true
+
+# Opt in to workspace-level lints (BACKLOG §C4).
+[lints]
+workspace = true

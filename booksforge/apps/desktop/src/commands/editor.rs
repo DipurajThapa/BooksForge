@@ -93,16 +93,63 @@ fn node_to_info(node: Node) -> NodeInfo {
 
 // ── node_list ─────────────────────────────────────────────────────────────────
 
-/// Return all non-deleted nodes ordered by LexoRank position.
+/// Return all non-deleted nodes ordered by LexoRank position, joined with
+/// the per-scene word count from `scene_content`.  Container nodes (Part,
+/// Chapter, Project) get `word_count = sum(descendant scenes)` so the
+/// binder and outline view can show rollups without a second round-trip.
 #[tauri::command]
 pub async fn node_list(state: State<'_, AppState>) -> Result<Vec<NodeInfo>, BooksForgeError> {
+    use std::collections::HashMap;
+
     let project = require_project(&state).await?;
     let nodes = project
         .storage
         .list_nodes()
         .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
-    Ok(nodes.into_iter().map(node_to_info).collect())
+    let scenes = project
+        .storage
+        .list_all_scene_content()
+        .await
+        .map_err(|e| BooksForgeError::internal(e.to_string()))?;
+
+    // Per-scene word count, keyed by node id.
+    let mut leaf_counts: HashMap<Ulid, u32> = HashMap::with_capacity(scenes.len());
+    for s in scenes {
+        leaf_counts.insert(s.node_id, s.word_count);
+    }
+
+    // For container kinds (Project / Part / Chapter), aggregate descendants.
+    // Build a parent → children map first so we can DFS without recursion
+    // hitting the storage layer again.
+    let mut by_parent: HashMap<Option<Ulid>, Vec<Ulid>> = HashMap::new();
+    for n in &nodes {
+        by_parent.entry(n.parent_id).or_default().push(n.id);
+    }
+
+    fn aggregate(
+        node_id:     Ulid,
+        by_parent:   &HashMap<Option<Ulid>, Vec<Ulid>>,
+        leaf_counts: &HashMap<Ulid, u32>,
+    ) -> u32 {
+        let mut total = leaf_counts.get(&node_id).copied().unwrap_or(0);
+        if let Some(children) = by_parent.get(&Some(node_id)) {
+            for child in children {
+                total = total.saturating_add(aggregate(*child, by_parent, leaf_counts));
+            }
+        }
+        total
+    }
+
+    Ok(nodes
+        .into_iter()
+        .map(|node| {
+            let count = aggregate(node.id, &by_parent, &leaf_counts);
+            let mut info = node_to_info(node);
+            info.word_count = count;
+            info
+        })
+        .collect())
 }
 
 // ── node_create ───────────────────────────────────────────────────────────────
@@ -257,6 +304,10 @@ pub async fn scene_save(
 
     // 5. Write Markdown mirror (best-effort — do not propagate errors).
     let _ = markdown_mirror::write_mirror(&project.bundle, &input.node_id, &input.pm_doc).await;
+
+    // 6. Mark the project as dirty so the hourly auto-snapshot scheduler
+    //    fires on the next tick (D7).
+    state.touch();
 
     Ok(())
 }

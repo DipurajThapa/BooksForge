@@ -6,13 +6,27 @@
  * - Scene selection and content loading
  * - Crash recovery check on mount
  */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import type { JSONContent } from "@tiptap/core";
 import type { NodeInfo, OpenProjectResult, RecoveryStatus, SceneLoadResult } from "@booksforge/shared-types";
-import { SceneEditor } from "@booksforge/editor";
+import { EditorToolbar, SceneEditor, type SceneEditorHandle } from "@booksforge/editor";
+import AgentDebugForm from "./AgentDebugForm";
+import AgentsPanel from "./agents/AgentsPanel";
+import ExportPanel from "./ExportPanel";
+import HelpDrawer from "./HelpDrawer";
+import LiveRunOverlay from "./LiveRunOverlay";
+import OnboardingTour, { shouldShowOnboarding } from "./OnboardingTour";
+import SettingsPanel from "./SettingsPanel";
 import Binder from "./Binder";
+import FindReplaceBar from "./FindReplaceBar";
+import InspectorPanel from "./InspectorPanel";
 import OllamaWizard from "./OllamaWizard";
+import QuickActionBar from "./QuickActionBar";
+import KnowledgePanel from "./KnowledgePanel";
 import RecoveryDialog from "./RecoveryDialog";
+import SnapshotsPanel from "./SnapshotsPanel";
+import ValidatorPanel from "./ValidatorPanel";
 import { ipc } from "../lib/ipc";
 
 interface Props {
@@ -27,12 +41,131 @@ export default function EditorShell({ project, onClose }: Props) {
   const [recovery, setRecovery] = useState<RecoveryStatus | null>(null);
   const [saving, setSaving] = useState(false);
   const [showOllamaWizard, setShowOllamaWizard] = useState(false);
+  const [showAgentDebug,   setShowAgentDebug]   = useState(false);
+  const [showSnapshots,    setShowSnapshots]    = useState(false);
+  const [showQuickAction,  setShowQuickAction]  = useState(false);
+  const [showValidators,   setShowValidators]   = useState(false);
+  const [showKnowledge,    setShowKnowledge]    = useState(false);
+  const [showAgents,       setShowAgents]       = useState(false);
+  const [showExport,       setShowExport]       = useState(false);
+  const [showSettings,     setShowSettings]     = useState(false);
+  const [showHelp,         setShowHelp]         = useState(false);
+  const [showOnboarding,   setShowOnboarding]   = useState(() => shouldShowOnboarding());
+  const [showFindReplace,  setShowFindReplace]  = useState(false);
+  const [exporting,        setExporting]        = useState(false);
+  const [exportToast,      setExportToast]      = useState<string | null>(null);
+  // D5 — focus / distraction-free mode.  Hides the binder + inspector +
+  // status bar so only the prose remains.  Toggle via the Focus button or
+  // ⌘. (Mac) / Ctrl+. (Win/Linux).
+  const [focusMode,        setFocusMode]        = useState(false);
+  const editorHandleRef = useRef<SceneEditorHandle>(null);
+  // Held in state (not just a ref) so the toolbar re-renders when the
+  // editor is mounted/unmounted as the user switches scenes.
+  const [editorInstance, setEditorInstance] = useState<import("@tiptap/react").Editor | null>(null);
+  // Live word count of the active scene; updated on every keystroke via
+  // the SceneEditor `onSave` callback.
+  const [liveSceneWords, setLiveSceneWords] = useState<number>(0);
+  // Project total at session start, used to compute "today" delta.
+  const sessionBaselineRef = useRef<number | null>(null);
+
+  // Export the manuscript to Markdown via the OS save-file dialog.
+  // Gates on the validator: errors block, warnings prompt, info silent.
+  const handleExport = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    setExportToast(null);
+
+    // Pre-export gate (Phase 4).
+    try {
+      const gate = await ipc.validatorsGate();
+      if (gate.outcome === "block") {
+        setExportToast(
+          `Export blocked — ${gate.errors.length} error(s) must be fixed first.`
+        );
+        window.setTimeout(() => setExportToast(null), 6000);
+        setShowValidators(true);
+        setExporting(false);
+        return;
+      }
+      if (gate.outcome === "warn") {
+        const ok = window.confirm(
+          `${gate.warnings.length} warning(s) detected. Export anyway?`,
+        );
+        if (!ok) {
+          setExporting(false);
+          setShowValidators(true);
+          return;
+        }
+      }
+    } catch (e) {
+      // If the gate itself fails, surface and bail — don't ship a possibly-
+      // broken manuscript silently.
+      setExportToast(`Pre-export check failed: ${String(e)}`);
+      window.setTimeout(() => setExportToast(null), 6000);
+      setExporting(false);
+      return;
+    }
+
+    const safeTitle = project.title.trim().replace(/[^a-zA-Z0-9_\- ]/g, "") || "manuscript";
+    const target = await saveDialog({
+      title: "Export manuscript as Markdown",
+      defaultPath: `${safeTitle}.md`,
+      filters: [{ name: "Markdown", extensions: ["md"] }],
+    }).catch(() => null);
+    if (!target) { setExporting(false); return; }
+
+    try {
+      const result = await ipc.exportMarkdown({ output_path: target });
+      setExportToast(
+        `Exported · ${result.scene_count} scenes · ${result.word_count.toLocaleString()} words`
+      );
+      window.setTimeout(() => setExportToast(null), 5000);
+    } catch (e) {
+      setExportToast(`Export failed: ${String(e)}`);
+      window.setTimeout(() => setExportToast(null), 6000);
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting, project.title]);
 
   // Load node list.
   const refreshNodes = useCallback(async () => {
     const list = await ipc.nodeList().catch(() => [] as NodeInfo[]);
     setNodes(list);
+    // Capture the project word count once on first successful load — that
+    // becomes the "today" baseline so the status bar can show session delta.
+    if (sessionBaselineRef.current === null) {
+      const total = list
+        .filter((n) => !n.parent_id || n.kind === "project")
+        .reduce((sum, n) => sum + n.word_count, 0);
+      sessionBaselineRef.current = total;
+    }
   }, []);
+
+  // Cmd/Ctrl+K opens the quick-action bar; Cmd/Ctrl+. toggles focus mode.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey)) {
+        if ((e.key === "k" || e.key === "K") && selectedNode?.kind === "scene") {
+          e.preventDefault();
+          setShowQuickAction(true);
+          return;
+        }
+        if (e.key === ".") {
+          e.preventDefault();
+          setFocusMode((on) => !on);
+          return;
+        }
+        if ((e.key === "f" || e.key === "F") && selectedNode?.kind === "scene") {
+          e.preventDefault();
+          setShowFindReplace(true);
+          return;
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedNode]);
 
   // On mount: load nodes first, then check for crash recovery (so the node is
   // already in the list when the dialog's onRestore tries to select it).
@@ -58,6 +191,7 @@ export default function EditorShell({ project, onClose }: Props) {
   const handleSave = useCallback(
     async (doc: JSONContent, wordCount: number, charCount: number) => {
       if (!selectedNode) return;
+      setLiveSceneWords(wordCount);
       setSaving(true);
       try {
         await ipc.sceneSave({
@@ -66,13 +200,14 @@ export default function EditorShell({ project, onClose }: Props) {
           word_count: wordCount,
           char_count: charCount,
         });
+        await refreshNodes(); // pulls fresh rollups for the binder + status bar
       } catch {
         // Best-effort — don't crash the UI on autosave failure.
       } finally {
         setSaving(false);
       }
     },
-    [selectedNode]
+    [selectedNode, refreshNodes]
   );
 
   async function handleRecoveryRestore() {
@@ -109,6 +244,74 @@ export default function EditorShell({ project, onClose }: Props) {
             AI Setup
           </button>
           <button
+            style={{ ...s.aiBtn, borderColor: "var(--color-border)" }}
+            onClick={() => setShowAgentDebug(true)}
+            title="Debug: run outline agent"
+          >
+            Debug AI
+          </button>
+          <button
+            style={{
+              ...s.aiBtn,
+              borderColor: focusMode ? "var(--color-amber-600)" : "var(--color-border)",
+              background:  focusMode ? "var(--color-amber-600)" : "none",
+              color:       focusMode ? "#fff" : "var(--color-amber-600)",
+            }}
+            onClick={() => setFocusMode((on) => !on)}
+            title="Focus mode — hides binder and inspector (⌘. / Ctrl+.)"
+          >
+            {focusMode ? "Exit Focus" : "Focus"}
+          </button>
+          <button
+            style={{ ...s.aiBtn, borderColor: "var(--color-border)" }}
+            onClick={() => setShowSnapshots(true)}
+            title="Snapshots — manual save points and restore"
+          >
+            Snapshots
+          </button>
+          <button
+            style={{ ...s.aiBtn, borderColor: "var(--color-border)" }}
+            onClick={() => setShowValidators(true)}
+            title="Run all 16 manuscript validators"
+          >
+            Check
+          </button>
+          <button
+            style={{ ...s.aiBtn, borderColor: "var(--color-border)" }}
+            onClick={() => setShowKnowledge(true)}
+            title="Project memory + vocabulary"
+          >
+            Knowledge
+          </button>
+          <button
+            style={{ ...s.aiBtn, borderColor: "var(--color-border)" }}
+            onClick={() => setShowAgents(true)}
+            title="Run any of the 11 agents (copyedit, humanize, continuity, draft, …)"
+          >
+            Agents
+          </button>
+          <button
+            style={{ ...s.aiBtn, borderColor: "var(--color-border)" }}
+            onClick={() => setShowExport(true)}
+            title="Export manuscript — Markdown / EPUB / DOCX / PDF"
+          >
+            Export
+          </button>
+          <button
+            style={{ ...s.aiBtn, borderColor: "var(--color-border)" }}
+            onClick={() => setShowHelp(true)}
+            title="In-app help — keyboard shortcuts, agents, exports"
+          >
+            Help
+          </button>
+          <button
+            style={{ ...s.aiBtn, borderColor: "var(--color-border)" }}
+            onClick={() => setShowSettings(true)}
+            title="Settings — telemetry, diagnostics, originality, dependencies"
+          >
+            Settings
+          </button>
+          <button
             style={s.closeBtn}
             onClick={() => {
               ipc.projectClose().catch(() => null);
@@ -122,23 +325,30 @@ export default function EditorShell({ project, onClose }: Props) {
 
       {/* ── Body ── */}
       <div style={s.body}>
-        <Binder
-          nodes={nodes}
-          selectedId={selectedNode?.id ?? null}
-          onSelect={setSelectedNode}
-          onNodesChanged={refreshNodes}
-        />
+        {!focusMode && (
+          <Binder
+            nodes={nodes}
+            selectedId={selectedNode?.id ?? null}
+            onSelect={setSelectedNode}
+            onNodesChanged={refreshNodes}
+          />
+        )}
 
         <main style={s.center}>
           {selectedNode?.kind === "scene" ? (
-            <SceneEditor
-              key={selectedNode.id}
-              initialDoc={
-                sceneContent ? (sceneContent.pm_doc as JSONContent) : null
-              }
-              onSave={handleSave}
-              saveDelay={5000}
-            />
+            <>
+              <EditorToolbar editor={editorInstance} />
+              <SceneEditor
+                key={selectedNode.id}
+                ref={editorHandleRef}
+                initialDoc={
+                  sceneContent ? (sceneContent.pm_doc as JSONContent) : null
+                }
+                onSave={handleSave}
+                saveDelay={5000}
+                onEditorReady={setEditorInstance}
+              />
+            </>
           ) : (
             <div style={s.noScene}>
               <p style={s.noSceneText}>
@@ -150,9 +360,25 @@ export default function EditorShell({ project, onClose }: Props) {
           )}
         </main>
 
-        {/* Right panel stub — will host inspector / entity panel in MZ-04+ */}
-        <aside style={s.right} />
+        {/* Right panel — outline / metadata inspector (Phase 2). */}
+        {!focusMode && (
+          <InspectorPanel
+            node={selectedNode}
+            onSaved={refreshNodes}
+          />
+        )}
       </div>
+
+      {/* ── Status bar (hidden in focus mode) ── */}
+      {!focusMode && (
+        <StatusBar
+          nodes={nodes}
+          selectedNode={selectedNode}
+          liveSceneWords={liveSceneWords}
+          sessionBaseline={sessionBaselineRef.current ?? 0}
+          saving={saving}
+        />
+      )}
 
       {/* ── Crash recovery dialog ── */}
       {recovery && (
@@ -170,9 +396,186 @@ export default function EditorShell({ project, onClose }: Props) {
           onComplete={() => setShowOllamaWizard(false)}
         />
       )}
+
+      {/* ── MZ-05 Agent debug form ── */}
+      {showAgentDebug && (
+        <AgentDebugForm
+          projectId={project.project_id}
+          onClose={() => setShowAgentDebug(false)}
+        />
+      )}
+
+      {/* ── MZ-06 Snapshots panel ── */}
+      {showSnapshots && (
+        <SnapshotsPanel onClose={() => setShowSnapshots(false)} />
+      )}
+
+      {/* ── Phase 4 Validator panel ── */}
+      {showValidators && (
+        <ValidatorPanel
+          onClose={() => setShowValidators(false)}
+          onSelectNode={(nodeId) => {
+            const target = nodes.find((n) => n.id === nodeId);
+            if (target) {
+              setSelectedNode(target);
+              setShowValidators(false);
+            }
+          }}
+        />
+      )}
+
+      {/* ── Turn B Knowledge panel ── */}
+      {showKnowledge && (
+        <KnowledgePanel onClose={() => setShowKnowledge(false)} />
+      )}
+
+      {/* ── §E0d.9 Agents panel ── */}
+      {showAgents && (
+        <AgentsPanel
+          projectId={project.project_id}
+          sceneId={selectedNode?.kind === "scene" ? selectedNode.id : null}
+          onClose={() => setShowAgents(false)}
+        />
+      )}
+
+      {/* ── Phase 6 Export panel ── */}
+      {showExport && (
+        <ExportPanel onClose={() => setShowExport(false)} />
+      )}
+
+      {/* ── §B4 Settings panel ── */}
+      {showSettings && (
+        <SettingsPanel onClose={() => setShowSettings(false)} />
+      )}
+
+      {/* ── §I4 Help drawer ── */}
+      {showHelp && (
+        <HelpDrawer onClose={() => setShowHelp(false)} />
+      )}
+
+      {/* ── §I5 Onboarding tour ── */}
+      {showOnboarding && (
+        <OnboardingTour onClose={() => setShowOnboarding(false)} />
+      )}
+
+      {/* ── §E4 Live agent-run overlay ── */}
+      <LiveRunOverlay />
+
+      {/* Export toast */}
+      {exportToast && (
+        <div style={s.toast} role="status">{exportToast}</div>
+      )}
+
+      {/* ── D3 Find / Replace bar (Cmd/Ctrl+F) ── */}
+      <FindReplaceBar
+        open={showFindReplace}
+        editor={editorInstance}
+        onClose={() => setShowFindReplace(false)}
+      />
+
+      {/* ── MZ-08 Quick-action bar (Cmd/Ctrl+K) ── */}
+      {showQuickAction && selectedNode?.kind === "scene" && (
+        <QuickActionBar
+          open={showQuickAction}
+          nodeId={selectedNode.id}
+          getScopeText={() => editorHandleRef.current?.getSelectionText() ?? ""}
+          onClose={() => setShowQuickAction(false)}
+          onApplied={() => {
+            // Reload scene content from storage so the editor shows the new prose.
+            ipc.sceneLoad(selectedNode.id).then(setSceneContent).catch(() => null);
+          }}
+        />
+      )}
     </div>
   );
 }
+
+// ── StatusBar ─────────────────────────────────────────────────────────────────
+
+interface StatusBarProps {
+  nodes:           NodeInfo[];
+  selectedNode:    NodeInfo | null;
+  liveSceneWords:  number;
+  sessionBaseline: number;
+  saving:          boolean;
+}
+
+function StatusBar({ nodes, selectedNode, liveSceneWords, sessionBaseline, saving }: StatusBarProps) {
+  // Project total = sum of every leaf scene's count. Do this from the
+  // node_list response so we don't need a second IPC.
+  const projectWords = nodes
+    .filter((n) => n.kind === "scene" || n.kind === "front_matter" || n.kind === "back_matter")
+    .reduce((sum, n) => sum + n.word_count, 0);
+
+  // Selected scene word count: prefer live (matches what the user sees as
+  // they type) over the persisted count (one autosave-cycle stale).
+  const sceneWords = selectedNode?.kind === "scene"
+    ? Math.max(liveSceneWords, selectedNode.word_count)
+    : 0;
+  const sceneTarget = selectedNode?.target_words ?? null;
+
+  // Chapter rollup — walk up to nearest chapter ancestor.
+  let chapterWords: number | null = null;
+  if (selectedNode) {
+    let cur: NodeInfo | undefined = selectedNode;
+    while (cur && cur.kind !== "chapter") {
+      cur = cur.parent_id ? nodes.find((n) => n.id === cur!.parent_id) : undefined;
+    }
+    if (cur) chapterWords = cur.word_count;
+  }
+
+  const today = projectWords - sessionBaseline;
+
+  return (
+    <footer style={statusBarStyles.bar} role="status">
+      <span style={statusBarStyles.cell}>
+        <b>{projectWords.toLocaleString()}</b> total
+      </span>
+      {chapterWords !== null && (
+        <span style={statusBarStyles.cell}>
+          <b>{chapterWords.toLocaleString()}</b> chapter
+        </span>
+      )}
+      {selectedNode?.kind === "scene" && (
+        <span style={statusBarStyles.cell}>
+          <b>{sceneWords.toLocaleString()}</b>
+          {sceneTarget ? ` / ${sceneTarget.toLocaleString()}` : ""} scene
+        </span>
+      )}
+      {today !== 0 && (
+        <span
+          style={{
+            ...statusBarStyles.cell,
+            color: today > 0 ? "var(--color-success, #22c55e)" : "var(--color-error, #ef4444)",
+          }}
+        >
+          {today > 0 ? "+" : ""}{today.toLocaleString()} today
+        </span>
+      )}
+      <span style={statusBarStyles.spacer} />
+      {saving && <span style={statusBarStyles.cellMuted}>Saving…</span>}
+    </footer>
+  );
+}
+
+const statusBarStyles: Record<string, React.CSSProperties> = {
+  bar: {
+    height: 28,
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+    padding: "0 var(--space-4)",
+    borderTop: "1px solid var(--color-border)",
+    background: "var(--color-surface-raised, #fafafa)",
+    fontSize: 11,
+    color: "var(--color-text-secondary)",
+    fontVariantNumeric: "tabular-nums",
+  },
+  cell:      { whiteSpace: "nowrap" },
+  cellMuted: { color: "var(--color-text-tertiary)", whiteSpace: "nowrap" },
+  spacer:    { flex: 1 },
+};
 
 const s: Record<string, React.CSSProperties> = {
   shell: {
@@ -267,5 +670,18 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 14,
     margin: 0,
     textAlign: "center",
+  },
+  toast: {
+    position:    "fixed",
+    bottom:      24,
+    right:       24,
+    background:  "var(--color-surface-raised)",
+    border:      "1px solid var(--color-border)",
+    borderRadius: 6,
+    padding:     "8px 14px",
+    fontSize:    13,
+    color:       "var(--color-text-primary)",
+    boxShadow:   "0 6px 20px rgba(0,0,0,0.2)",
+    zIndex:      700,
   },
 };

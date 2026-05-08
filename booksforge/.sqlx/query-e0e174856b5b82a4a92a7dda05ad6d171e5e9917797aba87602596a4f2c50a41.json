@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT node_id, pm_doc, word_count, char_count, hash, updated_at\n            FROM scene_content\n            WHERE node_id = ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "node_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "pm_doc",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "word_count",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "char_count",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "hash",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 5,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e0e174856b5b82a4a92a7dda05ad6d171e5e9917797aba87602596a4f2c50a41"
+}

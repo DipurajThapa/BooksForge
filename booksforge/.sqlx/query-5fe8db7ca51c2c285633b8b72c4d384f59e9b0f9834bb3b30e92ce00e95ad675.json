@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE agent_tasks\n            SET status = ?, output_hash = ?, context_tokens = ?, output_tokens = ?,\n                duration_ms = ?, retries = ?, error_category = ?, error_message = ?,\n                updated_at = ?\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "5fe8db7ca51c2c285633b8b72c4d384f59e9b0f9834bb3b30e92ce00e95ad675"
+}

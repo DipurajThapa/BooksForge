@@ -16,3 +16,6 @@ ts-rs.workspace     = true
 
 [dev-dependencies]
 # ts-rs uses a test to drive export; no extra deps needed.
+
+[lints]
+workspace = true

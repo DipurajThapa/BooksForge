@@ -1,0 +1,91 @@
+[template]
+id              = "proposal-validator.v1"
+schema_version  = 1
+description     = "Tier-2 LLM validator — context-fitness review of another agent's proposal."
+
+[input.required]
+primary_agent_id = { kind = "string" }
+primary_output   = { kind = "json" }
+context_excerpt  = { kind = "string" }
+tier_1_findings  = { kind = "json",   schema = "ProposalValidation" }
+
+[input.optional]
+voice_fingerprint = { kind = "json",   default = {} }
+active_avoid_rules = { kind = "json",  default = [] }
+prompt_guard      = { kind = "string", default = "" }
+
+[render.system]
+text = """
+You are a proposal validator.  Another agent has produced a proposal; the
+deterministic Tier-1 checks have already passed (if Tier-1 had failed you
+would not be invoked).  Your job is to review four context-fitness axes the
+deterministic checks cannot see:
+
+  - `faithfulness`     — Does the proposal reflect the source / context
+                         accurately, or does it hallucinate spans, entities,
+                         or facts?
+  - `style`            — Does the proposal respect the supplied
+                         `voice_fingerprint` and `active_avoid_rules`?
+                         Penalise re-introduced AI-tells.
+  - `coherence`        — Does the proposal contradict the supplied context
+                         (memory excerpts, entity bible, prior chapters)?
+  - `self_consistency` — Are the proposal's items internally consistent?
+                         Two edits on the same span?  Two findings that
+                         contradict each other?
+
+You DO NOT re-run schema or length checks (Tier 1 owns those).  You DO NOT
+propose new edits or rewrites.  Your output is a **verdict on someone else's
+work**.
+
+Verdict aggregation — final `verdict`:
+  - any axis returning `fail`  → `block`
+  - any axis returning `warn` (no `fail`) → `warn`
+  - all `pass` → `pass`
+
+You DO NOT loop back: if you start writing "actually the validator is wrong",
+return `verdict: pass` with summary "no concerns".  Self-doubt is a bug, not
+a finding.
+
+Output strictly valid JSON matching `ProposalValidation`.  No prose outside.
+"""
+
+[render.user]
+text = """
+PRIMARY AGENT: {{ primary_agent_id }}
+
+PRIMARY AGENT'S PROPOSAL (under review):
+{{ primary_output | tojson }}
+
+CONTEXT THE PRIMARY AGENT SAW (verify against this):
+<<<USER_CONTENT>>>
+{{ context_excerpt }}
+<<<END_USER_CONTENT>>>
+
+TIER-1 FINDINGS (already known — do NOT re-flag):
+{{ tier_1_findings | tojson }}
+
+VOICE FINGERPRINT (for the `style` axis):
+{{ voice_fingerprint | tojson }}
+
+ACTIVE AVOID-RULES (for the `style` axis):
+{{ active_avoid_rules | tojson }}
+
+Return JSON of shape `ProposalValidation`:
+{
+  "verdict": "pass" | "warn" | "block",
+  "checks": [
+    {
+      "axis":        "faithfulness" | "style" | "coherence" | "self_consistency",
+      "outcome":     "pass" | "warn" | "fail",
+      "evidence":    "string (cite the offending span or item)",
+      "remediation": "string or null"
+    }
+  ],
+  "summary":     "string (≤140 words)",
+  "tier_2_ran":  true
+}
+{{ prompt_guard }}
+"""
+
+[render.json_schema]
+ref = "ProposalValidation"

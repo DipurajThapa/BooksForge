@@ -1,0 +1,18 @@
+{
+  "name": "@booksforge/visual-regression",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Playwright pixel-diff harness for the editor preview vs EPUB renderings (BACKLOG §H6).",
+  "scripts": {
+    "test":          "playwright test",
+    "test:headed":   "playwright test --headed",
+    "test:ui":       "playwright test --ui",
+    "update-golden": "playwright test --update-snapshots",
+    "report":        "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "typescript":       "5.6.3"
+  }
+}

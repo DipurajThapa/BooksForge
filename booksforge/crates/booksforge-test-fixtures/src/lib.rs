@@ -6,6 +6,9 @@
 
 #![forbid(unsafe_code)]
 #![cfg(test)]
+// BACKLOG §C4: this entire crate is test-only (`#![cfg(test)]`); waive the
+// strict policy lints so fixture builders can use `.unwrap()` freely.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 pub mod mock_ollama;
 pub mod nodes;

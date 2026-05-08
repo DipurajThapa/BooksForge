@@ -16,3 +16,9 @@ tokio-util.workspace  = true
 futures-util.workspace = true
 async-trait.workspace = true
 tracing.workspace    = true
+
+# BACKLOG §C4: this crate cannot inherit `[lints] workspace = true`
+# because workspace policy forbids `unsafe_code` and `probe.rs` uses
+# `GlobalMemoryStatusEx` on Windows (an FFI call that requires an
+# unsafe block).  Strict policy clippy lints are enforced via inner
+# attributes in `lib.rs`.

@@ -8,6 +8,31 @@
 //! The mirror format is a minimal conversion from ProseMirror JSON, sufficient
 //! for human readability and disaster recovery.  It is NOT the canonical
 //! source of truth; that is `scene_content.pm_doc`.
+//!
+//! ## Snapshotting policy (BACKLOG §A4)
+//!
+//! The Markdown mirror is **not** included in snapshots.  Three reasons:
+//!
+//!   1. **The pm_doc IS in the snapshot.**  Every scene's `pm_doc` JSON
+//!      goes into the snapshot's content-addressed store, so a restore
+//!      can always rebuild the mirror from the canonical source.  Storing
+//!      the mirror separately would duplicate every scene on disk.
+//!
+//!   2. **Lossy round-trip.**  The mirror loses some inline marks
+//!      (links, custom node attrs) on conversion.  Re-importing a mirror
+//!      file as authoritative would silently degrade the manuscript.
+//!      Restore re-emits the mirror from the snapshotted pm_doc, which
+//!      stays lossless.
+//!
+//!   3. **Mirror is a *projection*, not state.**  The bundle's
+//!      `manuscript/*.md` files are an external-tooling courtesy
+//!      (Pandoc, Word import, GitHub preview).  Treating them as state
+//!      would make every mirror format change a snapshot migration.
+//!
+//! When a snapshot is restored, callers SHOULD re-run `write_mirror` for
+//! every restored scene so the on-disk Markdown matches the
+//! freshly-restored database.  `booksforge-snapshot::SnapshotService::restore`
+//! does NOT do this today; that's tracked as a follow-up under §A4.
 
 use serde_json::Value;
 

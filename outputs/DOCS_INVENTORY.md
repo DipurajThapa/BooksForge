@@ -123,7 +123,7 @@ If you add a new doc, add a row here. If you delete or merge a doc, mark the row
 | `diagrams/03-dataflow-edit-loop.svg` | Reference | Active | None |
 | `diagrams/04-workflow-lifecycle.svg` | Reference | Active | None |
 | `diagrams/05-plugin-architecture.svg` | Reference | Active | None — post-MVP |
-| `diagrams/06-ai-flow.svg` | Reference | Active | None — shows 9 MVP agents + Ollama HTTP |
+| `diagrams/06-ai-flow.svg` | Reference | Stale (count) | Depicts 9 MVP agents; catalog now has 10 user-visible (Final Review Editor added) + 1 internal (Proposal Validator). Refresh at next diagram pass. |
 | `diagrams/07-export-pipeline.svg` | Reference | Active | None — shows canonical-HTML pipeline |
 | `diagrams/08-roadmap-gantt.svg` | Reference | Stale | Refresh after a milestone closes |
 

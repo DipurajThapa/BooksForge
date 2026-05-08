@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM vocab_entries WHERE source = 'starter'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "e04d51fac4becd47acda7efa6e709ca465f84b4a73090387cdd619b2d7de768e"
+}

@@ -43,9 +43,13 @@ pub fn all_models() -> &'static [ModelEntry] {
     use std::sync::OnceLock;
     static REGISTRY: OnceLock<Vec<ModelEntry>> = OnceLock::new();
     REGISTRY.get_or_init(|| {
-        toml::from_str::<Registry>(MODELS_TOML)
-            .expect("models.toml is embedded and must parse correctly")
-            .model
+        // The TOML is `include_str!`'d at compile time and validated by
+        // a unit test below; if parsing ever fails here, the build is
+        // already broken.  expect() is the right call.
+        #[allow(clippy::expect_used)]
+        let r = toml::from_str::<Registry>(MODELS_TOML)
+            .expect("models.toml is embedded and must parse correctly");
+        r.model
     })
 }
 

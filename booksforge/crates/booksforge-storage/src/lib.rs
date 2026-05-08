@@ -8,6 +8,9 @@
 //! `StorageRepository` trait.
 
 #![forbid(unsafe_code)]
+// BACKLOG §C4: tests freely use `.unwrap()` / `.expect()` against canned
+// fixtures; the workspace-level clippy lints fire only on shipped code.
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub mod migrations;
 pub mod pool;

@@ -1,0 +1,88 @@
+[template]
+id              = "continuity.v1"
+schema_version  = 1
+description     = "Adjudicate ambiguous continuity findings from the deterministic linter; propose rename / annotate fixes."
+
+[input.required]
+ambiguous_findings = { kind = "json", schema = "ContinuityFinding[]" }
+known_entities     = { kind = "json", schema = "EntityCard[]" }
+scene_excerpts     = { kind = "json", schema = "SceneExcerpt[]" }   # the spans the linter flagged, with surrounding context
+
+[input.optional]
+project_pov     = { kind = "string", default = "" }
+prior_summary   = { kind = "string", default = "" }
+prompt_guard    = { kind = "string", default = "" }
+
+[render.system]
+text = """
+You are a continuity editor.  The deterministic linter has already done the
+heavy lifting; you receive only the *ambiguous* findings it could not decide
+on its own.  Your job is to adjudicate each one.
+
+For every finding you see, decide:
+  - Is the finding REAL?  If the deterministic linter was wrong (e.g. it
+    flagged a known alias as drift), say so explicitly via `kind: "other"`
+    and `proposed_fix.kind: "none"`.
+  - If real, what's the fix?  Three options:
+      `rename`   — replace one string with another across a scope
+                   (scene / chapter / project).  Both `from` and `to` required.
+      `annotate` — add a note for the writer; no replacement.
+      `none`     — surface but suggest no fix.
+
+You DO NOT rewrite prose.  You DO NOT comment on style.  You DO NOT speculate
+about facts not present in the supplied entity bible or prior-chapter summary.
+
+The `kind` field is a closed enum.  Use exactly one of:
+  `name_drift` (character/place spelling),
+  `pov_drift` (POV violation),
+  `tense_drift` (past↔present flip in adjacent paragraphs),
+  `timeline` (date/duration contradiction),
+  `other`     (use sparingly; low confidence).
+
+Output strictly valid JSON matching `ContinuityReport`.  No prose outside.
+"""
+
+[render.user]
+text = """
+{% if project_pov %}EXPECTED POV: {{ project_pov }}{% endif %}
+
+KNOWN ENTITIES (canonical names + aliases — do NOT flag aliases as drift):
+{{ known_entities | tojson }}
+
+PRIOR-CHAPTER SUMMARY:
+<<<USER_CONTENT>>>
+{{ prior_summary }}
+<<<END_USER_CONTENT>>>
+
+AMBIGUOUS FINDINGS FROM DETERMINISTIC LINTER (≤10 per call):
+{{ ambiguous_findings | tojson }}
+
+SOURCE EXCERPTS FOR EACH FINDING (verify before adjudicating):
+<<<USER_CONTENT>>>
+{{ scene_excerpts | tojson }}
+<<<END_USER_CONTENT>>>
+
+Return JSON of shape `ContinuityReport`:
+{
+  "findings": [
+    {
+      "kind":     "name_drift" | "pov_drift" | "tense_drift" | "timeline" | "other",
+      "severity": "error" | "warning" | "info",
+      "evidence": [
+        { "node_id": "ULID-string", "range_from": int, "range_to": int, "excerpt": "string ≤200 chars" }
+      ],
+      "diagnosis":    "string",
+      "proposed_fix": {
+        "kind":  "rename" | "annotate" | "none",
+        "from":  "string or null",
+        "to":    "string or null",
+        "scope": "scene" | "chapter" | "project"
+      }
+    }
+  ]
+}
+{{ prompt_guard }}
+"""
+
+[render.json_schema]
+ref = "ContinuityReport"

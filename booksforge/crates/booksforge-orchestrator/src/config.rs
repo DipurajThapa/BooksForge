@@ -21,6 +21,12 @@ pub struct OrchestratorConfig {
     /// Maximum retries for a single failing agent step before aborting the run.
     /// Hard ceiling: 3.
     pub max_retries_per_step: u32,
+
+    /// Whether the Tier-2 (LLM-backed) ProposalValidator runs automatically
+    /// after every primary agent that succeeds Tier-1.  Disabled by default
+    /// because it adds a second LLM call per run; enable in projects that
+    /// have set `validators.high_confidence_mode = true`.
+    pub tier2_enabled: bool,
 }
 
 impl OrchestratorConfig {
@@ -37,6 +43,7 @@ impl OrchestratorConfig {
             max_duration_secs:    Self::MAX_DURATION_HARD,
             max_tokens:           Self::MAX_TOKENS_HARD,
             max_retries_per_step: Self::MAX_RETRIES_HARD,
+            tier2_enabled:        false,
         }
     }
 
@@ -74,7 +81,11 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn exceeding_any_cap_fails_validation() {
+        // Each scenario flips one cap to its over-limit value;
+        // reassign-after-default reads more clearly here than the
+        // struct-update form that clippy prefers.
         let mut cfg = OrchestratorConfig::default();
         cfg.max_agent_calls = 9;
         assert!(cfg.validate().is_err());

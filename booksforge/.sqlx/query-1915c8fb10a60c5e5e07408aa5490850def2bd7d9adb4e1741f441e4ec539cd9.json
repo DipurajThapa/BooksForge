@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO scene_content (node_id, pm_doc, word_count, char_count, hash, updated_at)\n            VALUES (?, ?, ?, ?, ?, ?)\n            ON CONFLICT(node_id) DO UPDATE SET\n                pm_doc     = excluded.pm_doc,\n                word_count = excluded.word_count,\n                char_count = excluded.char_count,\n                hash       = excluded.hash,\n                updated_at = excluded.updated_at\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "1915c8fb10a60c5e5e07408aa5490850def2bd7d9adb4e1741f441e4ec539cd9"
+}

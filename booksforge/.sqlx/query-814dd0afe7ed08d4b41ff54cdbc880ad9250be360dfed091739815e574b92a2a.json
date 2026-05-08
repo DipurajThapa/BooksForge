@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO validator_issues\n                    (id, run_id, node_id, severity, code, message,\n                     offset_from, offset_to, auto_fixable)\n                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "814dd0afe7ed08d4b41ff54cdbc880ad9250be360dfed091739815e574b92a2a"
+}

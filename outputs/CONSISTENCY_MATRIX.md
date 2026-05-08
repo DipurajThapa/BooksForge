@@ -21,7 +21,7 @@ For each topic:
 
 | File | Says |
 |------|------|
-| **AUTHORITATIVE: `MVP_SCOPE.md`** | Three modes (fiction, non-fiction, memoir, academic-reduced). Three personas. 16-week MVP. Eight MVP agents. Linux deferred. |
+| **AUTHORITATIVE: `MVP_SCOPE.md`** | Three modes (fiction, non-fiction, memoir, academic-reduced). Three personas. 16-week MVP. Ten MVP agents (the original nine + Final Review Editor) plus one internal Proposal Validator. Linux deferred. |
 | `PRODUCT_REQUIREMENTS.md` | Same scope, more detail on user journeys |
 | `_deep/01-BRD-business-requirements.md` | Broader vision; references "fiction mode only" for MVP — note: `MVP_SCOPE.md` widens to include non-fiction and memoir at the cost of full academic features. |
 | `_deep/02-FSD-functional-specifications.md` | FR-IDs tagged M / 1.0 / 1.5 / 2.0 are still authoritative for individual feature requirements |
@@ -132,7 +132,7 @@ For each topic:
 |------|------|
 | **AUTHORITATIVE: the prose docs** | The text wins on every conflict |
 | `diagrams/02-component-architecture.svg` | Reflects the 16-crate MVP layout including `booksforge-orchestrator`, `booksforge-memory`, `booksforge-vocab`, `booksforge-export-epub`. |
-| `diagrams/06-ai-flow.svg` | Shows the agent swarm with the 9 MVP agents and Ollama HTTP runtime. |
+| `diagrams/06-ai-flow.svg` | Shows the agent swarm. **Stale** — depicts 9 MVP agents; the catalog now has 10 user-visible (added Final Review Editor) plus the internal Proposal Validator. Refresh at next diagram pass. |
 | `diagrams/07-export-pipeline.svg` | Shows the canonical-HTML pipeline (preview = EPUB content). |
 | `diagrams/08-roadmap-gantt.svg` | Stale — based on the 18-week original plan. Refresh at every milestone close. |
 | Other diagrams (01, 03, 04, 05) | Active — accurate at the high level. |

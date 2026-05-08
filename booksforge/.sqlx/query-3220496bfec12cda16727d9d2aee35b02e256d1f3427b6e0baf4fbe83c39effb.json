@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT em_dash, oxford_comma, quote_style, spaces_after_period,\n                   ellipsis_form, spelling_locale, capitalize_after_colon,\n                   bold_emphasis_allowed\n            FROM style_book WHERE id = 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "em_dash",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "oxford_comma",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "quote_style",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "spaces_after_period",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "ellipsis_form",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "spelling_locale",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "capitalize_after_colon",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "bold_emphasis_allowed",
+        "ordinal": 7,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "3220496bfec12cda16727d9d2aee35b02e256d1f3427b6e0baf4fbe83c39effb"
+}

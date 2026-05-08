@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id, task_id, node_id, pre_edit_snapshot_id,\n                   applied_at, edit_kind, edit_payload_json, reverted_at\n            FROM agent_applied_edits\n            WHERE task_id = ?\n            ORDER BY applied_at ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "task_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "node_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "pre_edit_snapshot_id",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "applied_at",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "edit_kind",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "edit_payload_json",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "reverted_at",
+        "ordinal": 7,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "b38a768dba96d07fa76acb7d380e4855321f19ffa075b706fc676cbd3806cebd"
+}

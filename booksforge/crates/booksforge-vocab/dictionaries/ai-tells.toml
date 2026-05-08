@@ -1,0 +1,137 @@
+# Anti-robotic baseline — common LLM-isms that pull a reader out of prose.
+# Layer: `ai_tells` (lowest specificity; any project / genre layer can override).
+# Source: shipped (BooksForge curated). Per AGENTS.md §11 / VOCABULARY_DICTIONARIES.md.
+
+[[entries]]
+term        = "delve"
+kind        = "avoid"
+rationale   = "Top LLM tell — banal verb beloved by chat models. Prefer 'explore', 'examine', or a concrete physical verb."
+
+[[entries]]
+term        = "delve into"
+kind        = "replace"
+replacement = "explore"
+rationale   = "Generic LLM phrasing."
+
+[[entries]]
+term        = "tapestry"
+kind        = "avoid"
+rationale   = "LLM cliché — almost never the precise word a writer wants."
+
+[[entries]]
+term        = "rich tapestry"
+kind        = "avoid"
+rationale   = "LLM cliché phrase. Be specific about what's actually present."
+
+[[entries]]
+term        = "intricate dance"
+kind        = "avoid"
+rationale   = "Overused metaphor. Show the interaction directly."
+
+[[entries]]
+term        = "in the realm of"
+kind        = "replace"
+replacement = "in"
+rationale   = "Pompous filler; almost always cuttable."
+
+[[entries]]
+term        = "stands as a testament"
+kind        = "avoid"
+rationale   = "LLM-academic phrasing. Show the testament — don't announce it."
+
+[[entries]]
+term        = "navigate the complexities"
+kind        = "avoid"
+rationale   = "Filler. Name the actual complexity."
+
+[[entries]]
+term        = "in conclusion"
+kind        = "avoid"
+rationale   = "Schoolbook phrasing rarely warranted in prose."
+
+[[entries]]
+term        = "it's important to note"
+kind        = "avoid"
+rationale   = "Hedge phrase. If it's important, just state it."
+
+[[entries]]
+term        = "it is worth noting"
+kind        = "avoid"
+rationale   = "Filler hedge. Cut and lead with the noun."
+
+[[entries]]
+term        = "underscore the importance"
+kind        = "avoid"
+rationale   = "Showcase, don't underscore."
+
+[[entries]]
+term        = "plays a crucial role"
+kind        = "avoid"
+rationale   = "Generic role-claim. Specify the role."
+
+[[entries]]
+term        = "play a crucial role"
+kind        = "avoid"
+rationale   = "Generic role-claim. Specify the role."
+
+[[entries]]
+term        = "key to understanding"
+kind        = "avoid"
+rationale   = "LLM-essay opener. Just explain."
+
+[[entries]]
+term        = "ever-evolving"
+kind        = "avoid"
+rationale   = "Cliché modifier."
+
+[[entries]]
+term        = "ever-changing"
+kind        = "avoid"
+rationale   = "Cliché modifier."
+
+[[entries]]
+term        = "myriad of"
+kind        = "replace"
+replacement = "many"
+rationale   = "'Myriad' is already plural; the 'of' is redundant. Use 'many' unless 'myriad' actually fits the register."
+
+[[entries]]
+term        = "plethora of"
+kind        = "replace"
+replacement = "many"
+rationale   = "Pompous synonym for 'lots' that flags AI-flavoured prose."
+
+[[entries]]
+term        = "whilst"
+kind        = "avoid"
+rationale   = "Archaic. Use 'while' unless writing in deliberate UK-historical voice."
+
+[[entries]]
+term        = "amongst"
+kind        = "avoid"
+rationale   = "Archaic. Use 'among'."
+
+[[entries]]
+term        = "moreover"
+kind        = "avoid"
+rationale   = "Essay-phrase. In prose, just continue the sentence."
+
+[[entries]]
+term        = "furthermore"
+kind        = "avoid"
+rationale   = "Essay-phrase. In prose, just continue the sentence."
+
+[[entries]]
+term        = "vibrant"
+kind        = "avoid"
+rationale   = "Empty modifier — show the colour/sound/movement."
+
+[[entries]]
+term        = "bustling"
+kind        = "avoid"
+rationale   = "LLM-tourist-brochure adjective."
+
+[[entries]]
+term        = "showcase"
+kind        = "avoid"
+rationale   = "Marketing verb. Reach for a precise alternative."

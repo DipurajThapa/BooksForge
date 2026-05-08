@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO vocab_entries\n                (id, layer, term, display_term, kind, replacement, rationale,\n                 source, created_at, updated_at)\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n            ON CONFLICT(layer, term, kind) DO UPDATE SET\n                display_term = excluded.display_term,\n                replacement  = excluded.replacement,\n                rationale    = excluded.rationale,\n                source       = excluded.source,\n                updated_at   = excluded.updated_at\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "630b74d74e2a13a261b2cbb5bcca9c25ea3fcac59ddca2368ff7c94963dcd408"
+}
