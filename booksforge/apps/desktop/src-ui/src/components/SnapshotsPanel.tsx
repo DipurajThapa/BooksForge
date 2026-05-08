@@ -26,6 +26,10 @@ export default function SnapshotsPanel({ onClose }: Props) {
   const [label, setLabel]         = useState("");
   const [busy, setBusy]           = useState(false);
   const [confirmRestore, setConfirmRestore] = useState<SnapshotDto | null>(null);
+  // Selective restore (audit #31) — when null the dialog restores every
+  // node; when populated, only the listed node ids are restored.  Built
+  // by checking boxes in the diff view alongside the snapshot tree.
+  const [restoreNodeFilter, setRestoreNodeFilter] = useState<Set<string> | null>(null);
   // Compare flow: pick first snapshot, then a second; show node-level diff.
   const [compareA, setCompareA]   = useState<SnapshotDto | null>(null);
   const [compareB, setCompareB]   = useState<SnapshotDto | null>(null);
@@ -97,15 +101,19 @@ export default function SnapshotsPanel({ onClose }: Props) {
     setDiffRows(null);
   }
 
-  async function handleRestore(snap: SnapshotDto) {
+  async function handleRestore(snap: SnapshotDto, selectedNodeIds: string[] | null) {
     setBusy(true);
     setError(null);
     try {
       await ipc.snapshotRestore({
         snapshot_id: snap.id,
-        selective:   null,
+        // null = full restore (every node); array = selective per-node restore.
+        // Per-node restore (audit #31) routes through the same Rust API
+        // (`SnapshotService::restore` already accepts `Option<Vec<Ulid>>`).
+        selective:   selectedNodeIds,
       });
       setConfirmRestore(null);
+      setRestoreNodeFilter(null);
       await refresh();
     } catch (e) {
       setError(String(e));
@@ -233,16 +241,86 @@ export default function SnapshotsPanel({ onClose }: Props) {
               A pre-restore snapshot will be created automatically so this is
               reversible.
             </p>
+
+            {/* Per-node selective restore (audit #31).  Only shown when a
+                Compare diff has been computed against this snapshot — that
+                gives us the list of changed nodes the user might want to
+                cherry-pick.  Without a diff, restore is full-project.        */}
+            {diffRows && diffRows.length > 0 && (compareA?.id === confirmRestore.id || compareB?.id === confirmRestore.id) && (
+              <fieldset style={s.restoreFieldset}>
+                <legend style={s.restoreLegend}>Restore which nodes?</legend>
+                <label style={s.restoreOption}>
+                  <input
+                    type="radio"
+                    name="bf-restore-mode"
+                    checked={restoreNodeFilter === null}
+                    onChange={() => setRestoreNodeFilter(null)}
+                  />
+                  Full project ({diffRows.length} changed node{diffRows.length === 1 ? "" : "s"})
+                </label>
+                <label style={s.restoreOption}>
+                  <input
+                    type="radio"
+                    name="bf-restore-mode"
+                    checked={restoreNodeFilter !== null}
+                    onChange={() => setRestoreNodeFilter(new Set(diffRows.map((d) => d.id)))}
+                  />
+                  Selected nodes only
+                </label>
+                {restoreNodeFilter !== null && (
+                  <ul style={s.restoreNodeList} aria-label="Choose nodes to restore">
+                    {diffRows.map((d) => (
+                      <li key={d.id} style={s.restoreNodeRow}>
+                        <label style={s.restoreOption}>
+                          <input
+                            type="checkbox"
+                            checked={restoreNodeFilter.has(d.id)}
+                            onChange={(e) => {
+                              setRestoreNodeFilter((prev) => {
+                                const next = new Set(prev ?? []);
+                                if (e.target.checked) next.add(d.id);
+                                else next.delete(d.id);
+                                return next;
+                              });
+                            }}
+                          />
+                          <span style={s.diffTitle}>{d.title || "(untitled)"}</span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </fieldset>
+            )}
+
             <div style={s.confirmActions}>
-              <button style={s.cancelBtn} onClick={() => setConfirmRestore(null)} disabled={busy}>
+              <button
+                style={s.cancelBtn}
+                onClick={() => {
+                  setConfirmRestore(null);
+                  setRestoreNodeFilter(null);
+                }}
+                disabled={busy}
+              >
                 Cancel
               </button>
               <button
                 style={{ ...s.primaryBtn, opacity: busy ? 0.6 : 1 }}
-                onClick={() => handleRestore(confirmRestore)}
-                disabled={busy}
+                onClick={() => handleRestore(
+                  confirmRestore,
+                  restoreNodeFilter === null ? null : Array.from(restoreNodeFilter),
+                )}
+                disabled={
+                  busy ||
+                  // Block restore when the user picked "selected" but unchecked everything.
+                  (restoreNodeFilter !== null && restoreNodeFilter.size === 0)
+                }
               >
-                {busy ? "Restoring…" : "Restore"}
+                {busy
+                  ? "Restoring…"
+                  : restoreNodeFilter === null
+                  ? "Restore all"
+                  : `Restore ${restoreNodeFilter.size} node${restoreNodeFilter.size === 1 ? "" : "s"}`}
               </button>
             </div>
           </div>
@@ -355,6 +433,43 @@ const s: Record<string, React.CSSProperties> = {
     color:        "var(--color-text-secondary)",
     padding:      "6px 14px",
     cursor:       "pointer",
+  },
+  // Selective-restore (audit #31) UI tokens.
+  restoreFieldset: {
+    border:       "1px solid var(--color-border)",
+    borderRadius: 4,
+    margin:       "12px 0",
+    padding:      "8px 12px",
+    display:      "flex",
+    flexDirection: "column",
+    gap:          6,
+  },
+  restoreLegend: {
+    fontSize:    12,
+    fontWeight:  600,
+    color:       "var(--color-text-secondary)",
+    padding:     "0 4px",
+  },
+  restoreOption: {
+    display:    "flex",
+    alignItems: "center",
+    gap:        8,
+    fontSize:   13,
+    color:      "var(--color-text-primary)",
+    cursor:     "pointer",
+  },
+  restoreNodeList: {
+    listStyle: "none",
+    padding:   "0 0 0 24px",
+    margin:    "4px 0 0",
+    display:   "flex",
+    flexDirection: "column",
+    gap:       4,
+    maxHeight: 200,
+    overflowY: "auto",
+  },
+  restoreNodeRow: {
+    fontSize: 12,
   },
   list: { listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 },
   row: {

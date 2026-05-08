@@ -64,7 +64,10 @@ pub use snapshot::{
 pub use validator::{
     ApplyFixInput, ApplyFixResult, ExportGateDto, ValidatorIssueDto, ValidatorReportDto,
 };
-pub use memory_vocab::{MemoryEntryDto, MemoryListInput, VocabEntryDto, VocabListInput};
+pub use memory_vocab::{
+    MemoryDeleteInput, MemoryEntryDto, MemoryListInput, MemoryUpsertInput, VocabEntryDto,
+    VocabListInput, VocabUpsertInput,
+};
 pub use editor::{
     NodeCreateInput, NodeInfo, NodeUpdateInput, RecoveryStatus, SceneLoadResult, SceneSaveInput,
 };
