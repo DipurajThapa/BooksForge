@@ -450,7 +450,10 @@ export default function EditorShell({ project, onClose }: Props) {
 
       {/* ── §I4 Help drawer ── */}
       {showHelp && (
-        <HelpDrawer onClose={() => setShowHelp(false)} />
+        <HelpDrawer
+          onClose={() => setShowHelp(false)}
+          onReplayWelcome={() => setShowOnboarding(true)}
+        />
       )}
 
       {/* ── §I5 Onboarding tour ── */}
