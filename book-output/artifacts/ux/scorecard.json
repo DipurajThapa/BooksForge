@@ -1,0 +1,185 @@
+{
+  "test_id": "BF-E2E-LOCAL-LLM-FIRST-BOOK-001 (UX phase)",
+  "audited_at": "2026-05-09T09:29:46.101471+00:00",
+  "weighted_score": 6.84,
+  "verdict": "FAIL",
+  "findings": [
+    {
+      "check": "01_first_time_inputs",
+      "score": 10.0,
+      "weight": 1.5,
+      "summary": "Beginner path: 4 required inputs (title, author, save-location). AI-brief adds 7 fields, 6 have non-empty defaults \u2014 premise alone has no default and effectively becomes required when AI is on.",
+      "evidence": [
+        "`booksforge/apps/desktop/src-ui/src/components/NewProjectWizard.tsx:87` \u2014 required: ['Title', 'Author', 'Save location', 'Premise']",
+        "`booksforge/apps/desktop/src-ui/src/components/NewProjectWizard.tsx:47` \u2014 AI-branch defaults populated for: ['genre', 'audience', 'tone', 'targetWordCount', 'targetChapterCount', 'model']",
+        "Required-to-start (non-AI path): 4 (['Title', 'Author', 'Save location', 'Premise'])",
+        "AI-brief fields with sensible defaults: 6/7"
+      ],
+      "status": "PASS"
+    },
+    {
+      "check": "02_defaults_coverage",
+      "score": 4.7,
+      "weight": 1.5,
+      "summary": "9/19 major workflow categories have defaults that the user can rely on. Big gaps: structure model, editorial strictness, originality level, KDP trim/bleed/interior, marketplace targets, cover brief style \u2014 each is either not exposed or has no sensible default.",
+      "evidence": [
+        "`booksforge/apps/desktop/src-ui/src/components/NewProjectWizard.tsx:47` \u2014 EMPTY FormState \u2014 defaults block",
+        "9/19 categories have defaults exposed in the wizard or export panel",
+        "- **book_type**: project template \u2192 \u2713",
+        "- **genre**: default 'fantasy' \u2192 \u2713",
+        "- **audience**: default 'adult' \u2192 \u2713",
+        "- **tone**: default 'adventurous' \u2192 \u2713",
+        "- **length**: default 80,000 words \u2192 \u2713",
+        "- **chapter_count**: default 12 \u2192 \u2713",
+        "- **pov**: no default in wizard; user types in chapter-drafter form \u2192 \u2717",
+        "- **structure_model**: no explicit structure-model picker \u2192 \u2717",
+        "- **editorial_strictness**: not exposed \u2192 \u2717",
+        "- **originality_check**: not exposed \u2192 \u2717",
+        "- **keyword_optimization**: not exposed \u2192 \u2717",
+        "- **trim_size**: ExportPanel exposes trim \u2192 \u2713",
+        "- **interior_type**: not exposed in wizard \u2192 \u2717",
+        "- **bleed**: not exposed \u2192 \u2717",
+        "- **ebook_format**: ExportPanel offers epub \u2192 \u2713",
+        "- **marketplace_targets**: no explicit picker \u2192 \u2717",
+        "- **metadata_generation**: agent-driven, not in wizard \u2192 \u2717",
+        "- **cover_brief_style**: not exposed \u2192 \u2717",
+        "- **preview_mode**: ValidatorPanel + previews \u2192 \u2713"
+      ],
+      "status": "FAIL"
+    },
+    {
+      "check": "03_dynamic_branching",
+      "score": 6.0,
+      "weight": 1.5,
+      "summary": "3/5 dynamic branches detected. The UI does NOT adapt to fiction vs non-fiction, beginner vs advanced, or KDP-print vs ebook-only. Every user sees the same field set.",
+      "evidence": [
+        "- fiction_vs_nonfiction: \u2713",
+        "- kdp_vs_ebook_only: \u2713",
+        "- beginner_vs_advanced: \u2717",
+        "- childrens_book_layout: \u2717",
+        "- chained_intake_outline: \u2713",
+        "`booksforge/apps/desktop/src-ui/src/components/agents/IntakeAndOutlinePanel.tsx:25` \u2014 chained intake \u2192 outline panel exists"
+      ],
+      "status": "WARN"
+    },
+    {
+      "check": "04_automation",
+      "score": 7.0,
+      "weight": 1.0,
+      "summary": "7/20 fully-automated, 7 AI-assisted, 6 user-required \u2192 70% automated-or-assisted (brief gate: \u226570%). Marketplace + cover-art are necessary human steps.",
+      "evidence": [
+        "- create project: user-required",
+        "- pick template: AI-assisted",
+        "- AI brief (genre/audience/tone): AI-assisted",
+        "- outline generation: fully-automated (one click)",
+        "- outline accept/reject: user-required",
+        "- scene drafting: AI-assisted (per-scene apply, post-fix)",
+        "- memory refresh: fully-automated",
+        "- vocabulary updates: AI-assisted",
+        "- copyedit: AI-assisted (per-edit accept)",
+        "- humanization: AI-assisted",
+        "- continuity: AI-assisted",
+        "- validators: fully-automated (gate)",
+        "- snapshots (auto-hourly): fully-automated",
+        "- manual snapshot: user-required",
+        "- DOCX export: fully-automated",
+        "- EPUB export: fully-automated",
+        "- PDF export: fully-automated (engine permitting)",
+        "- metadata + KDP submission: user-required (NOT automated)",
+        "- cover art: user-required (brief generated, art HUMAN_REQUIRED)",
+        "- marketplace upload: user-required"
+      ],
+      "status": "PASS"
+    },
+    {
+      "check": "05_speed_complexity",
+      "score": 8.0,
+      "weight": 1.0,
+      "summary": "Wizard has 3 step screens. \u22486 clicks and 4 text inputs to reach the first generated outline (with AI on). Brief target \u22643 setup screens met; \u22645 inputs met.",
+      "evidence": [
+        "`booksforge/apps/desktop/src-ui/src/components/NewProjectWizard.tsx:28` \u2014 type Step = 1 | 2 | 4",
+        "steps: 3; clicks-to-first-concept (estimated): 6"
+      ],
+      "status": "PASS"
+    },
+    {
+      "check": "06_progressive_disclosure",
+      "score": 7.5,
+      "weight": 1.0,
+      "summary": "AI brief fields are hidden behind a `useAi` toggle (correct). However the main editor surface exposes ALL 14 agents in the AgentsPanel switchboard with no beginner / advanced split \u2014 every user sees Proposal Validator + Peer Review even though those are auto-invoked meta agents.",
+      "evidence": [
+        "`booksforge/apps/desktop/src-ui/src/components/NewProjectWizard.tsx:36` \u2014 useAi toggle on FormState",
+        "`booksforge/apps/desktop/src-ui/src/components/agents/AgentsPanel.tsx:54` \u2014 AGENTS list \u2014 all 14 visible at once, no progressive split",
+        "<details> blocks in wizard: 1",
+        "'advanced' label in ExportPanel: False",
+        "'advanced' label in SettingsPanel: False"
+      ],
+      "status": "WARN"
+    },
+    {
+      "check": "07_approval_gates",
+      "score": 3.3,
+      "weight": 1.5,
+      "summary": "3/9 required approval gates exist. Outline-accept, per-edit-accept, export review, and pre-AI snapshot are present. The big missing gates: approve final topic, approve book plan, approve character/world bibles (blocked by missing fiction agents), approve manuscript before final polish.",
+      "evidence": [
+        "- approve_topic: not present \u2014 topic is implicit in brief \u2192 \u2717",
+        "- approve_book_plan: not present \u2192 \u2717",
+        "- approve_character_world: not present (no fiction agents) \u2192 \u2717",
+        "- approve_chapter_outline: OutlinePreview accept exists \u2192 \u2717",
+        "- approve_manuscript_pre_polish: not present \u2192 \u2717",
+        "- approve_export_settings: ExportPanel review screen exists \u2192 \u2713",
+        "- approve_metadata_marketplace: no marketplace submission flow yet \u2192 \u2717",
+        "- approve_individual_agent_edits: Copyedit/Continuity/Humanization per-edit accept \u2192 \u2713",
+        "- snapshot_before_ai_apply: snapshot trigger=pre_ai exists per IPC \u2192 \u2713"
+      ],
+      "status": "WARN"
+    },
+    {
+      "check": "08_failure_recovery",
+      "score": 7.5,
+      "weight": 1.0,
+      "summary": "6/8 recovery primitives exist (ErrorBoundary, RecoveryDialog, snapshot restore, pre-AI snapshot, cancel mid-job, EPUB validation). Missing: plain-English error copy and one-click 'auto-fix' affordances.",
+      "evidence": [
+        "- ErrorBoundary: \u2713",
+        "- RecoveryDialog: \u2713",
+        "- Snapshot restore: \u2713",
+        "- Pre-AI snapshot: \u2713",
+        "- Cancel mid-job: \u2713",
+        "- Plain-English errors: \u2717",
+        "- Suggested fix in errors: \u2717",
+        "- EPUB validation surface: \u2713"
+      ],
+      "status": "WARN"
+    },
+    {
+      "check": "09_copy_microcopy",
+      "score": 4.5,
+      "weight": 0.8,
+      "summary": "~6 friendly action labels detected (Generate/Choose/Approve/Fix/Prepare/Preview/Export). ~37 jargon strings present in 19 files: ['BISAC', 'EPUBCheck', 'trim', 'bleed', 'ULID', 'pm_doc', 'ProseMirror', 'MZ-', 'ts-rs', 'task_id', 'job_id']. BISAC, trim, bleed, ULID, task_id appear in user-facing surfaces \u2014 these need glossary tooltips or rename for non-technical authors.",
+      "evidence": [
+        "jargon-bearing components: ['booksforge/apps/desktop/src-ui/src/components/AgentDebugForm.tsx', 'booksforge/apps/desktop/src-ui/src/components/EditorShell.tsx', 'booksforge/apps/desktop/src-ui/src/components/ErrorBoundary.tsx', 'booksforge/apps/desktop/src-ui/src/components/ExportPanel.tsx', 'booksforge/apps/desktop/src-ui/src/components/FindReplaceBar.tsx', 'booksforge/apps/desktop/src-ui/src/components/InspectorPanel.tsx', 'booksforge/apps/desktop/src-ui/src/components/NewProjectWizard.tsx', 'booksforge/apps/desktop/src-ui/src/components/OutlinePreview.tsx']",
+        "friendly action-verb count across all components: ~6"
+      ],
+      "status": "WARN"
+    },
+    {
+      "check": "10_edit_review_bug",
+      "score": 9.0,
+      "weight": 2.0,
+      "summary": "User-reported bug: AI output buried in collapsed JSON view with no path to the editor. UI-only fix landed in this session \u2014 generated prose now renders as a readable preview, Apply-to-scene button writes pm_doc into the active scene with a pre-AI snapshot, and onApplied callback is threaded through AgentsPanel and EditorShell so the editor reloads. Follow-up: route the apply through the Orchestrator + audit ledger (BACKLOG \u00a7A9).",
+      "evidence": [
+        "`booksforge/apps/desktop/src-ui/src/components/agents/GenericAgentForm.tsx:75` \u2014 handleApplyToScene + pmDocToPlainText helpers added",
+        "`booksforge/apps/desktop/src-ui/src/components/agents/AgentsPanel.tsx:110` \u2014 onApplied prop threaded to GenericAgentForm",
+        "`booksforge/apps/desktop/src-ui/src/components/EditorShell.tsx:440` \u2014 EditorShell passes onApplied \u2192 ipc.sceneLoad \u2192 setSceneContent"
+      ],
+      "status": "PASS"
+    }
+  ],
+  "beginner_required_inputs": 3,
+  "ai_branch_required_inputs": 4,
+  "approval_gates_present": 4,
+  "approval_gates_missing": 5,
+  "automation_pct": 0.85,
+  "first_time_suitable": false,
+  "notes_first_time_suitable": "Not yet suitable for a first-time author with zero publishing knowledge: switchboard tax, no book-type branching, no Prepare-for-Publishing action, publishing jargon. Suitable today for a writer who is willing to read the agent docs and assemble a marketplace package by hand."
+}
