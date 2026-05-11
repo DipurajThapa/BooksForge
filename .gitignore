@@ -29,6 +29,42 @@ booksforge/apps/desktop/gen/
 **/__pycache__/
 *.pyc
 
+# book-output/ — research workspace and E2E artefacts.
+#
+# Convention: track inputs and decisions; ignore pipeline-generated outputs.
+# Quick test: "did a human author this, or did code emit it?"
+#   - human-authored .md, .py, input .json, design proposals → tracked
+#   - model-generated text, intermediate JSON, run logs, .pyc → ignored
+#
+# Apply the same rule to any new artefact directory: the moment a path
+# fills up from a pipeline run, ignore it; if it captures decisions or
+# input specs, track it.
+
+# Per-run output directories (model outputs + intermediate JSON)
+book-output/booksforge-*-run*/
+book-output/booksforge-final-export/
+book-output/booksforge-e2e-*/
+book-output/integrated-runs/
+book-output/incomplete-curse/
+book-output/manuscript/
+book-output/multi-chapter-runs/
+
+# Top-level run logs
+book-output/*.log
+
+# Per-stage outputs under artifacts/ (numbered NN_*, BF-E2E-*)
+book-output/artifacts/0[0-9]_*
+book-output/artifacts/1[0-9]_*
+book-output/artifacts/BF-E2E-*
+
+# Per-run audit + logs under artifacts/
+book-output/artifacts/audit/
+book-output/artifacts/logs/
+
+# Ghostwriter pipeline outputs (the .py source + spec.json + writeup stay tracked)
+book-output/artifacts/ghostwriter/proof_literary/
+book-output/artifacts/ghostwriter/proof_literary.stdout.log
+
 # Secrets / local env (defence-in-depth)
 .env
 .env.*
