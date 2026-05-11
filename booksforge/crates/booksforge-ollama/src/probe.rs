@@ -47,7 +47,10 @@ fn binary_candidates() -> Vec<PathBuf> {
     {
         if let Ok(local) = std::env::var("LOCALAPPDATA") {
             candidates.push(
-                PathBuf::from(&local).join("Programs").join("Ollama").join("ollama.exe"),
+                PathBuf::from(&local)
+                    .join("Programs")
+                    .join("Ollama")
+                    .join("ollama.exe"),
             );
         }
         if let Ok(prog) = std::env::var("PROGRAMFILES") {
@@ -68,7 +71,11 @@ pub fn find_binary() -> Option<PathBuf> {
 }
 
 fn which_ollama() -> Result<PathBuf, ()> {
-    let name = if cfg!(target_os = "windows") { "ollama.exe" } else { "ollama" };
+    let name = if cfg!(target_os = "windows") {
+        "ollama.exe"
+    } else {
+        "ollama"
+    };
     let path_var = std::env::var("PATH").map_err(|_| ())?;
     for dir in std::env::split_paths(&path_var) {
         let candidate = dir.join(name);
@@ -102,8 +109,8 @@ pub fn launch_ollama() -> Result<(), String> {
         // Fall through to binary launch if the .app bundle is not present.
     }
 
-    let binary = find_binary()
-        .ok_or_else(|| "Ollama binary not found on this system".to_owned())?;
+    let binary =
+        find_binary().ok_or_else(|| "Ollama binary not found on this system".to_owned())?;
 
     std::process::Command::new(&binary)
         .arg("serve")
@@ -138,11 +145,7 @@ pub fn available_ram_gb() -> Option<u32> {
         let content = std::fs::read_to_string("/proc/meminfo").ok()?;
         for line in content.lines() {
             if line.starts_with("MemTotal:") {
-                let kb: u64 = line
-                    .split_whitespace()
-                    .nth(1)?
-                    .parse()
-                    .ok()?;
+                let kb: u64 = line.split_whitespace().nth(1)?.parse().ok()?;
                 return Some((kb / 1_048_576) as u32);
             }
         }
@@ -155,14 +158,14 @@ pub fn available_ram_gb() -> Option<u32> {
         use std::mem;
         #[repr(C)]
         struct MemoryStatusEx {
-            dw_length:                  u32,
-            dw_memory_load:             u32,
-            ull_total_phys:             u64,
-            ull_avail_phys:             u64,
-            ull_total_page_file:        u64,
-            ull_avail_page_file:        u64,
-            ull_total_virtual:          u64,
-            ull_avail_virtual:          u64,
+            dw_length: u32,
+            dw_memory_load: u32,
+            ull_total_phys: u64,
+            ull_avail_phys: u64,
+            ull_total_page_file: u64,
+            ull_avail_page_file: u64,
+            ull_total_virtual: u64,
+            ull_avail_virtual: u64,
             ull_avail_extended_virtual: u64,
         }
         extern "system" {

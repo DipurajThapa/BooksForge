@@ -10,13 +10,13 @@ use ts_rs::TS;
 #[ts(export)]
 pub struct ValidatorIssueDto {
     pub validator_id: String,
-    pub code:         String,
+    pub code: String,
     /// "info" | "warning" | "error".
-    pub severity:     String,
-    pub message:      String,
-    pub node_id:      Option<String>,
-    pub offset_from:  Option<u32>,
-    pub offset_to:    Option<u32>,
+    pub severity: String,
+    pub message: String,
+    pub node_id: Option<String>,
+    pub offset_from: Option<u32>,
+    pub offset_to: Option<u32>,
     pub auto_fixable: bool,
 }
 
@@ -24,14 +24,14 @@ pub struct ValidatorIssueDto {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ValidatorReportDto {
-    pub run_id:       String,
+    pub run_id: String,
     /// "ok" | "warnings" | "errors" | "crashed".
-    pub status:       String,
-    pub duration_ms:  u64,
-    pub error_count:  u32,
+    pub status: String,
+    pub duration_ms: u64,
+    pub error_count: u32,
     pub warning_count: u32,
-    pub info_count:   u32,
-    pub issues:       Vec<ValidatorIssueDto>,
+    pub info_count: u32,
+    pub issues: Vec<ValidatorIssueDto>,
 }
 
 /// Result of the export-gate evaluation that the UI can show before
@@ -40,9 +40,9 @@ pub struct ValidatorReportDto {
 #[ts(export)]
 pub struct ExportGateDto {
     /// "pass" | "warn" | "block".
-    pub outcome:   String,
-    pub errors:    Vec<ValidatorIssueDto>,
-    pub warnings:  Vec<ValidatorIssueDto>,
+    pub outcome: String,
+    pub errors: Vec<ValidatorIssueDto>,
+    pub warnings: Vec<ValidatorIssueDto>,
 }
 
 /// Input to `validators_apply_fix` — a single auto-fix invocation.
@@ -50,7 +50,7 @@ pub struct ExportGateDto {
 #[ts(export)]
 pub struct ApplyFixInput {
     pub validator_id: String,
-    pub node_id:      String,
+    pub node_id: String,
 }
 
 /// Result of `validators_apply_fix`.
@@ -58,7 +58,7 @@ pub struct ApplyFixInput {
 #[ts(export)]
 pub struct ApplyFixResult {
     pub validator_id: String,
-    pub node_id:      String,
+    pub node_id: String,
     /// Number of text nodes the fix mutated.  Zero is a successful no-op.
     pub fixes_applied: u32,
 }

@@ -1,10 +1,10 @@
 //! System-level Tauri commands — health, versioning, Ollama connectivity.
 
-use booksforge_ipc::{AppVersion, BooksForgeError};
+use crate::state::AppState;
 use booksforge_ipc::ollama::OllamaStatusResponse;
+use booksforge_ipc::{AppVersion, BooksForgeError};
 use booksforge_ollama::OllamaClient;
 use tauri::State;
-use crate::state::AppState;
 
 /// Returns the application version.
 /// Maps to `invoke("app_version")` in the React frontend.
@@ -31,7 +31,9 @@ pub async fn app_version() -> Result<AppVersion, BooksForgeError> {
 /// `booksforge-ipc::OllamaStatusResponse`) and #20 (transient errors
 /// are no longer swallowed into a success-shaped response).
 #[tauri::command]
-pub async fn ollama_status(state: State<'_, AppState>) -> Result<OllamaStatusResponse, BooksForgeError> {
+pub async fn ollama_status(
+    state: State<'_, AppState>,
+) -> Result<OllamaStatusResponse, BooksForgeError> {
     match state.ollama.version().await {
         Ok(v) => Ok(OllamaStatusResponse {
             running: true,

@@ -40,9 +40,9 @@ use crate::{Orchestrator, OrchestratorError};
 /// Outcome of a single accepted copyedit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApplyCopyeditResult {
-    pub task_id:         String,
-    pub edit_index:      u32,
-    pub scene_id:        String,
+    pub task_id: String,
+    pub edit_index: u32,
+    pub scene_id: String,
     pub pre_snapshot_id: String,
     pub applied_edit_id: String,
     /// True when `before` no longer matched at the original range and we
@@ -56,15 +56,13 @@ impl Orchestrator {
     /// against `task_id`, applying it to scene `scene_id`.
     pub async fn apply_copyedit_edit(
         &self,
-        task_id:    Ulid,
-        scene_id:   Ulid,
+        task_id: Ulid,
+        scene_id: Ulid,
         edit_index: u32,
     ) -> Result<ApplyCopyeditResult, OrchestratorError> {
-        let snapshot: Arc<SnapshotService> = self
-            .snapshot()
-            .ok_or_else(|| OrchestratorError::Storage(
-                "snapshot service not attached".to_owned()
-            ))?;
+        let snapshot: Arc<SnapshotService> = self.snapshot().ok_or_else(|| {
+            OrchestratorError::Storage("snapshot service not attached".to_owned())
+        })?;
         let storage: Arc<SqliteStorage> = self.storage_arc();
 
         // 1. Load the persisted proposal.
@@ -72,27 +70,28 @@ impl Orchestrator {
             .agent_output_load(task_id)
             .await
             .map_err(|e| OrchestratorError::Storage(e.to_string()))?
-            .ok_or_else(|| OrchestratorError::Storage(format!(
-                "no agent_outputs row for task {task_id}"
-            )))?;
-        let raw = output
-            .content_inline
-            .ok_or_else(|| OrchestratorError::Storage(format!(
-                "agent_outputs[{task_id}] has no inline content"
-            )))?;
-        let proposal: CopyeditProposals = serde_json::from_str(&raw)
-            .map_err(|e| OrchestratorError::Storage(format!(
+            .ok_or_else(|| {
+                OrchestratorError::Storage(format!("no agent_outputs row for task {task_id}"))
+            })?;
+        let raw = output.content_inline.ok_or_else(|| {
+            OrchestratorError::Storage(format!("agent_outputs[{task_id}] has no inline content"))
+        })?;
+        let proposal: CopyeditProposals = serde_json::from_str(&raw).map_err(|e| {
+            OrchestratorError::Storage(format!(
                 "could not deserialise stored CopyeditProposals: {e}"
-            )))?;
+            ))
+        })?;
 
         let edit = proposal
             .edits
             .get(edit_index as usize)
             .cloned()
-            .ok_or_else(|| OrchestratorError::OutlineApply(format!(
-                "edit_index {edit_index} out of range (have {} edits)",
-                proposal.edits.len()
-            )))?;
+            .ok_or_else(|| {
+                OrchestratorError::OutlineApply(format!(
+                    "edit_index {edit_index} out of range (have {} edits)",
+                    proposal.edits.len()
+                ))
+            })?;
 
         // 2. Per-edit idempotency.  Decode existing payloads and refuse a
         //    second accept of the same index.
@@ -113,13 +112,11 @@ impl Orchestrator {
             .load_scene(scene_id)
             .await
             .map_err(|e| OrchestratorError::Storage(e.to_string()))?
-            .ok_or_else(|| OrchestratorError::Storage(format!(
-                "scene {scene_id} not found"
-            )))?;
+            .ok_or_else(|| OrchestratorError::Storage(format!("scene {scene_id} not found")))?;
 
         let flat = pm_doc_to_text(&scene.pm_doc);
-        let (new_flat, used_fallback) = apply_one_to_text(&flat, &edit)
-            .map_err(OrchestratorError::OutlineApply)?;
+        let (new_flat, used_fallback) =
+            apply_one_to_text(&flat, &edit).map_err(OrchestratorError::OutlineApply)?;
 
         // 4. Pre-edit snapshot (mandatory before mutation).
         let pre = snapshot
@@ -134,17 +131,17 @@ impl Orchestrator {
             .map_err(|e| OrchestratorError::Storage(e.to_string()))?;
 
         // 5. Save the new scene content.
-        let new_pm  = flat_text_to_pm_doc(&new_flat);
+        let new_pm = flat_text_to_pm_doc(&new_flat);
         let new_str = serde_json::to_string(&new_pm).unwrap_or_default();
         let new_hash = blake3::hash(new_str.as_bytes()).to_hex().to_string();
         let words: u32 = new_flat.split_whitespace().count() as u32;
         let chars: u32 = new_flat.chars().count() as u32;
         let new_scene = SceneContent {
-            node_id:    scene_id,
-            pm_doc:     new_pm,
+            node_id: scene_id,
+            pm_doc: new_pm,
             word_count: words,
             char_count: chars,
-            hash:       new_hash,
+            hash: new_hash,
             updated_at: Utc::now(),
         };
         storage
@@ -162,7 +159,8 @@ impl Orchestrator {
             "category":     format!("{:?}", edit.category).to_lowercase(),
             "rationale":    edit.rationale,
             "used_fallback_search": used_fallback,
-        }).to_string();
+        })
+        .to_string();
         let applied = SnapshotService::build_applied_edit(
             task_id,
             scene_id,
@@ -182,9 +180,9 @@ impl Orchestrator {
         );
 
         Ok(ApplyCopyeditResult {
-            task_id:         task_id.to_string(),
+            task_id: task_id.to_string(),
             edit_index,
-            scene_id:        scene_id.to_string(),
+            scene_id: scene_id.to_string(),
             pre_snapshot_id: pre.id.to_string(),
             applied_edit_id: applied.id.to_string(),
             used_fallback_search: used_fallback,
@@ -198,36 +196,44 @@ impl Orchestrator {
     /// as `apply_copyedit_edit` (BACKLOG §E0d.6).
     pub async fn apply_humanization_edit(
         &self,
-        task_id:    Ulid,
-        scene_id:   Ulid,
+        task_id: Ulid,
+        scene_id: Ulid,
         edit_index: u32,
     ) -> Result<ApplyCopyeditResult, OrchestratorError> {
-        let snapshot: Arc<SnapshotService> = self
-            .snapshot()
-            .ok_or_else(|| OrchestratorError::Storage(
-                "snapshot service not attached".to_owned()
-            ))?;
+        let snapshot: Arc<SnapshotService> = self.snapshot().ok_or_else(|| {
+            OrchestratorError::Storage("snapshot service not attached".to_owned())
+        })?;
         let storage: Arc<SqliteStorage> = self.storage_arc();
 
-        let output = storage.agent_output_load(task_id).await
+        let output = storage
+            .agent_output_load(task_id)
+            .await
             .map_err(|e| OrchestratorError::Storage(e.to_string()))?
-            .ok_or_else(|| OrchestratorError::Storage(format!(
-                "no agent_outputs row for task {task_id}"
-            )))?;
-        let raw = output.content_inline.ok_or_else(|| OrchestratorError::Storage(
-            format!("agent_outputs[{task_id}] has no inline content"),
-        ))?;
-        let proposal: HumanizationProposals = serde_json::from_str(&raw)
-            .map_err(|e| OrchestratorError::Storage(format!(
+            .ok_or_else(|| {
+                OrchestratorError::Storage(format!("no agent_outputs row for task {task_id}"))
+            })?;
+        let raw = output.content_inline.ok_or_else(|| {
+            OrchestratorError::Storage(format!("agent_outputs[{task_id}] has no inline content"))
+        })?;
+        let proposal: HumanizationProposals = serde_json::from_str(&raw).map_err(|e| {
+            OrchestratorError::Storage(format!(
                 "could not deserialise stored HumanizationProposals: {e}"
-            )))?;
-        let edit = proposal.edits.get(edit_index as usize).cloned()
-            .ok_or_else(|| OrchestratorError::OutlineApply(format!(
-                "edit_index {edit_index} out of range (have {} edits)",
-                proposal.edits.len()
-            )))?;
+            ))
+        })?;
+        let edit = proposal
+            .edits
+            .get(edit_index as usize)
+            .cloned()
+            .ok_or_else(|| {
+                OrchestratorError::OutlineApply(format!(
+                    "edit_index {edit_index} out of range (have {} edits)",
+                    proposal.edits.len()
+                ))
+            })?;
 
-        let prior = storage.list_applied_edits_for_task(task_id).await
+        let prior = storage
+            .list_applied_edits_for_task(task_id)
+            .await
             .map_err(|e| OrchestratorError::Storage(e.to_string()))?;
         for row in &prior {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(&row.edit_payload_json) {
@@ -237,7 +243,9 @@ impl Orchestrator {
             }
         }
 
-        let scene = storage.load_scene(scene_id).await
+        let scene = storage
+            .load_scene(scene_id)
+            .await
             .map_err(|e| OrchestratorError::Storage(e.to_string()))?
             .ok_or_else(|| OrchestratorError::Storage(format!("scene {scene_id} not found")))?;
 
@@ -245,21 +253,33 @@ impl Orchestrator {
         let (new_flat, used_fallback) = apply_one_humanization_to_text(&flat, &edit)
             .map_err(OrchestratorError::OutlineApply)?;
 
-        let pre = snapshot.pre_agent_edit_snapshot(
-            SnapshotScope::Scene, Some(scene_id),
-            Some(format!("pre-humanization-apply task {task_id} edit {edit_index}")),
-        ).await
+        let pre = snapshot
+            .pre_agent_edit_snapshot(
+                SnapshotScope::Scene,
+                Some(scene_id),
+                Some(format!(
+                    "pre-humanization-apply task {task_id} edit {edit_index}"
+                )),
+            )
+            .await
             .map_err(|e| OrchestratorError::Storage(e.to_string()))?;
 
-        let new_pm  = flat_text_to_pm_doc(&new_flat);
+        let new_pm = flat_text_to_pm_doc(&new_flat);
         let new_str = serde_json::to_string(&new_pm).unwrap_or_default();
         let new_hash = blake3::hash(new_str.as_bytes()).to_hex().to_string();
         let words: u32 = new_flat.split_whitespace().count() as u32;
         let chars: u32 = new_flat.chars().count() as u32;
-        storage.save_scene(&SceneContent {
-            node_id: scene_id, pm_doc: new_pm, word_count: words,
-            char_count: chars, hash: new_hash, updated_at: Utc::now(),
-        }).await.map_err(|e| OrchestratorError::Storage(e.to_string()))?;
+        storage
+            .save_scene(&SceneContent {
+                node_id: scene_id,
+                pm_doc: new_pm,
+                word_count: words,
+                char_count: chars,
+                hash: new_hash,
+                updated_at: Utc::now(),
+            })
+            .await
+            .map_err(|e| OrchestratorError::Storage(e.to_string()))?;
 
         let payload = serde_json::json!({
             "edit_index":    edit_index,
@@ -271,11 +291,18 @@ impl Orchestrator {
             "rationale":     edit.rationale,
             "used_fallback_search": used_fallback,
             "agent":         "humanization",
-        }).to_string();
+        })
+        .to_string();
         let applied = SnapshotService::build_applied_edit(
-            task_id, scene_id, pre.id, AppliedEditKind::TextReplace, payload,
+            task_id,
+            scene_id,
+            pre.id,
+            AppliedEditKind::TextReplace,
+            payload,
         );
-        storage.agent_applied_edit_insert(&applied).await
+        storage
+            .agent_applied_edit_insert(&applied)
+            .await
             .map_err(|e| OrchestratorError::Storage(e.to_string()))?;
 
         tracing::info!(
@@ -284,9 +311,9 @@ impl Orchestrator {
         );
 
         Ok(ApplyCopyeditResult {
-            task_id:         task_id.to_string(),
+            task_id: task_id.to_string(),
             edit_index,
-            scene_id:        scene_id.to_string(),
+            scene_id: scene_id.to_string(),
             pre_snapshot_id: pre.id.to_string(),
             applied_edit_id: applied.id.to_string(),
             used_fallback_search: used_fallback,
@@ -297,7 +324,13 @@ impl Orchestrator {
 /// Apply a single `CopyeditEdit` to flat text — thin wrapper over
 /// `apply_replacement`.
 pub fn apply_one_to_text(flat: &str, edit: &CopyeditEdit) -> Result<(String, bool), String> {
-    apply_replacement(flat, edit.range_from, edit.range_to, &edit.before, &edit.after)
+    apply_replacement(
+        flat,
+        edit.range_from,
+        edit.range_to,
+        &edit.before,
+        &edit.after,
+    )
 }
 
 /// Apply a single `HumanizationEdit` to flat text.
@@ -305,7 +338,13 @@ pub fn apply_one_humanization_to_text(
     flat: &str,
     edit: &HumanizationEdit,
 ) -> Result<(String, bool), String> {
-    apply_replacement(flat, edit.range_from, edit.range_to, &edit.before, &edit.after)
+    apply_replacement(
+        flat,
+        edit.range_from,
+        edit.range_to,
+        &edit.before,
+        &edit.after,
+    )
 }
 
 /// Try the agent's original char range first; if `before` no longer matches
@@ -315,16 +354,16 @@ pub fn apply_one_humanization_to_text(
 ///
 /// Pure function — no I/O.
 pub fn apply_replacement(
-    flat:       &str,
+    flat: &str,
     range_from: u32,
-    range_to:   u32,
-    before:     &str,
-    after:      &str,
+    range_to: u32,
+    before: &str,
+    after: &str,
 ) -> Result<(String, bool), String> {
     let chars: Vec<char> = flat.chars().collect();
     let len = chars.len();
     let from = range_from as usize;
-    let to   = range_to   as usize;
+    let to = range_to as usize;
 
     if to <= len && from < to {
         let actual: String = chars[from..to].iter().collect();
@@ -340,17 +379,12 @@ pub fn apply_replacement(
     if before.is_empty() {
         return Err("edit.before is empty — cannot locate insertion point".to_owned());
     }
-    let occurrences: Vec<usize> = flat
-        .match_indices(before)
-        .map(|(i, _)| i)
-        .collect();
+    let occurrences: Vec<usize> = flat.match_indices(before).map(|(i, _)| i).collect();
     match occurrences.as_slice() {
-        []  => Err(
-            "edit no longer applicable: `before` text not found in current scene".to_owned()
-        ),
+        [] => Err("edit no longer applicable: `before` text not found in current scene".to_owned()),
         [byte_idx] => {
             let start = *byte_idx;
-            let end   = start + before.len();
+            let end = start + before.len();
             let mut out = String::with_capacity(flat.len());
             out.push_str(&flat[..start]);
             out.push_str(after);
@@ -371,8 +405,10 @@ mod tests {
 
     fn edit(from: u32, to: u32, before: &str, after: &str) -> CopyeditEdit {
         CopyeditEdit {
-            range_from: from, range_to: to,
-            before: before.into(), after: after.into(),
+            range_from: from,
+            range_to: to,
+            before: before.into(),
+            after: after.into(),
             category: CopyeditCategory::Punctuation,
             rationale: "fix".into(),
         }
@@ -403,7 +439,7 @@ mod tests {
         // Original range points at non-matching text; fallback search finds
         // multiple occurrences of `before` and refuses to guess.
         let src = "XXXX and and and";
-        let e = edit(0, 3, "and", "und");  // chars 0..3 = "XXX", not "and"
+        let e = edit(0, 3, "and", "und"); // chars 0..3 = "XXX", not "and"
         let err = apply_one_to_text(src, &e).unwrap_err();
         assert!(err.contains("ambiguous"), "got {err}");
     }

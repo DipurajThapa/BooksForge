@@ -35,7 +35,7 @@ pub async fn load_or_default(storage: &Arc<SqliteStorage>) -> VoiceFingerprint {
         .flatten();
     match entry {
         Some(e) => serde_json::from_value(e.value_json).unwrap_or_default(),
-        None    => VoiceFingerprint::default(),
+        None => VoiceFingerprint::default(),
     }
 }
 
@@ -45,7 +45,7 @@ pub async fn load_or_default(storage: &Arc<SqliteStorage>) -> VoiceFingerprint {
 /// `agent_id` should be the caller's own id (e.g. `"memory-curator"`)
 /// so the audit trail attributes the write correctly.
 pub async fn refresh_from_corpus(
-    storage:  &Arc<SqliteStorage>,
+    storage: &Arc<SqliteStorage>,
     agent_id: &str,
 ) -> Result<VoiceFingerprint, booksforge_storage::StorageError> {
     let nodes_with_scenes = storage.list_nodes_with_scene_content_consistent().await?;
@@ -62,12 +62,11 @@ pub async fn refresh_from_corpus(
 
     let now = Utc::now();
     let entry = MemoryEntry {
-        id:         Ulid::new(),
-        scope:      MemoryScope::Style,
-        key:        VOICE_KEY.to_owned(),
-        value_json: serde_json::to_value(&fingerprint)
-            .unwrap_or_else(|_| serde_json::json!({})),
-        agent_id:   agent_id.to_owned(),
+        id: Ulid::new(),
+        scope: MemoryScope::Style,
+        key: VOICE_KEY.to_owned(),
+        value_json: serde_json::to_value(&fingerprint).unwrap_or_else(|_| serde_json::json!({})),
+        agent_id: agent_id.to_owned(),
         created_at: now,
         updated_at: now,
     };
@@ -98,7 +97,9 @@ mod tests {
     #[tokio::test]
     async fn refresh_with_empty_corpus_returns_default() {
         let (storage, _dir) = fresh_storage().await;
-        let fp = refresh_from_corpus(&storage, "memory-curator").await.unwrap();
+        let fp = refresh_from_corpus(&storage, "memory-curator")
+            .await
+            .unwrap();
         // Empty corpus → default fingerprint with corpus_tokens=0.
         assert_eq!(fp.corpus_tokens, 0);
         // And the row was upserted — load now returns it.

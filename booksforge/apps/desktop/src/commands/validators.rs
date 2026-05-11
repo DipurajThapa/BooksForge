@@ -34,46 +34,63 @@ pub async fn validators_run(
     let storage: Arc<_> = project.storage.clone();
 
     // Gather everything the validators need.
-    let nodes = storage.list_nodes().await
+    let nodes = storage
+        .list_nodes()
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
-    let scene_rows = storage.list_all_scene_content().await
+    let scene_rows = storage
+        .list_all_scene_content()
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
 
     let scenes: Vec<SceneText> = scene_rows
         .iter()
         .map(|s| SceneText {
             node_id: s.node_id,
-            text:    pm_doc_to_markdown(&s.pm_doc),
+            text: pm_doc_to_markdown(&s.pm_doc),
         })
         .collect();
 
-    let style = storage.load_style_book().await
+    let style = storage
+        .load_style_book()
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
 
     // Active layers.  MVP heuristic: project + ai_tells + the recorded mode
     // and genre from the manifest.  For now we always include `project`
     // and `ai_tells`; later this will read from the project manifest.
     let layers: Vec<&str> = vec!["project", "ai_tells"];
-    let vocab = storage.vocab_list_by_layers(&layers).await
+    let vocab = storage
+        .vocab_list_by_layers(&layers)
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
 
-    // Project metadata used by the KDP-metadata validator (G3).  Pulled
-    // from the open-project state today; once the manifest exposes a
-    // language tag it'll flow through here automatically.
+    // Project metadata used by the KDP-metadata validator (G3). Read
+    // the language tag from `manifest.toml` (defaulted to "en-US" by
+    // `BundleManifest::new`); fall back to "en-US" if the manifest
+    // can't be loaded so the KDP03 warning doesn't fire on an
+    // otherwise-valid project just because the manifest is briefly
+    // unreadable. ISBN stays None until the publishing flow records it.
+    let language = booksforge_fs::manifest::BundleManifest::read_from_bundle(&project.bundle)
+        .await
+        .ok()
+        .map(|m| m.meta.language)
+        .filter(|l| !l.trim().is_empty())
+        .unwrap_or_else(|| "en-US".to_owned());
     let meta = ProjectMetaSummary {
-        title:    project.title.clone(),
-        author:   project.author.clone(),
-        language: String::new(), // tracked in manifest.toml; future field
-        isbn:     None,
+        title: project.title.clone(),
+        author: project.author.clone(),
+        language,
+        isbn: None,
     };
 
     let ctx = ValidatorContext {
-        nodes:               &nodes,
-        scenes:              &scenes,
-        style:               &style,
-        vocab:               &vocab,
+        nodes: &nodes,
+        scenes: &scenes,
+        style: &style,
+        vocab: &vocab,
         active_vocab_layers: &layers,
-        project:             Some(&meta),
+        project: Some(&meta),
     };
 
     // Cache short-circuit: if the previous run hashed the same content,
@@ -83,12 +100,9 @@ pub async fn validators_run(
     let current_hash = compute_scope_hash(&ctx);
     if let Ok(Some(latest)) = storage.latest_validator_run().await {
         if latest.scope_hash == current_hash {
-            if let Ok(issues) = storage
-                .list_validator_issues_for_run(latest.id)
-                .await
-            {
+            if let Ok(issues) = storage.list_validator_issues_for_run(latest.id).await {
                 let cached = ValidationReport {
-                    run:    latest,
+                    run: latest,
                     issues,
                 };
                 return Ok(report_to_dto(&cached));
@@ -100,7 +114,9 @@ pub async fn validators_run(
 
     // Persist the run + issues for history / caching.  Best-effort: a
     // failure here doesn't block the UI from seeing the result.
-    let _ = storage.validator_run_persist(&report.run, &report.issues).await;
+    let _ = storage
+        .validator_run_persist(&report.run, &report.issues)
+        .await;
 
     Ok(report_to_dto(&report))
 }
@@ -108,19 +124,29 @@ pub async fn validators_run(
 /// Apply the export gate (errors block, warnings prompt, info silent) and
 /// return the result for the UI.
 #[tauri::command]
-pub async fn validators_gate(
-    state: State<'_, AppState>,
-) -> Result<ExportGateDto, BooksForgeError> {
+pub async fn validators_gate(state: State<'_, AppState>) -> Result<ExportGateDto, BooksForgeError> {
     let report_dto = validators_run(state).await?;
-    let errors:   Vec<ValidatorIssueDto> = report_dto.issues.iter()
-        .filter(|i| i.severity == "error").cloned().collect();
-    let warnings: Vec<ValidatorIssueDto> = report_dto.issues.iter()
-        .filter(|i| i.severity == "warning").cloned().collect();
-    let outcome = if !errors.is_empty()  { "block" }
-                  else if !warnings.is_empty() { "warn" }
-                  else { "pass" };
+    let errors: Vec<ValidatorIssueDto> = report_dto
+        .issues
+        .iter()
+        .filter(|i| i.severity == "error")
+        .cloned()
+        .collect();
+    let warnings: Vec<ValidatorIssueDto> = report_dto
+        .issues
+        .iter()
+        .filter(|i| i.severity == "warning")
+        .cloned()
+        .collect();
+    let outcome = if !errors.is_empty() {
+        "block"
+    } else if !warnings.is_empty() {
+        "warn"
+    } else {
+        "pass"
+    };
     Ok(ExportGateDto {
-        outcome:  outcome.to_owned(),
+        outcome: outcome.to_owned(),
         errors,
         warnings,
     })
@@ -129,26 +155,28 @@ pub async fn validators_gate(
 // ── Mapping helpers ───────────────────────────────────────────────────────────
 
 fn report_to_dto(report: &ValidationReport) -> ValidatorReportDto {
-    let issues: Vec<ValidatorIssueDto> = report.issues.iter().map(|i| {
-        ValidatorIssueDto {
+    let issues: Vec<ValidatorIssueDto> = report
+        .issues
+        .iter()
+        .map(|i| ValidatorIssueDto {
             validator_id: i.validator_id.clone(),
-            code:         i.code.clone(),
-            severity:     i.severity.as_str().to_owned(),
-            message:      i.message.clone(),
-            node_id:      i.node_id.map(|u| u.to_string()),
-            offset_from:  i.offset_from,
-            offset_to:    i.offset_to,
+            code: i.code.clone(),
+            severity: i.severity.as_str().to_owned(),
+            message: i.message.clone(),
+            node_id: i.node_id.map(|u| u.to_string()),
+            offset_from: i.offset_from,
+            offset_to: i.offset_to,
             auto_fixable: i.auto_fixable,
-        }
-    }).collect();
+        })
+        .collect();
 
     ValidatorReportDto {
-        run_id:        report.run.id.to_string(),
-        status:        report.run.status.as_str().to_owned(),
-        duration_ms:   report.run.duration_ms,
-        error_count:   report.count(Severity::Error)   as u32,
+        run_id: report.run.id.to_string(),
+        status: report.run.status.as_str().to_owned(),
+        duration_ms: report.run.duration_ms,
+        error_count: report.count(Severity::Error) as u32,
         warning_count: report.count(Severity::Warning) as u32,
-        info_count:    report.count(Severity::Info)    as u32,
+        info_count: report.count(Severity::Info) as u32,
         issues,
     }
 }
@@ -173,49 +201,61 @@ pub async fn validators_apply_fix(
         .map_err(|_| BooksForgeError::validation("invalid node_id ULID".to_owned()))?;
 
     // Load the scene (no-op fast path if it's never been saved).
-    let mut scene = match storage.load_scene(node_id).await
+    let mut scene = match storage
+        .load_scene(node_id)
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?
     {
         Some(s) => s,
-        None => return Ok(ApplyFixResult {
-            validator_id:  input.validator_id,
-            node_id:       input.node_id,
-            fixes_applied: 0,
-        }),
+        None => {
+            return Ok(ApplyFixResult {
+                validator_id: input.validator_id,
+                node_id: input.node_id,
+                fixes_applied: 0,
+            })
+        }
     };
 
     // Build a minimal context.  The fixes that need vocab pull it; the
     // others ignore it.  Same `active_vocab_layers` policy as
     // `validators_run`.
-    let style = storage.load_style_book().await
+    let style = storage
+        .load_style_book()
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
     let layers: Vec<&str> = vec!["project", "ai_tells"];
-    let vocab = storage.vocab_list_by_layers(&layers).await
+    let vocab = storage
+        .vocab_list_by_layers(&layers)
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
     let ctx = ValidatorContext {
-        nodes:               &[],
-        scenes:              &[],
-        style:               &style,
-        vocab:               &vocab,
+        nodes: &[],
+        scenes: &[],
+        style: &style,
+        vocab: &vocab,
         active_vocab_layers: &layers,
-        project:             None,
+        project: None,
     };
 
     // Run the fix in place on a clone of pm_doc, then persist if changed.
     let mut new_pm = scene.pm_doc.clone();
-    let count = apply_fix(&input.validator_id, &mut new_pm, &ctx)
-        .ok_or_else(|| BooksForgeError::validation(
-            format!("validator '{}' has no auto-fix", input.validator_id),
-        ))?;
+    let count = apply_fix(&input.validator_id, &mut new_pm, &ctx).ok_or_else(|| {
+        BooksForgeError::validation(format!(
+            "validator '{}' has no auto-fix",
+            input.validator_id
+        ))
+    })?;
 
     if count > 0 {
         // Recompute hash + word/char counts from the new content; the
         // editor will re-render once `node_list` refreshes.
         let bytes = serde_json::to_vec(&new_pm).unwrap_or_default();
-        scene.pm_doc     = new_pm;
-        scene.hash       = blake3::hash(&bytes).to_hex().to_string();
+        scene.pm_doc = new_pm;
+        scene.hash = blake3::hash(&bytes).to_hex().to_string();
         scene.updated_at = Utc::now();
-        storage.save_scene(&scene).await
+        storage
+            .save_scene(&scene)
+            .await
             .map_err(|e| BooksForgeError::internal(e.to_string()))?;
         // The persisted SceneContent struct still carries the old word /
         // char counts; that's fine — the next autosave or node_list
@@ -226,8 +266,8 @@ pub async fn validators_apply_fix(
     }
 
     Ok(ApplyFixResult {
-        validator_id:  input.validator_id,
-        node_id:       input.node_id,
+        validator_id: input.validator_id,
+        node_id: input.node_id,
         fixes_applied: count,
     })
 }

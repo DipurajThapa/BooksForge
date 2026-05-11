@@ -16,11 +16,11 @@ pub enum BookMode {
 /// Human-readable metadata stored in `manifest.toml [meta]`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectMeta {
-    pub title:        String,
-    pub subtitle:     Option<String>,
-    pub authors:      Vec<String>,
+    pub title: String,
+    pub subtitle: Option<String>,
+    pub authors: Vec<String>,
     /// BCP-47 language tag, e.g. "en-US", "fr-FR".
-    pub language:     String,
+    pub language: String,
     pub target_words: Option<u32>,
 }
 
@@ -30,15 +30,21 @@ pub struct ProjectMeta {
 /// from any prior format). Incrementing it is a major decision (see ARCHITECTURE_DECISIONS.md).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
-    pub id:               Ulid,
-    pub schema_version:   u32,
-    pub mode:             BookMode,
-    pub template_id:      String,
+    pub id: Ulid,
+    pub schema_version: u32,
+    pub mode: BookMode,
+    /// Finer-grained classification (Phase 4 / PRODUCT_ROADMAP_E2E.md).
+    /// `None` for projects created before BookKind landed; the desktop
+    /// app surfaces an onboarding overlay to backfill in that case.
+    /// New projects created via the wizard always set this.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub book_kind: Option<crate::BookKind>,
+    pub template_id: String,
     pub template_version: String,
-    pub meta:             ProjectMeta,
-    pub ai_enabled:       bool,
-    pub created_at:       DateTime<Utc>,
-    pub updated_at:       DateTime<Utc>,
+    pub meta: ProjectMeta,
+    pub ai_enabled: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl Project {

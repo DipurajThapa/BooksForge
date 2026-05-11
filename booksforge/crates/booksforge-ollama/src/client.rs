@@ -14,6 +14,27 @@ use crate::{
 
 const BASE_URL: &str = "http://127.0.0.1:11434";
 
+/// **Per-chunk streaming inactivity timeout.**
+///
+/// `Client::builder().timeout(...)` is a per-request total deadline that
+/// in practice does not reliably fire on streaming bodies — Run #11/#12
+/// proved this when 21+ minute drafter calls completed despite a 600s
+/// total timeout. The orchestrator's `max_duration_secs` cap likewise
+/// only fires *between* retry attempts, never *during* a single LLM call.
+///
+/// So if Ollama hangs mid-stream — TCP keepalive lost, model OOM,
+/// runner crashed, GPU stalled — nothing in the stack stops the call.
+/// The runner just blocks forever waiting for the next chunk that
+/// never comes.
+///
+/// This constant is the maximum gap between successive streaming
+/// chunks. A long-but-progressing generation passes (chunks usually
+/// arrive at sub-second intervals on the 36B MoE model). A genuine
+/// hang fails after this much idle time. 120s is generous enough to
+/// tolerate model hot-swap stalls but short enough that the user
+/// notices a problem instead of waiting forever.
+const STREAMING_CHUNK_IDLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+
 /// Stable interface for all Ollama operations.
 /// Implemented by `HttpOllamaClient` in production and a mock in tests.
 #[async_trait]
@@ -123,7 +144,11 @@ impl OllamaClient for HttpOllamaClient {
             .send()
             .await
             .map_err(|e| {
-                if e.is_connect() { OllamaError::NotRunning } else { OllamaError::Request(e) }
+                if e.is_connect() {
+                    OllamaError::NotRunning
+                } else {
+                    OllamaError::Request(e)
+                }
             })?;
 
         if !resp.status().is_success() {
@@ -138,12 +163,14 @@ impl OllamaClient for HttpOllamaClient {
 
     async fn show(&self, model: &str) -> Result<ModelInfo, OllamaError> {
         #[derive(serde::Serialize)]
-        struct ShowBody<'a> { name: &'a str }
+        struct ShowBody<'a> {
+            name: &'a str,
+        }
 
         #[derive(serde::Deserialize)]
         struct ShowDetails {
-            family:             Option<String>,
-            parameter_size:     Option<String>,
+            family: Option<String>,
+            parameter_size: Option<String>,
             quantization_level: Option<String>,
         }
 
@@ -159,11 +186,17 @@ impl OllamaClient for HttpOllamaClient {
             .send()
             .await
             .map_err(|e| {
-                if e.is_connect() { OllamaError::NotRunning } else { OllamaError::Request(e) }
+                if e.is_connect() {
+                    OllamaError::NotRunning
+                } else {
+                    OllamaError::Request(e)
+                }
             })?;
 
         if resp.status().as_u16() == 404 {
-            return Err(OllamaError::ModelNotFound { model: model.to_owned() });
+            return Err(OllamaError::ModelNotFound {
+                model: model.to_owned(),
+            });
         }
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
@@ -179,37 +212,49 @@ impl OllamaClient for HttpOllamaClient {
         });
 
         Ok(ModelInfo {
-            name:               model.to_owned(),
-            digest:             None, // digest is available via /api/tags — use list_local_models
-            family:             details.family,
-            parameter_size:     details.parameter_size,
+            name: model.to_owned(),
+            digest: None, // digest is available via /api/tags — use list_local_models
+            family: details.family,
+            parameter_size: details.parameter_size,
             quantization_level: details.quantization_level,
         })
     }
 
     async fn pull(&self, model: &str, progress: ProgressSink) -> Result<(), OllamaError> {
         #[derive(serde::Serialize)]
-        struct PullBody<'a> { name: &'a str, stream: bool }
+        struct PullBody<'a> {
+            name: &'a str,
+            stream: bool,
+        }
 
         #[derive(serde::Deserialize)]
         struct PullLine {
-            status:    String,
+            status: String,
             completed: Option<u64>,
-            total:     Option<u64>,
+            total: Option<u64>,
         }
 
         let resp = self
             .http
             .post(format!("{}/api/pull", self.base_url))
-            .json(&PullBody { name: model, stream: true })
+            .json(&PullBody {
+                name: model,
+                stream: true,
+            })
             .send()
             .await
             .map_err(|e| {
-                if e.is_connect() { OllamaError::NotRunning } else { OllamaError::Request(e) }
+                if e.is_connect() {
+                    OllamaError::NotRunning
+                } else {
+                    OllamaError::Request(e)
+                }
             })?;
 
         if resp.status().as_u16() == 404 {
-            return Err(OllamaError::ModelNotFound { model: model.to_owned() });
+            return Err(OllamaError::ModelNotFound {
+                model: model.to_owned(),
+            });
         }
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
@@ -220,17 +265,17 @@ impl OllamaClient for HttpOllamaClient {
         // Consume NDJSON stream line by line.
         use tokio::io::AsyncBufReadExt as _;
         let stream = resp.bytes_stream();
-        let reader = tokio_util::io::StreamReader::new(
-            stream.map_err(std::io::Error::other),
-        );
+        let reader = tokio_util::io::StreamReader::new(stream.map_err(std::io::Error::other));
         let mut lines = reader.lines();
         while let Some(line) = lines.next_line().await.map_err(OllamaError::Io)? {
-            if line.trim().is_empty() { continue; }
+            if line.trim().is_empty() {
+                continue;
+            }
             if let Ok(p) = serde_json::from_str::<PullLine>(&line) {
                 progress(PullProgress {
-                    status:    p.status,
+                    status: p.status,
                     completed: p.completed,
-                    total:     p.total,
+                    total: p.total,
                 });
             }
         }
@@ -257,7 +302,11 @@ impl OllamaClient for HttpOllamaClient {
             .send()
             .await
             .map_err(|e| {
-                if e.is_connect() { OllamaError::NotRunning } else { OllamaError::Request(e) }
+                if e.is_connect() {
+                    OllamaError::NotRunning
+                } else {
+                    OllamaError::Request(e)
+                }
             })?;
 
         if !resp.status().is_success() {
@@ -269,28 +318,47 @@ impl OllamaClient for HttpOllamaClient {
         #[derive(serde::Deserialize)]
         struct StreamChunk {
             response: String,
-            done:     bool,
+            done: bool,
             // Final chunk fields (only present when done = true).
-            model:               Option<String>,
-            prompt_eval_count:   Option<u32>,
-            eval_count:          Option<u32>,
-            total_duration:      Option<u64>,
+            model: Option<String>,
+            prompt_eval_count: Option<u32>,
+            eval_count: Option<u32>,
+            total_duration: Option<u64>,
         }
 
         use tokio::io::AsyncBufReadExt as _;
         let stream = resp.bytes_stream();
-        let reader = tokio_util::io::StreamReader::new(
-            stream.map_err(std::io::Error::other),
-        );
+        let reader = tokio_util::io::StreamReader::new(stream.map_err(std::io::Error::other));
         let mut lines = reader.lines();
         let mut full_response = String::new();
         let mut final_chunk: Option<StreamChunk> = None;
 
-        while let Some(line) = lines.next_line().await.map_err(OllamaError::Io)? {
+        loop {
             if cancel.is_cancelled() {
                 return Err(OllamaError::Cancelled);
             }
-            if line.trim().is_empty() { continue; }
+            // Per-chunk inactivity guard — see STREAMING_CHUNK_IDLE_TIMEOUT.
+            // Catches mid-stream Ollama hangs that the per-request HTTP
+            // timeout does not reliably fire on for streaming bodies.
+            let line = match tokio::time::timeout(STREAMING_CHUNK_IDLE_TIMEOUT, lines.next_line())
+                .await
+            {
+                Ok(Ok(Some(line))) => line,
+                Ok(Ok(None)) => break, // end of stream without done=true
+                Ok(Err(e)) => return Err(OllamaError::Io(e)),
+                Err(_elapsed) => {
+                    return Err(OllamaError::Http {
+                        status: 0,
+                        body: format!(
+                            "Ollama stream idle for {}s — generation appears hung (model loaded? GPU stalled?)",
+                            STREAMING_CHUNK_IDLE_TIMEOUT.as_secs(),
+                        ),
+                    });
+                }
+            };
+            if line.trim().is_empty() {
+                continue;
+            }
             let chunk: StreamChunk = serde_json::from_str(&line)?;
             if !chunk.response.is_empty() {
                 sink(&chunk.response);
@@ -308,10 +376,10 @@ impl OllamaClient for HttpOllamaClient {
         })?;
 
         Ok(GenerateOutcome {
-            model:             fc.model.unwrap_or_else(|| request.model.clone()),
-            response:          full_response,
+            model: fc.model.unwrap_or_else(|| request.model.clone()),
+            response: full_response,
             prompt_eval_count: fc.prompt_eval_count.unwrap_or(0),
-            eval_count:        fc.eval_count.unwrap_or(0),
+            eval_count: fc.eval_count.unwrap_or(0),
             total_duration_ns: fc.total_duration.unwrap_or(0),
         })
     }
@@ -335,7 +403,11 @@ impl OllamaClient for HttpOllamaClient {
             .send()
             .await
             .map_err(|e| {
-                if e.is_connect() { OllamaError::NotRunning } else { OllamaError::Request(e) }
+                if e.is_connect() {
+                    OllamaError::NotRunning
+                } else {
+                    OllamaError::Request(e)
+                }
             })?;
 
         if !resp.status().is_success() {
@@ -345,32 +417,51 @@ impl OllamaClient for HttpOllamaClient {
         }
 
         #[derive(serde::Deserialize)]
-        struct MsgChunk { content: String }
+        struct MsgChunk {
+            content: String,
+        }
 
         #[derive(serde::Deserialize)]
         struct StreamChunk {
-            message:           Option<MsgChunk>,
-            done:              bool,
-            model:             Option<String>,
+            message: Option<MsgChunk>,
+            done: bool,
+            model: Option<String>,
             prompt_eval_count: Option<u32>,
-            eval_count:        Option<u32>,
-            total_duration:    Option<u64>,
+            eval_count: Option<u32>,
+            total_duration: Option<u64>,
         }
 
         use tokio::io::AsyncBufReadExt as _;
         let stream = resp.bytes_stream();
-        let reader = tokio_util::io::StreamReader::new(
-            stream.map_err(std::io::Error::other),
-        );
+        let reader = tokio_util::io::StreamReader::new(stream.map_err(std::io::Error::other));
         let mut lines = reader.lines();
         let mut full_content = String::new();
         let mut final_chunk: Option<StreamChunk> = None;
 
-        while let Some(line) = lines.next_line().await.map_err(OllamaError::Io)? {
+        loop {
             if cancel.is_cancelled() {
                 return Err(OllamaError::Cancelled);
             }
-            if line.trim().is_empty() { continue; }
+            // Per-chunk inactivity guard — see STREAMING_CHUNK_IDLE_TIMEOUT.
+            let line = match tokio::time::timeout(STREAMING_CHUNK_IDLE_TIMEOUT, lines.next_line())
+                .await
+            {
+                Ok(Ok(Some(line))) => line,
+                Ok(Ok(None)) => break,
+                Ok(Err(e)) => return Err(OllamaError::Io(e)),
+                Err(_elapsed) => {
+                    return Err(OllamaError::Http {
+                        status: 0,
+                        body: format!(
+                            "Ollama stream idle for {}s — generation appears hung (model loaded? GPU stalled?)",
+                            STREAMING_CHUNK_IDLE_TIMEOUT.as_secs(),
+                        ),
+                    });
+                }
+            };
+            if line.trim().is_empty() {
+                continue;
+            }
             let chunk: StreamChunk = serde_json::from_str(&line)?;
             if let Some(ref msg) = chunk.message {
                 if !msg.content.is_empty() {
@@ -390,10 +481,10 @@ impl OllamaClient for HttpOllamaClient {
         })?;
 
         Ok(ChatOutcome {
-            model:             fc.model.unwrap_or_else(|| request.model.clone()),
-            message:           crate::types::ChatMessage::assistant(full_content),
+            model: fc.model.unwrap_or_else(|| request.model.clone()),
+            message: crate::types::ChatMessage::assistant(full_content),
             prompt_eval_count: fc.prompt_eval_count.unwrap_or(0),
-            eval_count:        fc.eval_count.unwrap_or(0),
+            eval_count: fc.eval_count.unwrap_or(0),
             total_duration_ns: fc.total_duration.unwrap_or(0),
         })
     }

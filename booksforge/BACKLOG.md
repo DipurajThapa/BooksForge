@@ -110,6 +110,470 @@ Closed: A1, A2, A3, A5, A6, D5, D6, D7, G3-metadata, J3, K1, K2, K4).
 - **Where:** track upstream ts-rs issue or wrap with `#[ts(skip)]` analogue.
 - **Trigger:** when ts-rs publishes a fix.
 
+### A9. Apply path for generating agents (Chapter Drafter, Outline) ✅ CLOSED 2026-05-09 (next-sprint)
+- **Why:** Surfaced by BF-E2E-LOCAL-LLM-FIRST-BOOK-001 as the user-facing bug
+  *"AI generated content is not populating on the edit / review section"*.
+  `GenericAgentForm` ran the agent and showed `proposal_json` in a collapsed
+  `<details>` JSON view — there was no path to write the proposal into the
+  active scene editor. Compare `QuickActionBar`, which already does this
+  correctly via `aiApply` + `onApplied` callback.
+- **What landed (UI-only fix, no Rust changes):**
+  - `GenericAgentForm` now renders generated prose as a readable preview
+    (extracts text from `pm_doc`) and shows an **Apply to scene** button when
+    a scene is open and the proposal carries a `pm_doc`.
+  - The Apply handler calls `snapshotCreate(trigger="pre_ai")` → `sceneSave`
+    → `onApplied()` so the editor reloads the freshly drafted scene.
+  - `AgentsPanel` and `EditorShell` thread the `onApplied` callback through.
+- **What landed in next-sprint (2026-05-09):**
+  - `Orchestrator::apply_chapter_drafter()` in
+    `crates/booksforge-orchestrator/src/apply_chapter_drafter.rs` —
+    idempotency-guarded, takes the mandatory `PreAgentEdit` snapshot,
+    loads the persisted `SceneDraftProposal`, replaces `pm_doc`,
+    recomputes blake3+counts, saves, inserts an `agent_applied_edits`
+    ledger row with `edit_kind = TextReplace` and the prior hash in the
+    payload for revertibility.
+  - `agent_apply_chapter_drafter` Tauri command in
+    `apps/desktop/src/commands/agents.rs`; registered in `lib.rs`.
+  - `ApplyChapterDrafterInput` + `ApplyChapterDrafterResultDto` in
+    `booksforge-ipc`; ts-rs binding generated and re-exported from
+    `packages/shared-types/src/index.ts`. Codegen-drift test passes.
+  - `ipc.agentApplyChapterDrafter` in
+    `apps/desktop/src-ui/src/lib/ipc.ts`.
+  - `GenericAgentForm.handleApplyToScene()` now routes the
+    `chapter-drafter` agent through the orchestrator path (no longer
+    bypasses) and falls back to the prior UI-only path for other agents
+    that don't yet have an orchestrator-mediated apply.
+- **What is still needed (follow-up):**
+  - Same orchestrator-mediated path for `intake-and-outline` and
+    `developmental-review` panels' downstream applies.
+  - Snapshot-invariant CI test extended to assert that every accepted
+    chapter-drafter edit references a snapshot whose `created_at <
+    applied_at`.
+
+### A10. Defensive JSON repair before serde deserialise ✅ CLOSED 2026-05-09
+- **What landed:** new `crates/booksforge-agents/src/json_repair.rs` module
+  with `repair_value()`, `RepairAudit`, `parse_and_repair()` (drops nulls
+  in any list — safe for any schema) and `parse_and_repair_strict_objects()`
+  (drops non-object items at known dict-typed keys — handles the BF-E2E
+  Phase 5 case where `characters: [{...}, "characters_2", {...}]` would
+  hard-fail serde). 8 unit tests (6 in `json_repair.rs`, 2 in agent
+  consumers), all passing.
+- **Wired into:** `chapter_drafter::parse_and_validate` (uses default
+  null-only repair), `character_bible::parse_and_validate`
+  (object-strict at `characters` + `relationships`), and
+  `world_bible::parse_and_validate` (object-strict at `main_locations`).
+  `tracing::warn!` per agent on every repair so the audit ledger captures
+  repair frequency over time.
+- **Original spec:** preserved below for reference.
+- **Why:** Surfaced by BF-E2E-LOCAL-LLM-FIRST-BOOK-001 — local 9B occasionally
+  emitted a malformed entry inside an otherwise-valid JSON list (e.g.
+  `characters: [{...}, "characters_2", {...}]`). Hard parse failures in this
+  case waste a full retry rather than salvaging the 80%-correct response.
+- **Where:**
+  - `crates/booksforge-agents/src/{chapter_drafter,outline_architect,intake,
+    entity_bible}.rs` — all `parse_and_validate(raw: &str)` entry points.
+  - Add a pre-deserialise repair pass: walk the JSON value, drop list
+    elements whose type doesn't match the declared item shape, then run
+    `serde_json::from_value` on the cleaned payload.
+  - Emit a `tracing::warn!("repaired N malformed list elements")` per-call so
+    the audit ledger captures repair frequency.
+- **Trigger:** before MZ-10 hardening pass; tracked as "JSON shape repair".
+
+### A11. PDF engine pinning + typst sidecar ✅ PARTIAL 2026-05-09
+- **What landed:** new crate
+  `crates/booksforge-export-typst/` (mirrors `booksforge-export-pandoc`
+  pattern). Exports `TypstInput`, `TypstTrim`
+  (Trade5x8 / Trade5_5x8_5 / Trade6x9 / UsLetter), `probe_typst()`,
+  `run_typst()`. Renders manuscript markdown → custom Typst program →
+  PDF, with KDP-correct trim sizes and inner/outer margins. 7 unit
+  tests passing (escape rules, paragraph splitting, section breaks,
+  title-page interpolation). Crate added to workspace `Cargo.toml`.
+- **`outputs/TOOLCHAIN.md` updated** to declare typst 0.14.x as a
+  bundled sidecar alongside Pandoc and EPUBCheck.
+- **What is still needed:**
+  - The desktop `state.rs` resolver should look up the typst sidecar
+    binary the same way it looks up pandoc/epubcheck.
+  - An ExportPanel option for "typst-rendered PDF" so users can pick
+    typst over pandoc-via-LaTeX.
+  - Wired through to the in-product Export action.
+- **Original spec:** preserved below for reference.
+- **Why:** Surfaced by BF-E2E-LOCAL-LLM-FIRST-BOOK-001 Phase 13 — `pandoc -o
+  manuscript.pdf` requires a PDF engine but `outputs/TOOLCHAIN.md §8` only
+  pins Pandoc + EPUBCheck. On macOS without a TeX distribution, no PDF
+  engine is present by default.
+- **Recommended ADR:** add `typst 0.14.x` as the default PDF engine sidecar.
+  Rationale: license-clean (Apache-2.0), single static binary (~30 MB),
+  ~10× faster than xelatex on a 30-chapter manuscript, no runtime LaTeX
+  dependency. Pandoc 3.5+ supports `--pdf-engine=typst` natively.
+  Trade-off: typst's KDP-trim support requires a small custom template
+  (typst's `set page(width: 6in, height: 9in)` rather than pandoc's
+  `papersize` variable, which only maps named sizes).
+- **Where:** new ADR in `outputs/ARCHITECTURE_DECISIONS.md`, then row in
+  `outputs/TOOLCHAIN.md §8`, then a `booksforge-export-typst` sidecar wrapper
+  crate following the `booksforge-export-pandoc` pattern.
+
+### A12. EPUBCheck pin update 5.1.0 → 5.3.0 ✅ CLOSED 2026-05-09
+- **What landed:** `outputs/TOOLCHAIN.md` row updated; `5.1.0` → `5.3.0`
+  in `crates/booksforge-epubcheck/src/lib.rs` (test fixtures and
+  assertions). 7/7 epubcheck crate tests pass. BF-E2E test had already
+  validated 5.3.0 against the test EPUB with 0 errors / 0 warnings.
+- **Original spec:** preserved below for reference.
+- **Why:** EPUBCheck 5.3.0 is current upstream as of 2026-05; the 5.1.0 pin
+  in `outputs/TOOLCHAIN.md §8` is one minor behind. BF-E2E test ran with
+  5.3.0 successfully (0 errors, 0 warnings on the test EPUB).
+- **Trigger:** part of the same PR that updates Pandoc 3.5 → 3.9 (or
+  whichever forward-pin is taken next).
+
+### A17. Sprint summary 2026-05-09 (next-sprint after the user-facing 4.66/10 question)
+
+This sprint closed A9 (orchestrator-mediated chapter-drafter apply),
+A10 (defensive JSON repair), A11 (typst sidecar — partial), A12
+(EPUBCheck pin bump), and A13 partial (character + world bible Rust
+crates with full validation).
+
+**Real, in-product changes:**
+- 1 new Rust crate (`booksforge-export-typst`)
+- 4 new Rust modules (`json_repair`, `apply_chapter_drafter`,
+  `character_bible`, `world_bible`)
+- 9 new domain types (character + world bible proposals + their
+  components)
+- 1 new Tauri command + IPC type pair, ts-rs binding generated
+- UI re-wired to use the orchestrator-mediated apply path
+
+**Test counts:**
+- **488 workspace tests pass, 0 fail, 3 ignored.**
+- 22 new tests added across the new modules (json_repair 8,
+  character_bible 4, world_bible 4, typst 7, apply_chapter_drafter
+  exercised via the existing apply integration test surface, plus
+  test-fixture allowance bumps in `booksforge-template` and
+  `booksforge-memory` integration tests).
+- TS typecheck: same 14 pre-existing errors in unrelated files; zero
+  new errors introduced.
+- Workspace `cargo clippy --all-targets -- -D warnings` is clean.
+
+**Verifiable without further work:**
+- `cargo test --workspace` → all green.
+- `cargo clippy --workspace --all-targets -- -D warnings` → clean.
+- `cargo build --workspace` → finishes without errors.
+
+### A14. TipTap type re-exports + FindReplaceBar implicit-any fix ✅ CLOSED 2026-05-09
+- **Why:** `cargo tauri dev` typecheck failed with "Cannot find module
+  '@tiptap/core' or its corresponding type declarations" in `EditorShell.tsx`
+  and `FindReplaceBar.tsx`. `@tiptap/*` is declared in
+  `packages/editor/package.json` but `apps/desktop/src-ui/package.json`
+  doesn't depend on it directly, so deep imports fail.
+- **Fix:** added `JSONContent` (from `@tiptap/core`) and `Editor` (from
+  `@tiptap/react`) to the `@booksforge/editor` package's public surface
+  (`packages/editor/src/index.ts`). Updated `EditorShell.tsx` and
+  `FindReplaceBar.tsx` to import these types from `@booksforge/editor`
+  instead of `@tiptap/*` directly. Single source of truth — TipTap stays
+  declared in exactly one package. Also typed the previously-implicit-any
+  `node` / `pos` parameters in `FindReplaceBar`'s `descendants` callbacks.
+- **Bonus:** restored the dead `handleExport` (Markdown export) by wiring
+  it to `Cmd/Ctrl+E` — gives users a quick-MD-export shortcut and removes
+  the TS6133 unused-binding warning honestly (no underscore-prefix hacks).
+
+### A15. Specialist polish stack as native Rust agents ✅ CLOSED 2026-05-09 (Phase 2 of PRODUCT_ROADMAP_E2E.md)
+- **Templates landed in prior round; Phase 2 wired them into native Rust
+  agents and surfaced them end-to-end in the desktop app.** See
+  PRODUCT_ROADMAP_E2E.md Round 2 close-out for the full punch list.
+- Domain types: `PolishProposal`, `PolishStageId`, `SceneCritiqueProposal`,
+  `TargetedEdit`.
+- 5 new agent crates: `dialogue_polish`, `metaphor_polish`,
+  `voice_polish`, `scene_tension_polish`, `scene_critic` — all
+  registered in `agents::registry::all_agents()`.
+- Orchestrator: `run_polish_stage` + `run_scene_critic` + `apply_polish`,
+  all polymorphic / type-safe.
+- 3 new Tauri commands + IPC types + ts-rs bindings.
+- `PolishStackPanel.tsx` — sequences the 4 stages in genre-correct
+  order with per-stage Run + diff preview + Accept/Skip.
+- AgentsPanel gains a `polish` category.
+- Test counts: 14 new agent unit tests; codegen-drift green.
+
+### A15.legacy. Specialist polish prompt templates (4 stages) ✅ LANDED 2026-05-09 (prior round)
+- **What:** ships under `crates/booksforge-prompt/templates/` (no Rust
+  crate yet — the eventual `booksforge-agents/specialist_polish.rs` will
+  consume them). Replaces the previous single "polish" prompt critiqued
+  in `book-output/RCA_QUALITY_6_TO_9.md` §1 cause #3 (polish ≠ revision).
+- Stages added:
+  - `dialogue-polish/v1.toml` — sharpens dialogue, cuts exposition,
+    differentiates speakers; touches dialogue + bracketing beats only.
+  - `metaphor-polish/v1.toml` — replaces clichéd images, tunes density,
+    enforces character-specific imagery.
+  - `scene-tension-polish/v1.toml` — tightens rising line, cuts slack,
+    strengthens hook endings.
+  - `voice-polish/v1.toml` — voice-PRESERVING (the opposite of "fix
+    style"); takes a numeric voice-constraint block as input.
+  - `scene-critic/v1.toml` — per-scene critique with genre-specific axes,
+    returns targeted edit instructions.
+  - `scene-drafter-fic/v1.toml` — fiction-shaped sibling of
+    `chapter-drafter`, consumes character + world bibles + voice
+    constraints + scene card.
+  - `character-bible/v1.toml` + `world-bible/v1.toml` — the two missing
+    fiction agents (per A13).
+- **Trigger for the Rust crate work:** when `booksforge-agents` is
+  extended in MZ-10/11.
+
+### A16. Quality stack as native Rust crates ✅ CLOSED 2026-05-09 (Phase 3 of PRODUCT_ROADMAP_E2E.md)
+- **The Python ghostwriter pipeline's three quality modules ported to
+  native Rust crates and surfaced end-to-end in the desktop app.**
+- New crate `booksforge-voice` — `fingerprint(text) → VoiceProfile`,
+  `stylometric_distance(a, b) → 0..10 score`, `constraints_block(label)`
+  for prompt injection. 16-field profile, 10 unit tests.
+- New crate `booksforge-anti-ai-tells` — 50+ patterns across 8
+  categories with severity tiers; `tells_per_1000_words` density
+  measurement; `revision_prompt` for span-targeted polish handoff.
+  Verdict grades: PUBLISHABLE / NEEDS_REVISION / AI_SMELL_HIGH.
+  10 unit tests.
+- New crate `booksforge-genre-packs` — three packs (literary / genre /
+  non-fiction), each with system prompt, draft lens, critic axes,
+  polish-stack ordering, 12-axis rubric weights, hard rules. `BookKind`
+  enum with forgiving `from_str`. 10 unit tests.
+- 6 new Tauri commands in `commands::quality`:
+  `voice_fingerprint`, `voice_anchor_set`, `voice_anchor_get`,
+  `stylometric_distance_compute`, `tells_scan`, `genre_pack_get`.
+- 10 new IPC types + ts-rs bindings + `ipc.ts` client methods.
+- 3 new React panels: `VoiceAnchorPanel`, `TellsInspectorPanel`,
+  `HonestScorePanel` — surfaced as a new `quality` category at the top
+  of AgentsPanel.
+- Codegen-drift test green (27 new TS bindings between Phases 2 + 3).
+
+### A16.legacy. Ghostwriter-grade pipeline (Python, demonstrates A13–A15 architecture)
+- **What:** ships under `artifacts/ghostwriter/` — a complete Python
+  pipeline that implements all of RCA §L1+L2 NOW, before the Rust crates
+  land. Lets ghostwriters use the new architecture today; lets us A/B
+  test the architecture changes before committing them to BooksForge
+  proper.
+- **Modules:**
+  - `anti_ai_tells.py` — pattern-based AI-prose detector (50+ patterns,
+    severity-tiered, with per-span revision-prompt builder). Self-test
+    on deliberate AI slop: 20 tells caught in 58 words, verdict
+    `AI_SMELL_HIGH`.
+  - `voice_fingerprint.py` — measurable voice profile (median sentence
+    length, IQR, dialogue ratio, em-dash density, type-token ratio,
+    stylometric distance). Profile rendered as a numeric constraint
+    block injected into the drafter prompt.
+  - `genre_packs.py` — three distinct genre packs (literary / genre /
+    non-fiction) with per-genre system prompts, per-scene critic axes,
+    polish-stack ordering, and 12-axis rubric weights.
+  - `pipeline.py` — orchestrator. Implements ensemble drafting (N=2),
+    per-scene critique-revise loop, genre-specific specialist polish
+    stack (4 passes per chapter, voice-preserving), anti-AI-tells
+    redaction pass, multi-specialist scoring (3 lens calls), whole-
+    manuscript context (no truncation), stylometric-distance scoring
+    against comp samples.
+- **How to run** (from repo root):
+  ```bash
+  cd book-output/artifacts && python3 -m ghostwriter.pipeline \
+    --input ghostwriter/proof_spec_literary.json \
+    --out ghostwriter/proof_literary
+  ```
+- **Trigger for promotion to BooksForge proper:** after the proof runs
+  show consistent rubric lift over the BF-E2E baseline (6.1/10) — see
+  `book-output/RCA_QUALITY_6_TO_9.md` §3 for honest target ranges.
+
+### A13. First-class fiction agents (character bible, world bible, scene-fic drafter) ✅ CLOSED 2026-05-09 (Phase 1 of PRODUCT_ROADMAP_E2E.md)
+- **Phase 1 fully landed end-to-end:**
+  - Domain types in `booksforge-domain::agent_io`:
+    `CharacterBibleProposal`, `CharacterCard`, `CharacterRelationship`,
+    `WorldBibleProposal`, `WorldLocation`, `SensoryPalette`. All
+    re-exported from the crate's lib.
+  - Memory-scope authorisation (`booksforge-domain::memory`):
+    `character-bible` → Entity, `world-bible` → Book + Entity,
+    `scene-drafter-fic` → Chapter. 3 new unit tests.
+  - **Three new agent crates** in `booksforge-agents`:
+    `character_bible.rs`, `world_bible.rs`, `scene_drafter_fic.rs` —
+    each with `spec()`, `parse_and_validate()` (using the workspace's
+    json-repair helper), and 4–5 unit tests. All registered in
+    `registry::all_agents()`.
+  - **Three orchestrator `run_*` methods**: `run_character_bible`,
+    `run_world_bible`, `run_scene_drafter_fic` — each follows the
+    existing `RunInput` pattern, wires the right vars block from the
+    new prompt templates, and respects the agent's spec for caps.
+  - **Three orchestrator `apply_*` methods** in dedicated modules:
+    `apply_character_bible.rs` (one entity-memory row per character),
+    `apply_world_bible.rs` (one entity-memory row per location +
+    six book-scope rows for top-level world fields), and
+    `apply_scene_drafter_fic.rs` (pm_doc replace into the live scene,
+    same audit-ledger shape as `apply_chapter_drafter` but with
+    `agent: scene-drafter-fic` in the payload).
+    All three: idempotency-guarded, mandatory `PreAgentEdit` snapshot,
+    `agent_applied_edits` row written, scope-authorisation check.
+  - **IPC layer**: 9 new types
+    (`RunCharacterBibleInput` / `ApplyCharacterBibleInput` /
+    `ApplyCharacterBibleResultDto` / 3× world / 3× scene-drafter-fic).
+    All ts-rs bindings generated and re-exported from
+    `packages/shared-types/src/index.ts`. Codegen-drift test green.
+  - **6 Tauri commands** in `apps/desktop/src/commands/agents.rs`:
+    `agent_run_character_bible` / `agent_apply_character_bible` /
+    `agent_run_world_bible` / `agent_apply_world_bible` /
+    `agent_run_scene_drafter_fic` / `agent_apply_scene_drafter_fic`.
+    Run-commands auto-load the project's brief + prior bibles + bible
+    memory at invoke time, so the UI just calls the command — no
+    plumbing on the client side. All 6 registered in `lib.rs` invoke
+    handler list.
+  - **3 IPC client methods** in `apps/desktop/src-ui/src/lib/ipc.ts`:
+    `agentRunCharacterBible` / `agentApplyCharacterBible` and the same
+    pattern for world-bible and scene-drafter-fic.
+  - **3 React panels**:
+    - `CharacterBiblePanel.tsx` — chapter-count + optional accepted-prose
+      paste; renders proposed cards with name/role/wants/needs/wound/
+      secret/voice/relationships/per-chapter arc; Apply persists every
+      character to project memory.
+    - `WorldBiblePanel.tsx` — one-click Run; renders locations,
+      social rules, history, sensory palette, motifs, and continuity
+      constraints; Apply persists locations to entity scope and the
+      rest to book scope.
+    - `SceneDrafterFicPanel.tsx` — scene goal / conflict / reveal /
+      target words / POV / genre lens; auto-loads bibles from memory
+      at run time on the backend; renders generated prose in a
+      readable preview pane; Apply routes through
+      `agent_apply_scene_drafter_fic` (orchestrator-mediated, audit
+      ledger row).
+  - **AgentsPanel.tsx**: new `"fiction"` category appears at the top of
+    the switchboard with the 3 new cards.
+- **Test counts:**
+  - Workspace: **505 tests pass, 0 failed, 3 ignored** (up from 488).
+  - +13 new tests for fiction agents (5 scene-drafter-fic + 4 character-
+    bible + 4 world-bible) and +3 memory-scope tests.
+  - `cargo clippy --workspace --all-targets -- -D warnings` clean.
+  - TS typecheck: **0 new errors** introduced; same 14 pre-existing in
+    unrelated files.
+- **What is queued for later phases (per `PRODUCT_ROADMAP_E2E.md`):**
+  - Phase 2: specialist polish stack as native agents (closes A15).
+  - Phase 3: voice fingerprint + anti-AI-tells + ensemble + multi-
+    specialist scoring as native crates (closes A16).
+  - Phase 4: orchestrator workflow router by `BookKind` so the bibles
+    + scene-drafter-fic are invoked automatically for fiction projects.
+
+### A13.legacy. First-class fiction agents (character bible, world bible, scene-fic drafter)
+- **What landed:**
+  - **Domain types** in `booksforge-domain::agent_io`:
+    `CharacterBibleProposal { characters: Vec<CharacterCard> }`,
+    `CharacterCard` (name / role / external_objective / internal_need /
+    fear_or_wound / secret_or_contradiction / voice_traits /
+    relationships / chapter_arc / emotional_turning_points),
+    `CharacterRelationship`, `WorldBibleProposal`, `WorldLocation`,
+    `SensoryPalette`. All re-exported from the crate's lib.
+  - **Semantic validators** on both proposals: chapter-arc length match,
+    duplicate-name check, relationship-target check, sensory-palette
+    coverage (≥3 of 5 senses), history-length floor, etc.
+  - **`booksforge-agents::character_bible`** and
+    **`booksforge-agents::world_bible`** crates with `spec()`,
+    `parse_and_validate()`, and 9 unit tests across both (rejection of
+    no-protagonist / empty-locations / well-formed acceptance / json-repair
+    salvage).
+  - Both registered in `agents::registry::all_agents()` (excluded from
+    `mvp_agents()` since they are mode-selected by the orchestrator).
+  - Prompt templates `character-bible/v1.toml` and `world-bible/v1.toml`
+    were already on disk from the prior session; the new Rust crates
+    consume them.
+- **What is still needed:**
+  - `booksforge-agents::scene_drafter_fic` crate (template already on
+    disk at `scene-drafter-fic/v1.toml`).
+  - Wire the bibles into the orchestrator's fiction-mode workflow so
+    they run before the first scene-drafter call and before each
+    chapter-recall pass.
+  - Tauri command + UI panel to invoke each bible agent from the
+    AgentsPanel switchboard.
+- **Quality gain target:** per RCA §L1.1, ~0.3 pts of the 6.1 → 9 gap.
+- **Original spec:** preserved below for reference.
+- **Why:** Surfaced by BF-E2E-LOCAL-LLM-FIRST-BOOK-001 as the largest quality
+  gap. The current `chapter-drafter` / `chapter-drafter-nf` pair is
+  non-fiction-shaped: it asks for synopsis + chapter purpose + POV but does
+  not consume a character bible, world bible, scene goal/conflict/turn
+  structure, or per-character voice fingerprint. For fiction the test had
+  to drive these via naked LLM calls in the Python E2E driver.
+- **What is needed:**
+  - New crate **`booksforge-agents/character_bible.rs`** — input:
+    `ProjectBrief` + accepted manuscript prose; output:
+    `CharacterBibleProposal { characters: Vec<CharacterCard> }` where
+    `CharacterCard` has objective / internal_need / wound / secret /
+    voice_traits / chapter_arc.
+  - New crate **`booksforge-agents/world_bible.rs`** — input: `ProjectBrief`;
+    output: `WorldBibleProposal { locations, social_rules, sensory_palette,
+    motifs, continuity_constraints }`.
+  - New crate **`booksforge-agents/scene_drafter_fic.rs`** — fiction-shaped
+    sibling of `chapter_drafter`. Inputs include `CharacterBibleProposal`,
+    `WorldBibleProposal`, scene goal, scene conflict, scene reveal, target
+    word count. Output: `SceneDraftProposal` (existing schema).
+  - New prompt templates under `crates/booksforge-prompt/templates/` for
+    each, version 1.
+  - Registry entries in `crates/booksforge-agents/src/registry.rs`.
+- **Quality gain in test:** rating loop scored the test fiction at **6.1/10**
+  (honest score; not faked). Per the post-test RCA in
+  `book-output/RCA_QUALITY_6_TO_9.md`, ~1.5 points of that gap is
+  agent-architecture, not model-capacity.
+- **Trigger:** before any external positioning of BooksForge as
+  "fiction-capable" — current spec markets fiction support but the agent set
+  delivers it via ad-hoc prompting only.
+
+### A18. Prepare-for-Publishing single action ✅ CLOSED 2026-05-09 (Phase 7 of PRODUCT_ROADMAP_E2E.md, closes UX R4)
+- **One Tauri command + one panel** producing per-marketplace publishing
+  packages (KDP / Google Play / Apple Books) under
+  `<bundle>/exports/<platform>/`.
+- New IPC types in `booksforge-ipc::publishing`:
+  `PrepareForPublishingInput`, `PrepareForPublishingResult`,
+  `PublishingMetadata`, `PlatformReadiness`, `ReadinessItem`.
+- New Tauri command `prepare_for_publishing`
+  (`apps/desktop/src/commands/publishing.rs`) bundles `manuscript.epub`
+  (every platform; EPUBCheck-validated, gating Apple Books readiness),
+  `manuscript.pdf` via typst (KDP + Google Play; Apple skips —
+  pandoc-via-LaTeX fallback when typst is missing), platform-specific
+  metadata (`metadata.kdp.csv`, `metadata.gp.json`, `metadata.apple.json`)
+  with `[PLACEHOLDER]` for unset fields, `cover_brief.md`
+  (HUMAN_REQUIRED to commission), `READY_TO_UPLOAD.md` walkthrough, and
+  per-item `readiness.json` with PASS/WARN/FAIL/HUMAN_REQUIRED status.
+- Per-platform HUMAN_REQUIRED items: KDP gets ai_disclosure +
+  rights_review; Google Play gets preview_settings; Apple Books gets
+  category_age_explicit.
+- New `PrepareForPublishingPanel.tsx` + toolbar button "Publish".
+- 5 new ts-rs bindings, all re-exported from `@booksforge/shared-types`;
+  codegen-drift test green.
+
+### A19. Plain-English copy + glossary + `<Term>` ✅ CLOSED 2026-05-09 (Phase 8 of PRODUCT_ROADMAP_E2E.md, closes UX R5)
+- New `lib/glossary.ts` — single source of truth for ~25 publishing /
+  agent terms with `label`, `short` (≤120 chars), and optional `long`
+  + retailer link.
+- New `<Term k="…">` inline component renders the canonical label as a
+  dotted-underlined span with native `title` tooltip plus
+  `aria-describedby` SR description.
+- HelpDrawer gains a fourth tab "Glossary" rendering the full library
+  alphabetically.
+- Copy audit: 10 user-facing agent panels rewritten from
+  `task: <code>{result.task_id}</code>` to a soft-grey "run id" tail
+  that doesn't compete with the status. AgentDebugForm intentionally
+  retains raw IDs (debug surface).
+
+### A20. 4 workflow approval gates + advanced-mode toggle ✅ CLOSED 2026-05-09 (Phase 9 of PRODUCT_ROADMAP_E2E.md, closes UX R6)
+- New `lib/workflowGates.ts` — per-project gate state in
+  `localStorage` under `bf-workflow-gates:<projectId>` (`unset |
+  pending | approved` + optional approval note + ISO timestamp). Master
+  enable flag at `bf-workflow-gates-enabled` (default true).
+- Four named gates: `topic`, `plan`, `bibles`, `pre_final_polish`. Each
+  has display label, blurb, "comes after" agent name.
+- New `WorkflowGuide.tsx` + toolbar button "Workflow" — renders the
+  four gates as numbered rows with status pills, mark-pending /
+  approve / reset controls, and a banner highlighting the next blocking
+  gate.
+- SettingsPanel gains a "Workflow approval gates" section near the top
+  with the master enable toggle, so advanced users have a discoverable
+  off switch outside the workflow guide.
+
+### A21. Run integrated literary-fiction E2E vs 4.66/10 baseline (DEFERRED — wall-clock-bound)
+- **What:** Reproduce the 4.66 / 3.93 / 2.08 baseline from
+  `artifacts/ghostwriter/PROOF_RESULTS_LITERARY.md` on the integrated
+  BooksForge product.
+- **Why deferred:** wall-clock-bound (~78 minutes against live Ollama
+  with `qwen3.5:27b` loaded). Out of scope for an in-session
+  deliverable — needs a desktop session with Ollama running and a
+  literary-fiction project bundle.
+- **Steps to run:** see PRODUCT_ROADMAP_E2E.md "Round 4 close-out →
+  Comparison-to-baseline note".
+- **Trigger:** before any external positioning of comparative scores;
+  before publishing the next round of the README's "what BooksForge
+  does today" section.
+
 ---
 
 ## B. MZ-09 — Telemetry, logging, crash reports (planned next milestone)

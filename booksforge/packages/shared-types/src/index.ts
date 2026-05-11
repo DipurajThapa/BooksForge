@@ -17,6 +17,7 @@ export type { CreateProjectInput } from "./bindings/CreateProjectInput";
 export type { OpenProjectInput } from "./bindings/OpenProjectInput";
 export type { OpenProjectResult } from "./bindings/OpenProjectResult";
 export type { RecentProjectEntry } from "./bindings/RecentProjectEntry";
+export type { RecentRemoveInput } from "./bindings/RecentRemoveInput";
 export type { OllamaProbeResult } from "./bindings/OllamaProbeResult";
 export type { ModelListEntry } from "./bindings/ModelListEntry";
 export type { PullProgressPayload } from "./bindings/PullProgressPayload";
@@ -27,6 +28,59 @@ export type { ApplyOutlineInput } from "./bindings/ApplyOutlineInput";
 export type { ApplyOutlineResult } from "./bindings/ApplyOutlineResult";
 export type { ApplyCopyeditInput } from "./bindings/ApplyCopyeditInput";
 export type { ApplyCopyeditResult } from "./bindings/ApplyCopyeditResult";
+export type { ApplyChapterDrafterInput } from "./bindings/ApplyChapterDrafterInput";
+export type { ApplyChapterDrafterResultDto } from "./bindings/ApplyChapterDrafterResultDto";
+// Fiction agents (BACKLOG §A13 / Phase 1).
+export type { RunCharacterBibleInput } from "./bindings/RunCharacterBibleInput";
+export type { ApplyCharacterBibleInput } from "./bindings/ApplyCharacterBibleInput";
+export type { ApplyCharacterBibleResultDto } from "./bindings/ApplyCharacterBibleResultDto";
+export type { RunWorldBibleInput } from "./bindings/RunWorldBibleInput";
+export type { ApplyWorldBibleInput } from "./bindings/ApplyWorldBibleInput";
+export type { ApplyWorldBibleResultDto } from "./bindings/ApplyWorldBibleResultDto";
+export type { RunSceneDrafterFicInput } from "./bindings/RunSceneDrafterFicInput";
+export type { ApplySceneDrafterFicInput } from "./bindings/ApplySceneDrafterFicInput";
+export type { ApplySceneDrafterFicResultDto } from "./bindings/ApplySceneDrafterFicResultDto";
+// Specialist polish stack (BACKLOG §A15 / Phase 2).
+export type { RunPolishStageInput } from "./bindings/RunPolishStageInput";
+export type { ApplyPolishInput } from "./bindings/ApplyPolishInput";
+export type { ApplyPolishResultDto } from "./bindings/ApplyPolishResultDto";
+export type { RunSceneCriticInput } from "./bindings/RunSceneCriticInput";
+export type { RunConceptScorerInput } from "./bindings/RunConceptScorerInput";
+export type { RunAudienceMapperInput } from "./bindings/RunAudienceMapperInput";
+export type { RunCharacterCriticInput } from "./bindings/RunCharacterCriticInput";
+export type { RunStructureCriticInput } from "./bindings/RunStructureCriticInput";
+// Stage 6 — cover & boilerplate flow.
+export type { CoverAssetDto } from "./bindings/CoverAssetDto";
+export type { CoverSetDto } from "./bindings/CoverSetDto";
+export type { CoverImportInput } from "./bindings/CoverImportInput";
+export type { CoverRemoveInput } from "./bindings/CoverRemoveInput";
+export type { BoilerplatePageDto } from "./bindings/BoilerplatePageDto";
+export type { BoilerplateSaveInput } from "./bindings/BoilerplateSaveInput";
+export type { BoilerplateSaveResult } from "./bindings/BoilerplateSaveResult";
+// Quality stack (BACKLOG §A16 / Phase 3) — voice + tells + genre packs.
+export type { VoiceProfile } from "./bindings/VoiceProfile";
+export type { StylometricComponent } from "./bindings/StylometricComponent";
+export type { StylometricDistance } from "./bindings/StylometricDistance";
+export type { TellsReport } from "./bindings/TellsReport";
+export type { TellHit } from "./bindings/TellHit";
+export type { BookKind } from "./bindings/BookKind";
+export type { GenrePack } from "./bindings/GenrePack";
+export type { VoiceFingerprintInput } from "./bindings/VoiceFingerprintInput";
+export type { VoiceFingerprintResult } from "./bindings/VoiceFingerprintResult";
+export type { VoiceAnchorSetInput } from "./bindings/VoiceAnchorSetInput";
+export type { VoiceAnchorSetResult } from "./bindings/VoiceAnchorSetResult";
+export type { VoiceAnchorGetResult } from "./bindings/VoiceAnchorGetResult";
+export type { StylometricDistanceInput } from "./bindings/StylometricDistanceInput";
+export type { StylometricDistanceResult } from "./bindings/StylometricDistanceResult";
+export type { TellsScanInput } from "./bindings/TellsScanInput";
+export type { TellsScanResult } from "./bindings/TellsScanResult";
+export type { GenrePackInput } from "./bindings/GenrePackInput";
+// Project classification (Phase 4 / 5B of PRODUCT_ROADMAP_E2E.md).
+export type { ProjectKindSetInput } from "./bindings/ProjectKindSetInput";
+export type { ProjectKindSetResult } from "./bindings/ProjectKindSetResult";
+// Round 5 — manually-edit ProjectBrief save/load round-trip.
+export type { ProjectBriefSaveInput } from "./bindings/ProjectBriefSaveInput";
+export type { ProjectBriefDto } from "./bindings/ProjectBriefDto";
 export type { ApplyHumanizationInput } from "./bindings/ApplyHumanizationInput";
 export type { ApplyContinuityInput } from "./bindings/ApplyContinuityInput";
 export type { ApplyContinuityResultDto } from "./bindings/ApplyContinuityResultDto";
@@ -95,3 +149,10 @@ export type { NodeDiffDto } from "./bindings/NodeDiffDto";
 export type { SnapshotRestoreResult } from "./bindings/SnapshotRestoreResult";
 
 export type { OllamaStatusResponse } from "./bindings/OllamaStatusResponse";
+
+// Prepare-for-Publishing single action (Phase 7 / UX R4 of PRODUCT_ROADMAP_E2E.md).
+export type { PrepareForPublishingInput } from "./bindings/PrepareForPublishingInput";
+export type { PrepareForPublishingResult } from "./bindings/PrepareForPublishingResult";
+export type { PublishingMetadata } from "./bindings/PublishingMetadata";
+export type { PlatformReadiness } from "./bindings/PlatformReadiness";
+export type { ReadinessItem } from "./bindings/ReadinessItem";

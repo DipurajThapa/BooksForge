@@ -1,0 +1,18 @@
+[package]
+name        = "booksforge-export-typst"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+booksforge-export  = { path = "../booksforge-export" }
+tokio.workspace      = true
+tracing.workspace    = true
+blake3.workspace     = true
+
+[dev-dependencies]
+tempfile = "3"
+
+# Opt in to workspace-level lints (BACKLOG §C4).
+[lints]
+workspace = true

@@ -9,7 +9,7 @@ booksforge-domain  = { path = "../booksforge-domain" }
 booksforge-prompt  = { path = "../booksforge-prompt" }
 serde.workspace      = true
 serde_json.workspace = true
-thiserror.workspace  = true
+tracing.workspace    = true
 
 # Opt in to workspace-level lints (BACKLOG §C4).
 [lints]

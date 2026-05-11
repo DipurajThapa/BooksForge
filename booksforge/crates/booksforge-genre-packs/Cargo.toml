@@ -1,0 +1,13 @@
+[package]
+name        = "booksforge-genre-packs"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+booksforge-domain    = { path = "../booksforge-domain" }
+serde.workspace      = true
+ts-rs.workspace      = true
+
+[lints]
+workspace = true

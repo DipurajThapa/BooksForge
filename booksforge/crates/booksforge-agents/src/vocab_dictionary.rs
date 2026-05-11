@@ -8,14 +8,26 @@ use booksforge_domain::VocabUpdateProposals;
 use booksforge_prompt::PromptTemplateId;
 
 use crate::spec::{
-    AgentSpec, ContextBudget, CrossCuttingValidator, FailureMode, ModelFamily, ModelPreference,
-    ModelSizeHint, UserGate, WhenToRun,
+    AgentSpec, ContextBudget, CrossCuttingValidator, DefaultThinking, FailureMode, ModelFamily,
+    ModelPreference, ModelSizeHint, UserGate, WhenToRun,
 };
 
 const FAILURE_MODES: &[FailureMode] = &[
-    FailureMode { id: "duplicate-term",        description: "Proposed addition duplicates an existing term in the same layer.", recoverable: true  },
-    FailureMode { id: "kind-out-of-enum",      description: "Entry kind is not prefer/avoid/replace.",                            recoverable: true  },
-    FailureMode { id: "replace-without-target", description: "kind=replace without a replacement string.",                        recoverable: true  },
+    FailureMode {
+        id: "duplicate-term",
+        description: "Proposed addition duplicates an existing term in the same layer.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "kind-out-of-enum",
+        description: "Entry kind is not prefer/avoid/replace.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "replace-without-target",
+        description: "kind=replace without a replacement string.",
+        recoverable: true,
+    },
 ];
 
 pub fn spec() -> AgentSpec {
@@ -43,12 +55,13 @@ pub fn spec() -> AgentSpec {
         failure_modes: FAILURE_MODES,
         when_to_run:   WhenToRun::Scheduled,
         user_gate:     UserGate::NotRequired,
+        default_thinking: DefaultThinking::Disabled,
     }
 }
 
 pub fn parse_and_validate(raw: &str) -> Result<VocabUpdateProposals, String> {
-    let parsed: VocabUpdateProposals = serde_json::from_str(raw)
-        .map_err(|e| format!("JSON parse error: {e}"))?;
+    let parsed: VocabUpdateProposals =
+        serde_json::from_str(raw).map_err(|e| format!("JSON parse error: {e}"))?;
     let errs = parsed.validate();
     if !errs.is_empty() {
         return Err(format!("semantic validation failed: {}", errs.join("; ")));

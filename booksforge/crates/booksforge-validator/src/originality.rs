@@ -48,16 +48,16 @@ pub enum OverlapKind {
 /// an inline highlight + "go to source" pointer in the UI.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct OverlapHit {
-    pub kind:        OverlapKind,
+    pub kind: OverlapKind,
     /// Character offset of the matched span's start in the *output* text.
     pub output_from: u32,
     /// Character offset of the matched span's end in the *output* text.
-    pub output_to:   u32,
+    pub output_to: u32,
     /// Number of whitespace-separated words in the matched span.
-    pub words:       u32,
+    pub words: u32,
     /// The matched text itself (truncated to 200 chars in the struct so
     /// large hits don't bloat the JSON).
-    pub quote:       String,
+    pub quote: String,
 }
 
 /// Detect verbatim spans of ≥`min_words` words in `output` that appear in
@@ -66,11 +66,7 @@ pub struct OverlapHit {
 /// plagiarism, that's attribution).
 ///
 /// Returns hits sorted by `output_from` ascending.
-pub fn detect_verbatim_overlap(
-    output:    &str,
-    source:    &str,
-    min_words: usize,
-) -> Vec<OverlapHit> {
+pub fn detect_verbatim_overlap(output: &str, source: &str, min_words: usize) -> Vec<OverlapHit> {
     detect_overlap(output, source, min_words, OverlapKind::Source)
 }
 
@@ -78,18 +74,18 @@ pub fn detect_verbatim_overlap(
 /// `prior_corpus` (concatenation of prior accepted scenes).  Same n-gram
 /// logic as `detect_verbatim_overlap` but tagged `PriorScene`.
 pub fn detect_self_plagiarism(
-    output:       &str,
+    output: &str,
     prior_corpus: &str,
-    min_words:    usize,
+    min_words: usize,
 ) -> Vec<OverlapHit> {
     detect_overlap(output, prior_corpus, min_words, OverlapKind::PriorScene)
 }
 
 fn detect_overlap(
-    output:    &str,
-    haystack:  &str,
+    output: &str,
+    haystack: &str,
     min_words: usize,
-    kind:      OverlapKind,
+    kind: OverlapKind,
 ) -> Vec<OverlapHit> {
     let min_words = min_words.max(3);
     if output.is_empty() || haystack.is_empty() {
@@ -98,7 +94,9 @@ fn detect_overlap(
 
     // Tokenise output into words with character spans.
     let out_tokens = tokenise_with_spans(output);
-    if out_tokens.len() < min_words { return Vec::new(); }
+    if out_tokens.len() < min_words {
+        return Vec::new();
+    }
 
     // Normalise haystack words for set membership (lowercased, no punct).
     let hay_norm: Vec<String> = haystack
@@ -106,7 +104,9 @@ fn detect_overlap(
         .map(normalise_word)
         .filter(|s| !s.is_empty())
         .collect();
-    if hay_norm.len() < min_words { return Vec::new(); }
+    if hay_norm.len() < min_words {
+        return Vec::new();
+    }
 
     // Build a hashset of haystack n-grams of the minimum length.  Any
     // matching n-gram in the output is then *grown* greedily to cover the
@@ -152,7 +152,7 @@ fn detect_overlap(
                 }
             }
             let from = out_tokens[i].char_from;
-            let to   = out_tokens[j - 1].char_to;
+            let to = out_tokens[j - 1].char_to;
             // Skip hits wholly inside an ASCII-quote run — those are
             // legitimate citations, not plagiarism.
             let inside_quote = quoted_ranges
@@ -164,7 +164,7 @@ fn detect_overlap(
                 hits.push(OverlapHit {
                     kind,
                     output_from: from,
-                    output_to:   to,
+                    output_to: to,
                     words,
                     quote,
                 });
@@ -181,8 +181,8 @@ fn detect_overlap(
 #[derive(Debug, Clone)]
 struct Token {
     normalised: String,
-    char_from:  u32,
-    char_to:    u32,
+    char_from: u32,
+    char_to: u32,
 }
 
 /// Split `s` into whitespace-separated tokens, returning the normalised
@@ -198,12 +198,18 @@ fn tokenise_with_spans(s: &str) -> Vec<Token> {
             if let Some(start_idx) = start.take() {
                 let n = normalise_word(&buf);
                 if !n.is_empty() {
-                    out.push(Token { normalised: n, char_from: start_idx, char_to: char_idx });
+                    out.push(Token {
+                        normalised: n,
+                        char_from: start_idx,
+                        char_to: char_idx,
+                    });
                 }
                 buf.clear();
             }
         } else {
-            if start.is_none() { start = Some(char_idx); }
+            if start.is_none() {
+                start = Some(char_idx);
+            }
             buf.push(ch);
         }
         char_idx += 1;
@@ -211,7 +217,11 @@ fn tokenise_with_spans(s: &str) -> Vec<Token> {
     if let Some(start_idx) = start {
         let n = normalise_word(&buf);
         if !n.is_empty() {
-            out.push(Token { normalised: n, char_from: start_idx, char_to: char_idx });
+            out.push(Token {
+                normalised: n,
+                char_from: start_idx,
+                char_to: char_idx,
+            });
         }
     }
     out
@@ -234,8 +244,8 @@ fn ascii_quoted_ranges(s: &str) -> Vec<(u32, u32)> {
         let idx = idx as u32;
         if ch == '"' {
             match open.take() {
-                Some(start) => out.push((start, idx + 1)),  // inclusive of both quotes
-                None        => open = Some(idx),
+                Some(start) => out.push((start, idx + 1)), // inclusive of both quotes
+                None => open = Some(idx),
             }
         }
     }
@@ -245,7 +255,7 @@ fn ascii_quoted_ranges(s: &str) -> Vec<(u32, u32)> {
 fn clamp_quote(s: &str, from: u32, to: u32) -> String {
     let chars: Vec<char> = s.chars().collect();
     let from = (from as usize).min(chars.len());
-    let to   = (to   as usize).min(chars.len());
+    let to = (to as usize).min(chars.len());
     let raw: String = chars[from..to].iter().collect();
     if raw.chars().count() > 200 {
         let trimmed: String = raw.chars().take(200).collect();
@@ -283,7 +293,10 @@ mod tests {
         let source = "She walked into the dimly lit corridor and the floorboards groaned beneath her weight.";
         let output = "He read aloud: \"She walked into the dimly lit corridor and the floorboards groaned beneath her weight.\"";
         let hits = detect_verbatim_overlap(output, source, 12);
-        assert!(hits.is_empty(), "ASCII-quoted citation should be skipped, got {hits:?}");
+        assert!(
+            hits.is_empty(),
+            "ASCII-quoted citation should be skipped, got {hits:?}"
+        );
     }
 
     #[test]
@@ -315,7 +328,8 @@ mod tests {
 
     #[test]
     fn quote_field_is_truncated_for_very_long_matches() {
-        let long_clause: String = "alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima ".repeat(40);
+        let long_clause: String =
+            "alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima ".repeat(40);
         let hits = detect_verbatim_overlap(&long_clause, &long_clause, 12);
         assert!(!hits.is_empty());
         assert!(hits[0].quote.chars().count() <= 201);

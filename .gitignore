@@ -24,6 +24,11 @@ booksforge/apps/desktop/gen/
 .idea/
 .vscode/
 
+# Python (research/E2E drivers under book-output/, ux harness, etc.)
+**/.venv/
+**/__pycache__/
+*.pyc
+
 # Secrets / local env (defence-in-depth)
 .env
 .env.*

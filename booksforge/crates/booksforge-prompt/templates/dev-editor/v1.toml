@@ -10,8 +10,9 @@ project_brief   = { kind = "json", schema = "ProjectBrief" }
 prior_chapter_summaries = { kind = "json" }   # array of { chapter_id, summary }
 
 [input.optional]
-known_entities  = { kind = "json",   default = [] }
-prompt_guard    = { kind = "string", default = "" }
+known_entities    = { kind = "json",   default = [] }
+prompt_guard      = { kind = "string", default = "" }
+creative_profile  = { kind = "string", default = "" }
 
 [render.system]
 text = """
@@ -77,6 +78,13 @@ Return JSON of shape `DevelopmentalNotes`:
   ],
   "summary": "string (≤200 words; the chapter's structural shape)"
 }
+
+When evaluating the `theme` axis, weigh chapter content against the
+CREATIVE PROFILE's theme keywords + creative seed below — drift from
+those should surface as a `theme` note, not be silently accepted.
+
+{{ creative_profile }}
+
 {{ prompt_guard }}
 """
 

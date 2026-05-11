@@ -25,21 +25,47 @@ pub enum Severity {
 impl Severity {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Info    => "info",
+            Self::Info => "info",
             Self::Warning => "warning",
-            Self::Error   => "error",
+            Self::Error => "error",
         }
     }
 
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
-            "info"    => Some(Self::Info),
+            "info" => Some(Self::Info),
             "warning" => Some(Self::Warning),
-            "error"   => Some(Self::Error),
-            _         => None,
+            "error" => Some(Self::Error),
+            _ => None,
         }
     }
+
+    /// True iff this severity should block its consuming quality gate.
+    /// Used by the Phase C critic types (`CharacterCriticProposal`,
+    /// `StructureCriticProposal`).
+    pub fn blocks_gate(self) -> bool {
+        matches!(self, Self::Error)
+    }
+}
+
+impl Default for Severity {
+    fn default() -> Self {
+        Self::Warning
+    }
+}
+
+/// Tolerant deserialiser: unknown / null / wrong-typed values fall
+/// back to `Severity::Warning` rather than erroring the whole parent
+/// parse. Use as `#[serde(default, deserialize_with =
+/// "deserialize_severity_tolerant")]` on fields where a misbehaving
+/// model's typo'd severity must not poison the rest of the payload.
+pub fn deserialize_severity_tolerant<'de, D>(deserializer: D) -> Result<Severity, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = Option::<String>::deserialize(deserializer)?;
+    Ok(s.as_deref().and_then(Severity::from_str).unwrap_or_default())
 }
 
 /// A single finding emitted by a validator.
@@ -49,15 +75,15 @@ pub struct ValidatorIssue {
     /// `"heading-hierarchy"`, `"double-spaces"`, …
     pub validator_id: String,
     /// Stable per-issue code so the UI can dedupe / show docs links.
-    pub code:         String,
-    pub severity:     Severity,
-    pub message:      String,
+    pub code: String,
+    pub severity: Severity,
+    pub message: String,
     /// Node the issue is attached to, when applicable.
-    pub node_id:      Option<Ulid>,
+    pub node_id: Option<Ulid>,
     /// Character offsets within the node's plain text — for the editor to
     /// highlight the offending span.
-    pub offset_from:  Option<u32>,
-    pub offset_to:    Option<u32>,
+    pub offset_from: Option<u32>,
+    pub offset_to: Option<u32>,
     /// Whether a deterministic one-click fix is available.  Used by the UI
     /// to surface an "Apply all" affordance.
     pub auto_fixable: bool,
@@ -77,28 +103,32 @@ pub enum ValidatorRunStatus {
 impl ValidatorRunStatus {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Ok       => "ok",
+            Self::Ok => "ok",
             Self::Warnings => "warnings",
-            Self::Errors   => "errors",
-            Self::Crashed  => "crashed",
+            Self::Errors => "errors",
+            Self::Crashed => "crashed",
         }
     }
 
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
-            "ok"       => Some(Self::Ok),
+            "ok" => Some(Self::Ok),
             "warnings" => Some(Self::Warnings),
-            "errors"   => Some(Self::Errors),
-            "crashed"  => Some(Self::Crashed),
-            _          => None,
+            "errors" => Some(Self::Errors),
+            "crashed" => Some(Self::Crashed),
+            _ => None,
         }
     }
 
     /// Compute the run-level status from a list of issues.
     pub fn from_issues(issues: &[ValidatorIssue]) -> Self {
-        if issues.iter().any(|i| i.severity == Severity::Error)   { return Self::Errors; }
-        if issues.iter().any(|i| i.severity == Severity::Warning) { return Self::Warnings; }
+        if issues.iter().any(|i| i.severity == Severity::Error) {
+            return Self::Errors;
+        }
+        if issues.iter().any(|i| i.severity == Severity::Warning) {
+            return Self::Warnings;
+        }
         Self::Ok
     }
 }
@@ -106,27 +136,30 @@ impl ValidatorRunStatus {
 /// Persistable record for `validator_runs`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidatorRun {
-    pub id:           Ulid,
+    pub id: Ulid,
     /// `"batch:all"` for whole-project runs, or a single validator id.
     pub validator_id: String,
-    pub ran_at:       DateTime<Utc>,
-    pub status:       ValidatorRunStatus,
-    pub duration_ms:  u64,
+    pub ran_at: DateTime<Utc>,
+    pub status: ValidatorRunStatus,
+    pub duration_ms: u64,
     /// blake3 of the manuscript scope so re-runs over unchanged input
     /// short-circuit (future optimisation).
-    pub scope_hash:   String,
+    pub scope_hash: String,
 }
 
 /// The whole-batch report — what `run_all_validators` returns.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidationReport {
-    pub run:    ValidatorRun,
+    pub run: ValidatorRun,
     pub issues: Vec<ValidatorIssue>,
 }
 
 impl ValidationReport {
     pub fn count(&self, severity: Severity) -> usize {
-        self.issues.iter().filter(|i| i.severity == severity).count()
+        self.issues
+            .iter()
+            .filter(|i| i.severity == severity)
+            .count()
     }
 
     pub fn worst_severity(&self) -> Option<Severity> {
@@ -143,17 +176,28 @@ pub enum GateOutcome {
     Pass,
     /// Warnings present — the UI must surface them and ask the user to
     /// confirm before proceeding.
-    Warn  { warnings: Vec<ValidatorIssue> },
+    Warn { warnings: Vec<ValidatorIssue> },
     /// Error-level issues — export refused.
-    Block { errors: Vec<ValidatorIssue>, warnings: Vec<ValidatorIssue> },
+    Block {
+        errors: Vec<ValidatorIssue>,
+        warnings: Vec<ValidatorIssue>,
+    },
 }
 
 /// Apply the export-gate policy to a report.
 pub fn pre_export_gate(report: &ValidationReport) -> GateOutcome {
-    let errors:   Vec<ValidatorIssue> =
-        report.issues.iter().filter(|i| i.severity == Severity::Error).cloned().collect();
-    let warnings: Vec<ValidatorIssue> =
-        report.issues.iter().filter(|i| i.severity == Severity::Warning).cloned().collect();
+    let errors: Vec<ValidatorIssue> = report
+        .issues
+        .iter()
+        .filter(|i| i.severity == Severity::Error)
+        .cloned()
+        .collect();
+    let warnings: Vec<ValidatorIssue> = report
+        .issues
+        .iter()
+        .filter(|i| i.severity == Severity::Warning)
+        .cloned()
+        .collect();
 
     if !errors.is_empty() {
         GateOutcome::Block { errors, warnings }
@@ -171,12 +215,12 @@ mod tests {
     fn issue(severity: Severity) -> ValidatorIssue {
         ValidatorIssue {
             validator_id: "test".into(),
-            code:         "T001".into(),
+            code: "T001".into(),
             severity,
-            message:      "x".into(),
-            node_id:      None,
-            offset_from:  None,
-            offset_to:    None,
+            message: "x".into(),
+            node_id: None,
+            offset_from: None,
+            offset_to: None,
             auto_fixable: false,
         }
     }

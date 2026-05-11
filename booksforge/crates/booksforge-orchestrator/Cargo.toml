@@ -8,11 +8,11 @@ rust-version.workspace = true
 booksforge-domain   = { path = "../booksforge-domain" }
 booksforge-agents   = { path = "../booksforge-agents" }
 booksforge-ollama   = { path = "../booksforge-ollama" }
-booksforge-memory   = { path = "../booksforge-memory" }
 booksforge-prompt   = { path = "../booksforge-prompt" }
 booksforge-storage  = { path = "../booksforge-storage" }
 booksforge-snapshot = { path = "../booksforge-snapshot" }
 booksforge-validator = { path = "../booksforge-validator" }
+booksforge-genre-packs = { path = "../booksforge-genre-packs" }
 async-trait.workspace  = true
 serde.workspace        = true
 serde_json.workspace   = true
@@ -25,7 +25,13 @@ blake3.workspace       = true
 
 [dev-dependencies]
 booksforge-fs = { path = "../booksforge-fs" }
+booksforge-test-fixtures = { path = "../booksforge-test-fixtures" }
+booksforge-anti-ai-tells = { path = "../booksforge-anti-ai-tells" }
+booksforge-voice = { path = "../booksforge-voice" }
 tempfile      = "3"
+# RCA Fix 2 — examples need a tracing subscriber to surface
+# the per-call num_ctx + prompt-size telemetry the runner emits.
+tracing-subscriber.workspace = true
 
 [lints]
 workspace = true

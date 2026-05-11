@@ -1,0 +1,101 @@
+# character-bible-card/v1.toml
+#
+# Per-character bible-card generator. Produces ONE `CharacterCard`
+# per invocation, where the existing `character-bible/v1.toml`
+# produces 4-6 in a single response.
+#
+# Why two templates: small local models (≤ 9B) can't reliably emit
+# 4-6 nested objects with cross-coupled constraints (chapter_arc
+# length matching, no-duplicate-name, relationships self-referencing,
+# voice_traits exactly 1-6 entries) in a single response. Run-#3
+# (Round 7) observed qwen3.5:9b spend 11.6 min producing an empty
+# `characters: []` array because the runner cycled through max
+# retries with the same monolithic prompt. The chunked approach asks
+# for ONE character per call (~250-400 output tokens — fits 9B's
+# competence window). The orchestrator stitches the responses into a
+# `CharacterBibleProposal` and runs the full multi-character
+# `validate()` once at the end.
+#
+# Output schema: a single `CharacterCard` (NOT wrapped in
+# `{"characters": [...]}`). The orchestrator's stitcher handles the
+# wrapping.
+
+schema_version  = 1
+description     = "Generate ONE character card for the bible. Called N times by the orchestrator's chunked bibles helper."
+
+[input.required]
+project_brief    = { kind = "json",   schema = "ProjectBrief" }
+chapter_count    = { kind = "integer" }
+role             = { kind = "string" }   # protagonist | antagonist | mentor | foil | ally | supporting
+character_index  = { kind = "integer" }  # 1-based; what number character is this?
+
+[input.optional]
+prior_characters = { kind = "json",   default = [], schema = "CharacterCard[]" }
+prompt_guard     = { kind = "string", default = "" }
+creative_profile = { kind = "string", default = "" }
+
+[render.system]
+text = """
+You produce ONE character card for a fiction bible. The orchestrator
+will call you again for each subsequent character, feeding back the
+characters you've already generated as `prior_characters`.
+
+The card MUST have:
+  - name : a name appropriate to the brief's setting + culture; MUST
+    NOT match any name in `prior_characters`.
+  - role : exactly the value passed in `role` (the orchestrator
+    decided which role this slot fills).
+  - external_objective : what they want and would tell anyone they want.
+  - internal_need : what they actually need (often opposed to objective).
+    For role=protagonist, this MUST be opposed to or distinct from
+    external_objective.
+  - fear_or_wound : the formative thing they would not name.
+  - secret_or_contradiction : the thing that, if revealed, changes how
+    other characters see them.
+  - voice_traits : 3-6 specific MEASURABLE traits — vocabulary tier,
+    sentence length, evasion patterns, lexicon. ("speaks in sentences
+    under 8 words" is measurable; "is shy" is not.)
+  - relationships : 0-3 entries. Each entry is an OBJECT with
+    EXACTLY two MANDATORY string fields:
+        { "to": "<name>", "nature": "<one short sentence>" }
+    BOTH fields are required; do NOT emit `{"to": "..."}` alone.
+    `to` MUST reference a name in `prior_characters`. `nature` is
+    one short sentence (≤ 80 chars) describing how they relate
+    (e.g. "estranged sister", "former employer", "her son's tutor").
+    Empty array `[]` is fine for the first character (no priors yet).
+  - chapter_arc : a JSON array whose LENGTH MUST EQUAL `chapter_count`.
+    If chapter_count is 2, chapter_arc has EXACTLY 2 string entries
+    (one per chapter). If chapter_count is 5, exactly 5 entries. NOT
+    one summary, NOT a paragraph — an array of strings.
+  - emotional_turning_points : 2-4 named moments (an array of 2 to 4
+    short strings; not a paragraph).
+
+Do NOT output the wrapping `{"characters": [...]}` — emit JUST the
+single CharacterCard object.
+
+{{ creative_profile }}
+
+{{ prompt_guard }}
+
+Return JSON only.
+"""
+
+[render.user]
+text = """
+PROJECT BRIEF:
+{{ project_brief | tojson }}
+
+CHAPTER COUNT: {{ chapter_count }}
+↑ CRITICAL: your chapter_arc field MUST be a JSON array with EXACTLY
+  {{ chapter_count }} string entries.
+
+THIS CHARACTER:
+- Index : {{ character_index }}
+- Role  : {{ role }}
+
+PRIOR CHARACTERS (do NOT repeat names; relationships may target these):
+{{ prior_characters | tojson }}
+"""
+
+[render.json_schema]
+ref = "CharacterCard"

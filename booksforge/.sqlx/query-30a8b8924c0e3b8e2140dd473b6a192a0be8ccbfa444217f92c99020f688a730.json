@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT o.task_id, o.schema_id, o.schema_version,\n                   o.content_inline, o.content_path, o.hash, o.validated_at\n            FROM agent_outputs o\n            JOIN agent_tasks t ON t.id = o.task_id\n            WHERE t.prompt_template_hash = ?\n              AND t.model                = ?\n              AND t.input_hash           = ?\n              AND t.status               = 'completed'\n            ORDER BY t.id DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "task_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "schema_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "schema_version",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "content_inline",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "content_path",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "hash",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "validated_at",
+        "ordinal": 6,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "30a8b8924c0e3b8e2140dd473b6a192a0be8ccbfa444217f92c99020f688a730"
+}

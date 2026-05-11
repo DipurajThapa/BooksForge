@@ -16,7 +16,12 @@
 //! The Playwright suite then loads each pair under headless Chromium
 //! and pixel-diffs them against committed goldens.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::print_stdout)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::print_stdout
+)]
 
 use std::collections::BTreeMap;
 use std::io::{Cursor, Read};
@@ -36,41 +41,54 @@ const PROFILES: &[FormatProfile] = &[
 ];
 
 fn fixed_now() -> DateTime<Utc> {
-    Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).single().expect("valid timestamp")
+    Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0)
+        .single()
+        .expect("valid timestamp")
 }
 
 fn make_node(id: Ulid, parent: Option<Ulid>, kind: NodeKind, title: &str, position: &str) -> Node {
     let now = fixed_now();
     Node {
-        id, parent_id: parent, kind,
+        id,
+        parent_id: parent,
+        kind,
         title: title.to_owned(),
         position: position.to_owned(),
         status: NodeStatus::Drafting,
-        pov: None, beat: None, target_words: None,
-        created_at: now, updated_at: now, deleted_at: None,
+        pov: None,
+        beat: None,
+        target_words: None,
+        created_at: now,
+        updated_at: now,
+        deleted_at: None,
     }
 }
 
-fn stable_ulid(seed: u128) -> Ulid { Ulid(seed) }
+fn stable_ulid(seed: u128) -> Ulid {
+    Ulid(seed)
+}
 
 fn fixture_manuscript() -> ManuscriptInput {
     let project = stable_ulid(0x01);
-    let part1   = stable_ulid(0x10);
-    let c1      = stable_ulid(0x11);
-    let scenes: &[(Ulid, Ulid, &str, &str, &str)] = &[
-        (stable_ulid(0xa1), c1, "Open",  "0|i00000:",
-         "<p>The <strong>door</strong> creaked open.</p>\
+    let part1 = stable_ulid(0x10);
+    let c1 = stable_ulid(0x11);
+    let scenes: &[(Ulid, Ulid, &str, &str, &str)] = &[(
+        stable_ulid(0xa1),
+        c1,
+        "Open",
+        "0|i00000:",
+        "<p>The <strong>door</strong> creaked open.</p>\
           <p>She paused — and listened.</p>\
           <hr/>\
           <p>It was the <em>letter</em> she'd been waiting for.</p>\
           <p>For sixteen long months — every birthday, every dawn — she had\
           waited.  Now it lay on the threshold, the wax seal pressed deep\
-          into the page like a thumbprint.</p>"),
-    ];
+          into the page like a thumbprint.</p>",
+    )];
     let mut nodes = vec![
-        make_node(project, None,           NodeKind::Project, "Test Book", "0|hzzzzz:"),
-        make_node(part1,   Some(project),  NodeKind::Part,    "Part 1",    "0|i00000:"),
-        make_node(c1,      Some(part1),    NodeKind::Chapter, "One",       "0|i00000:"),
+        make_node(project, None, NodeKind::Project, "Test Book", "0|hzzzzz:"),
+        make_node(part1, Some(project), NodeKind::Part, "Part 1", "0|i00000:"),
+        make_node(c1, Some(part1), NodeKind::Chapter, "One", "0|i00000:"),
     ];
     let mut texts: BTreeMap<Ulid, String> = BTreeMap::new();
     for (id, parent, title, pos, body) in scenes {
@@ -78,7 +96,8 @@ fn fixture_manuscript() -> ManuscriptInput {
         texts.insert(*id, (*body).to_owned());
     }
     ManuscriptInput {
-        nodes, scene_texts: texts,
+        nodes,
+        scene_texts: texts,
         title: "Test Book".to_owned(),
         author: "Jane Doe".to_owned(),
     }
@@ -86,11 +105,18 @@ fn fixture_manuscript() -> ManuscriptInput {
 
 fn workspace_root() -> PathBuf {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest.ancestors().nth(2).expect("workspace root").to_owned()
+    manifest
+        .ancestors()
+        .nth(2)
+        .expect("workspace root")
+        .to_owned()
 }
 
 fn fixtures_dir() -> PathBuf {
-    workspace_root().join("tests").join("visual-regression").join("fixtures")
+    workspace_root()
+        .join("tests")
+        .join("visual-regression")
+        .join("fixtures")
 }
 
 fn main() {
@@ -110,38 +136,48 @@ fn main() {
 
         // 2. EPUB chapter XHTML — build the EPUB, extract chapter-001.xhtml +
         //    book.css, inline the CSS into the chapter so it's self-contained.
-        let chapters: Vec<HtmlChapter> = preview.iter()
+        let chapters: Vec<HtmlChapter> = preview
+            .iter()
             .map(|c| HtmlChapter {
-                node_id:   c.node_id.to_string(),
-                title:     c.title.clone(),
+                node_id: c.node_id.to_string(),
+                title: c.title.clone(),
                 html_body: c.html_body.clone(),
             })
             .collect();
         let bytes = build_epub_bytes(&EpubPackageInput {
             chapters,
             metadata: EpubMetadata {
-                title:       "Test Book".to_owned(),
-                authors:     vec!["Jane Doe".to_owned()],
-                language:    "en".to_owned(),
-                publisher:   None, description: None, isbn: None,
-                book_id:     "01HZBOOK000000000000000FIXT".to_owned(),
-                dedication: None, epigraph: None, copyright_notice: None,
+                title: "Test Book".to_owned(),
+                authors: vec!["Jane Doe".to_owned()],
+                language: "en".to_owned(),
+                publisher: None,
+                description: None,
+                isbn: None,
+                book_id: "01HZBOOK000000000000000FIXT".to_owned(),
+                dedication: None,
+                epigraph: None,
+                copyright_notice: None,
             },
             profile: ExportProfile::GenericEpub,
             output_path: "/tmp/ignored.epub".to_owned(),
             format_profile: *profile,
             font_bundle_dir: None,
-        }).expect("build EPUB");
+        })
+        .expect("build EPUB");
 
         let mut zip = zip::ZipArchive::new(Cursor::new(&bytes[..])).expect("open epub zip");
         let chapter_xhtml = read_zip_entry(&mut zip, "OEBPS/text/chapter-001.xhtml");
-        let book_css      = read_zip_entry(&mut zip, "OEBPS/styles/book.css");
+        let book_css = read_zip_entry(&mut zip, "OEBPS/styles/book.css");
 
         let inlined = inline_chapter_with_css(&chapter_xhtml, &book_css);
         std::fs::write(profile_dir.join("epub-chapter.xhtml"), inlined)
             .expect("write epub chapter");
 
-        println!("[fixtures] {} → {}", profile.as_str(), profile_dir.display());
+        println!(
+            "[fixtures] {} → {}",
+            profile.as_str(),
+            profile_dir.display()
+        );
     }
     println!("Done.  Run `pnpm --filter @booksforge/visual-regression test` next.");
 }
@@ -173,11 +209,11 @@ fn wrap_preview(html_body: &str, profile: &FormatProfile) -> String {
     // matches what the EPUB would render.  The visual-regression
     // suite then compares the two pages, which differ only by the
     // EPUB's chapter wrapper / fonts-from-disk path.
-    let body_family    = profile.body_font_family();
+    let body_family = profile.body_font_family();
     let heading_family = profile.heading_font_family();
-    let body_em        = profile.body_em();
-    let line_height    = profile.line_height();
-    let para_indent    = profile.paragraph_indent_em();
+    let body_em = profile.body_em();
+    let line_height = profile.line_height();
+    let para_indent = profile.paragraph_indent_em();
     format!(
         r#"<!doctype html>
 <html lang="en">

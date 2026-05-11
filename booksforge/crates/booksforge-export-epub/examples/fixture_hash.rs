@@ -1,4 +1,11 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::print_stdout, clippy::print_stderr, clippy::unimplemented)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::unimplemented
+)]
 
 //! Cross-host reproducibility probe (BACKLOG §C5).
 //!
@@ -22,7 +29,9 @@ fn fixed_now() -> DateTime<Utc> {
     // The integration test uses `Utc::now()`, but timestamps don't
     // flow into the EPUB bytes (the packager pins entry mtime).  We
     // pick a fixed instant here just to make the fixture explicit.
-    Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).single().expect("valid timestamp")
+    Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0)
+        .single()
+        .expect("valid timestamp")
 }
 
 fn make_node(id: Ulid, parent: Option<Ulid>, kind: NodeKind, title: &str, position: &str) -> Node {
@@ -34,29 +43,45 @@ fn make_node(id: Ulid, parent: Option<Ulid>, kind: NodeKind, title: &str, positi
         title: title.to_owned(),
         position: position.to_owned(),
         status: NodeStatus::Drafting,
-        pov: None, beat: None, target_words: None,
-        created_at: now, updated_at: now, deleted_at: None,
+        pov: None,
+        beat: None,
+        target_words: None,
+        created_at: now,
+        updated_at: now,
+        deleted_at: None,
     }
 }
 
-fn stable_ulid(seed: u128) -> Ulid { Ulid(seed) }
+fn stable_ulid(seed: u128) -> Ulid {
+    Ulid(seed)
+}
 
 fn main() {
     let project = stable_ulid(0x01);
-    let part1   = stable_ulid(0x10);
-    let c1      = stable_ulid(0x11);
+    let part1 = stable_ulid(0x10);
+    let c1 = stable_ulid(0x11);
 
     let scenes: &[(Ulid, Ulid, &str, &str, &str)] = &[
-        (stable_ulid(0xa1), c1, "Open",  "0|i00000:",
-         "<p>The <strong>door</strong> creaked open.</p><p>She paused — and listened.</p>"),
-        (stable_ulid(0xa2), c1, "Close", "0|j00000:",
-         "<p>It was the <em>letter</em> she'd been waiting for.</p>"),
+        (
+            stable_ulid(0xa1),
+            c1,
+            "Open",
+            "0|i00000:",
+            "<p>The <strong>door</strong> creaked open.</p><p>She paused — and listened.</p>",
+        ),
+        (
+            stable_ulid(0xa2),
+            c1,
+            "Close",
+            "0|j00000:",
+            "<p>It was the <em>letter</em> she'd been waiting for.</p>",
+        ),
     ];
 
     let mut nodes = vec![
-        make_node(project, None,           NodeKind::Project, "Test", "0|hzzzzz:"),
-        make_node(part1,   Some(project),  NodeKind::Part,    "Part", "0|i00000:"),
-        make_node(c1,      Some(part1),    NodeKind::Chapter, "One",  "0|i00000:"),
+        make_node(project, None, NodeKind::Project, "Test", "0|hzzzzz:"),
+        make_node(part1, Some(project), NodeKind::Part, "Part", "0|i00000:"),
+        make_node(c1, Some(part1), NodeKind::Chapter, "One", "0|i00000:"),
     ];
     let mut texts: BTreeMap<Ulid, String> = BTreeMap::new();
     for (id, parent, title, pos, body) in scenes {
@@ -66,15 +91,16 @@ fn main() {
     let manuscript = ManuscriptInput {
         nodes,
         scene_texts: texts,
-        title:  "Test Book".to_owned(),
+        title: "Test Book".to_owned(),
         author: "Jane Doe".to_owned(),
     };
 
     let preview = manuscript_to_html_chapters(&manuscript);
-    let chapters: Vec<HtmlChapter> = preview.into_iter()
+    let chapters: Vec<HtmlChapter> = preview
+        .into_iter()
         .map(|c| HtmlChapter {
-            node_id:   c.node_id.to_string(),
-            title:     c.title,
+            node_id: c.node_id.to_string(),
+            title: c.title,
             html_body: c.html_body,
         })
         .collect();
@@ -82,18 +108,23 @@ fn main() {
     let bytes = build_epub_bytes(&EpubPackageInput {
         chapters,
         metadata: EpubMetadata {
-            title:       "Test Book".to_owned(),
-            authors:     vec!["Jane Doe".to_owned()],
-            language:    "en".to_owned(),
-            publisher:   None, description: None, isbn: None,
-            book_id:     "01HZBOOK000000000000000XHASH".to_owned(),
-            dedication: None, epigraph: None, copyright_notice: None,
+            title: "Test Book".to_owned(),
+            authors: vec!["Jane Doe".to_owned()],
+            language: "en".to_owned(),
+            publisher: None,
+            description: None,
+            isbn: None,
+            book_id: "01HZBOOK000000000000000XHASH".to_owned(),
+            dedication: None,
+            epigraph: None,
+            copyright_notice: None,
         },
         profile: ExportProfile::GenericEpub,
         output_path: "/tmp/ignored.epub".to_owned(),
         format_profile: FormatProfile::FictionTradeStandard,
         font_bundle_dir: None,
-    }).expect("build fixture");
+    })
+    .expect("build fixture");
 
     // Hash to stdout — the CI workflow captures this as an artefact.
     println!("{}", blake3::hash(&bytes).to_hex());

@@ -33,7 +33,9 @@ const RANK_WIDTH: usize = 6;
 /// `n == 0` returns an empty `Vec`.
 /// `n == 1` returns a single mid-bucket rank.
 pub fn initial_positions(n: usize) -> Vec<String> {
-    if n == 0 { return Vec::new(); }
+    if n == 0 {
+        return Vec::new();
+    }
 
     // Lower and upper bounds — leave room above and below for inserts.
     let lo: u64 = base36_to_int(b"100000"); // 60_466_176
@@ -119,7 +121,11 @@ mod tests {
     fn base36_roundtrip() {
         for v in [0_u64, 1, 35, 36, 1_000_000, 2_176_782_335] {
             let s = int_to_base36(v, RANK_WIDTH);
-            assert_eq!(base36_to_int(s.as_bytes()), v, "value {v} round-tripped to {s}");
+            assert_eq!(
+                base36_to_int(s.as_bytes()),
+                v,
+                "value {v} round-tripped to {s}"
+            );
         }
     }
 }

@@ -70,7 +70,10 @@ pub enum FsError {
     AlreadyLocked { pid: u32 },
 
     #[error("I/O error at {path}: {source}")]
-    Io { path: String, source: std::io::Error },
+    Io {
+        path: String,
+        source: std::io::Error,
+    },
 
     #[error("serialization error: {0}")]
     Serialization(String),

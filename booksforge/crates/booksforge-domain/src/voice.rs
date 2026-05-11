@@ -31,15 +31,15 @@ pub struct VoiceFingerprint {
     /// Mean and standard deviation of sentence length (in words).
     /// Human prose typically has SD ≥ 0.6 × mean.  LLM prose has lower
     /// SD because models prefer "balanced" sentences.
-    pub sentence_words_mean:   f32,
+    pub sentence_words_mean: f32,
     pub sentence_words_stddev: f32,
 
     /// Em-dashes per 1,000 words.  LLM-generated prose tends to use
     /// ~3–5×; calibrated humans range 0.5–4.
-    pub em_dash_per_1000:      f32,
+    pub em_dash_per_1000: f32,
 
     /// Adverbs ending in `-ly` per 1,000 words.  LLMs over-use.
-    pub ly_adverb_per_1000:    f32,
+    pub ly_adverb_per_1000: f32,
 
     /// Combined rate of three classic AI-tells per 1,000 words
     /// (`delve`, `tapestry`, `intricate`).  Should be near zero in
@@ -66,26 +66,30 @@ impl Default for VoiceFingerprint {
     /// guidelines."
     fn default() -> Self {
         Self {
-            sentence_words_mean:       16.0,
-            sentence_words_stddev:     8.0,
-            em_dash_per_1000:          1.5,
-            ly_adverb_per_1000:        12.0,
-            ai_tell_triad_per_1000:    0.0,
+            sentence_words_mean: 16.0,
+            sentence_words_stddev: 8.0,
+            em_dash_per_1000: 1.5,
+            ly_adverb_per_1000: 12.0,
+            ai_tell_triad_per_1000: 0.0,
             discourse_marker_per_1000: 1.0,
-            type_token_ratio:          0.45,
-            corpus_tokens:             0,
+            type_token_ratio: 0.45,
+            corpus_tokens: 0,
         }
     }
 }
 
 impl VoiceFingerprint {
-    pub fn is_established(&self) -> bool { self.corpus_tokens >= 2_000 }
+    pub fn is_established(&self) -> bool {
+        self.corpus_tokens >= 2_000
+    }
 
     /// Compute a fingerprint from a plain-text corpus.
     pub fn compute(text: &str) -> Self {
         let words: Vec<&str> = text.split_whitespace().collect();
         let total_words = words.len() as u32;
-        if total_words == 0 { return Self::default(); }
+        if total_words == 0 {
+            return Self::default();
+        }
 
         // Sentence segmentation: naive split on `.`, `!`, `?` followed by
         // whitespace+capital.  Sufficient for fingerprint statistics.
@@ -105,57 +109,78 @@ impl VoiceFingerprint {
                 prev_end = false;
             }
         }
-        if current > 0 { sentences.push(current); }
+        if current > 0 {
+            sentences.push(current);
+        }
 
         let (sent_mean, sent_sd) = mean_stddev(&sentences);
 
         // Per-1000-word signals.
         let em_dash_count = text.matches('—').count() as f32;
-        let ly_adverbs    = words.iter().filter(|w| {
-            let lower = w.trim_matches(|c: char| !c.is_alphabetic()).to_lowercase();
-            lower.len() > 3 && lower.ends_with("ly")
-        }).count() as f32;
+        let ly_adverbs = words
+            .iter()
+            .filter(|w| {
+                let lower = w.trim_matches(|c: char| !c.is_alphabetic()).to_lowercase();
+                lower.len() > 3 && lower.ends_with("ly")
+            })
+            .count() as f32;
         let lower = text.to_ascii_lowercase();
-        let triad_count    = ["delve", "tapestry", "intricate"]
-            .iter().map(|t| count_word(&lower, t)).sum::<usize>() as f32;
-        let disc_count     = ["indeed", "moreover", "furthermore", "thus", "hence"]
-            .iter().map(|t| count_word(&lower, t)).sum::<usize>() as f32;
+        let triad_count = ["delve", "tapestry", "intricate"]
+            .iter()
+            .map(|t| count_word(&lower, t))
+            .sum::<usize>() as f32;
+        let disc_count = ["indeed", "moreover", "furthermore", "thus", "hence"]
+            .iter()
+            .map(|t| count_word(&lower, t))
+            .sum::<usize>() as f32;
 
         let scale = 1_000.0 / total_words as f32;
 
         // Type-token ratio — distinct lower-case alphabetic tokens / total.
         use std::collections::HashSet;
-        let lemmas: HashSet<String> = words.iter()
+        let lemmas: HashSet<String> = words
+            .iter()
             .map(|w| w.trim_matches(|c: char| !c.is_alphabetic()).to_lowercase())
             .filter(|s| !s.is_empty())
             .collect();
         let ttr = lemmas.len() as f32 / total_words.max(1) as f32;
 
         Self {
-            sentence_words_mean:       sent_mean,
-            sentence_words_stddev:     sent_sd,
-            em_dash_per_1000:          em_dash_count * scale,
-            ly_adverb_per_1000:        ly_adverbs    * scale,
-            ai_tell_triad_per_1000:    triad_count   * scale,
-            discourse_marker_per_1000: disc_count    * scale,
-            type_token_ratio:          ttr,
-            corpus_tokens:             total_words,
+            sentence_words_mean: sent_mean,
+            sentence_words_stddev: sent_sd,
+            em_dash_per_1000: em_dash_count * scale,
+            ly_adverb_per_1000: ly_adverbs * scale,
+            ai_tell_triad_per_1000: triad_count * scale,
+            discourse_marker_per_1000: disc_count * scale,
+            type_token_ratio: ttr,
+            corpus_tokens: total_words,
         }
     }
 }
 
 fn mean_stddev(xs: &[usize]) -> (f32, f32) {
-    if xs.is_empty() { return (0.0, 0.0); }
+    if xs.is_empty() {
+        return (0.0, 0.0);
+    }
     let n = xs.len() as f32;
     let mean = xs.iter().sum::<usize>() as f32 / n;
-    let var = xs.iter().map(|x| { let d = *x as f32 - mean; d * d }).sum::<f32>() / n;
+    let var = xs
+        .iter()
+        .map(|x| {
+            let d = *x as f32 - mean;
+            d * d
+        })
+        .sum::<f32>()
+        / n;
     (mean, var.sqrt())
 }
 
 fn count_word(haystack_lower: &str, needle: &str) -> usize {
     let mut n = 0;
     for token in haystack_lower.split(|c: char| !c.is_alphabetic()) {
-        if token == needle { n += 1; }
+        if token == needle {
+            n += 1;
+        }
     }
     n
 }
@@ -173,7 +198,10 @@ mod tests {
     fn compute_counts_em_dashes() {
         let text = "She paused — and then ran. He watched — and waited.";
         let fp = VoiceFingerprint::compute(text);
-        assert!(fp.em_dash_per_1000 > 100.0, "two em-dashes in tiny corpus → high rate");
+        assert!(
+            fp.em_dash_per_1000 > 100.0,
+            "two em-dashes in tiny corpus → high rate"
+        );
     }
 
     #[test]
@@ -193,7 +221,7 @@ mod tests {
     fn type_token_ratio_lower_for_repetitive_text() {
         let repetitive = "the the the the the the the the the the".to_string()
             + " the the the the the the the the the the";
-        let varied     = "the quick brown fox jumps over the lazy dog beside ".to_string()
+        let varied = "the quick brown fox jumps over the lazy dog beside ".to_string()
             + "a sleeping cat under bright stars while wind whispers through";
         let fp_rep = VoiceFingerprint::compute(&repetitive);
         let fp_var = VoiceFingerprint::compute(&varied);

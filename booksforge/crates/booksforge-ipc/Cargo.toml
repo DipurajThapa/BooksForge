@@ -13,9 +13,19 @@ serde.workspace     = true
 serde_json.workspace = true
 thiserror.workspace = true
 ts-rs.workspace     = true
-
-[dev-dependencies]
-# ts-rs uses a test to drive export; no extra deps needed.
+# Quality-stack crates whose pure-logic types are surfaced as IPC
+# inputs/results in `quality.rs` (BACKLOG §A16 / Phase 3). The IPC
+# layer also drives their ts-rs binding emission so the bindings land
+# in `packages/shared-types/src/bindings/` alongside everything else.
+booksforge-voice         = { path = "../booksforge-voice" }
+booksforge-anti-ai-tells = { path = "../booksforge-anti-ai-tells" }
+booksforge-genre-packs   = { path = "../booksforge-genre-packs" }
+# `BookKind` (Phase 4 of PRODUCT_ROADMAP_E2E.md) lives in
+# `booksforge-domain`; the IPC layer drives its TS binding emission and
+# re-exports it via project.rs. Domain is a Layer 3 dep — IPC is
+# already higher up the layer stack so this doesn't violate the
+# layer-boundary lint.
+booksforge-domain        = { path = "../booksforge-domain" }
 
 [lints]
 workspace = true

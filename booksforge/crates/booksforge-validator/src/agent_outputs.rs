@@ -43,12 +43,12 @@ use booksforge_domain::{
 pub struct AgentOutputContext<'a> {
     /// The scene text the agent was given (for `before`-matches-source
     /// checks on Copyeditor / Humanization / etc.).
-    pub source_text:          Option<&'a str>,
+    pub source_text: Option<&'a str>,
     /// Target chapter count — used by `OutlineProposal::validate`.
     pub target_chapter_count: Option<u32>,
     /// Brief total word target — used by `OutlineProposal::validate`
     /// for the per-scene budget cross-check.
-    pub brief_word_count:     Option<u32>,
+    pub brief_word_count: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -58,9 +58,9 @@ pub struct AgentOutputReport {
     /// is unknown (caller may treat as "no validator wired").
     pub validated: bool,
     /// Whether the typed parse from JSON succeeded.
-    pub parse_ok:  bool,
+    pub parse_ok: bool,
     /// Per-rule semantic errors.  Empty == clean pass.
-    pub errors:    Vec<String>,
+    pub errors: Vec<String>,
 }
 
 impl AgentOutputReport {
@@ -84,14 +84,14 @@ impl AgentOutputReport {
 ///   - `HumanizationProposals`     (§4.9 Humanization)
 pub fn validate_agent_output(
     schema_id: &str,
-    parsed:    &serde_json::Value,
-    ctx:       AgentOutputContext<'_>,
+    parsed: &serde_json::Value,
+    ctx: AgentOutputContext<'_>,
 ) -> AgentOutputReport {
     let mut report = AgentOutputReport {
         schema_id: schema_id.to_owned(),
         validated: false,
-        parse_ok:  false,
-        errors:    Vec::new(),
+        parse_ok: false,
+        errors: Vec::new(),
     };
 
     macro_rules! parse_and_validate {
@@ -100,7 +100,7 @@ pub fn validate_agent_output(
             match serde_json::from_value::<$ty>(parsed.clone()) {
                 Ok(t) => {
                     report.parse_ok = true;
-                    report.errors   = ($invoke)(&t);
+                    report.errors = ($invoke)(&t);
                 }
                 Err(e) => {
                     report.parse_ok = false;
@@ -113,10 +113,10 @@ pub fn validate_agent_output(
     match schema_id {
         "OutlineProposal" => {
             parse_and_validate!(OutlineProposal, |t: &OutlineProposal| {
-                let chap = ctx.target_chapter_count.unwrap_or_else(|| {
-                    t.parts.iter().map(|p| p.chapters.len() as u32).sum()
-                });
-                let wc   = ctx.brief_word_count.unwrap_or(0);
+                let chap = ctx
+                    .target_chapter_count
+                    .unwrap_or_else(|| t.parts.iter().map(|p| p.chapters.len() as u32).sum());
+                let wc = ctx.brief_word_count.unwrap_or(0);
                 t.validate(chap, wc)
             });
         }
@@ -135,10 +135,12 @@ pub fn validate_agent_output(
             });
         }
         "MemoryRefreshProposals" => {
-            parse_and_validate!(MemoryRefreshProposals, |t: &MemoryRefreshProposals| t.validate());
+            parse_and_validate!(MemoryRefreshProposals, |t: &MemoryRefreshProposals| t
+                .validate());
         }
         "VocabUpdateProposals" => {
-            parse_and_validate!(VocabUpdateProposals, |t: &VocabUpdateProposals| t.validate());
+            parse_and_validate!(VocabUpdateProposals, |t: &VocabUpdateProposals| t
+                .validate());
         }
         "HumanizationProposals" => {
             parse_and_validate!(HumanizationProposals, |t: &HumanizationProposals| {
@@ -159,7 +161,11 @@ mod tests {
 
     #[test]
     fn unknown_schema_id_returns_unvalidated() {
-        let r = validate_agent_output("FrobnicateOutput", &json!({}), AgentOutputContext::default());
+        let r = validate_agent_output(
+            "FrobnicateOutput",
+            &json!({}),
+            AgentOutputContext::default(),
+        );
         assert!(!r.validated);
         assert!(r.errors.is_empty());
     }
@@ -178,13 +184,20 @@ mod tests {
             "summary": "x"
         });
         let r = validate_agent_output(
-            "CopyeditProposals", &parsed,
-            AgentOutputContext { source_text: Some("hello world"), ..Default::default() },
+            "CopyeditProposals",
+            &parsed,
+            AgentOutputContext {
+                source_text: Some("hello world"),
+                ..Default::default()
+            },
         );
         assert!(r.validated);
         assert!(r.parse_ok);
-        assert!(r.errors.iter().any(|e| e.contains("fabricated position")),
-                "expected fabricated-position error, got: {:#?}", r.errors);
+        assert!(
+            r.errors.iter().any(|e| e.contains("fabricated position")),
+            "expected fabricated-position error, got: {:#?}",
+            r.errors
+        );
     }
 
     #[test]
@@ -210,7 +223,9 @@ mod tests {
             "modifications": []
         });
         let r = validate_agent_output(
-            "VocabUpdateProposals", &parsed, AgentOutputContext::default(),
+            "VocabUpdateProposals",
+            &parsed,
+            AgentOutputContext::default(),
         );
         assert!(r.errors.iter().any(|e| e.contains("not in enum")));
     }
@@ -219,9 +234,7 @@ mod tests {
     fn typed_parse_failure_is_reported() {
         // Missing required field `summary` on CopyeditProposals.
         let parsed = json!({"edits": []});
-        let r = validate_agent_output(
-            "CopyeditProposals", &parsed, AgentOutputContext::default(),
-        );
+        let r = validate_agent_output("CopyeditProposals", &parsed, AgentOutputContext::default());
         assert!(r.validated);
         assert!(!r.parse_ok);
         assert!(r.errors.iter().any(|e| e.contains("typed parse failed")));
@@ -241,8 +254,12 @@ mod tests {
             "summary": "one casing fix"
         });
         let r = validate_agent_output(
-            "CopyeditProposals", &parsed,
-            AgentOutputContext { source_text: Some(source), ..Default::default() },
+            "CopyeditProposals",
+            &parsed,
+            AgentOutputContext {
+                source_text: Some(source),
+                ..Default::default()
+            },
         );
         assert!(r.is_clean(), "expected clean, got {:#?}", r.errors);
     }

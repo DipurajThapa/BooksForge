@@ -21,6 +21,10 @@ target_chapter_count: number,
  */
 genre_overlay: string | null, 
 /**
- * Ollama model tag to use (e.g. "qwen2.5:7b-instruct-q4_K_M").
+ * Ollama model tag to use (e.g. `"qwen3.5:9b"`). Optional — when
+ * `None` or empty, the backend resolves the right tier (Light for
+ * outline-architect) from the installed models. The UI no longer
+ * asks the user to pick a model; this field exists only for the
+ * CLI examples and tests that want to force a specific tag.
  */
-model: string, };
+model: string | null, };

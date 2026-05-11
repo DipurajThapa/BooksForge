@@ -20,13 +20,14 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use booksforge_domain::{ExportProfile, FormatProfile};
+use booksforge_epubcheck::{java_on_path, run_epubcheck};
 use booksforge_export::{
     manuscript_to_html_chapters, manuscript_to_markdown, pm_doc_to_html, pm_doc_to_markdown,
     ManuscriptInput,
 };
 use booksforge_export_epub::{EpubMetadata, EpubPackageInput};
 use booksforge_export_pandoc::{pandoc_on_path, run_pandoc, PandocInput};
-use booksforge_epubcheck::{java_on_path, run_epubcheck};
+use booksforge_export_typst::{run_typst, typst_on_path, TypstInput, TypstTrim};
 use booksforge_ipc::{
     BooksForgeError, ExportDependencyReport, ExportDependencyStatus, ExportHistoryEntry,
     ExportMarkdownInput, ExportMarkdownResult, ExportRunInput, ExportRunResult,
@@ -52,7 +53,9 @@ pub async fn export_markdown(
     let storage = &project.storage;
 
     // 1. Tree.
-    let nodes = storage.list_nodes().await
+    let nodes = storage
+        .list_nodes()
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
     if nodes.is_empty() {
         return Err(BooksForgeError::validation(
@@ -62,7 +65,9 @@ pub async fn export_markdown(
     }
 
     // 2. All scene content in one round-trip.
-    let scene_rows = storage.list_all_scene_content().await
+    let scene_rows = storage
+        .list_all_scene_content()
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
 
     // 3. Convert each pm_doc to plain Markdown body.
@@ -78,7 +83,7 @@ pub async fn export_markdown(
     let manuscript = ManuscriptInput {
         nodes,
         scene_texts,
-        title:  project.title.clone(),
+        title: project.title.clone(),
         author: project.author.clone(),
     };
     let (rendered, stats) = manuscript_to_markdown(&manuscript);
@@ -90,41 +95,49 @@ pub async fn export_markdown(
     })?;
     if !parent.as_os_str().is_empty() && !parent.exists() {
         return Err(BooksForgeError::validation(format!(
-            "output directory does not exist: {}", parent.display()
+            "output directory does not exist: {}",
+            parent.display()
         )));
     }
 
     // Write to a sibling .tmp then rename — never leave a half-written file.
     let tmp = path.with_extension({
-        let mut ext = path.extension().map(|e| e.to_string_lossy().into_owned()).unwrap_or_default();
+        let mut ext = path
+            .extension()
+            .map(|e| e.to_string_lossy().into_owned())
+            .unwrap_or_default();
         ext.push_str(".tmp");
         ext
     });
-    tokio::fs::write(&tmp, rendered.as_bytes()).await
+    tokio::fs::write(&tmp, rendered.as_bytes())
+        .await
         .map_err(|e| BooksForgeError::internal(format!("write failed: {e}")))?;
-    tokio::fs::rename(&tmp, path).await
+    tokio::fs::rename(&tmp, path)
+        .await
         .map_err(|e| BooksForgeError::internal(format!("rename failed: {e}")))?;
 
     // 6. Ledger row.
     let hash = blake3::hash(rendered.as_bytes()).to_hex().to_string();
     let record = booksforge_domain::ExportRecord {
-        id:          Ulid::new(),
-        profile:     ExportProfile::Markdown,
+        id: Ulid::new(),
+        profile: ExportProfile::Markdown,
         output_path: input.output_path.clone(),
-        hash:        hash.clone(),
-        created_at:  Utc::now(),
+        hash: hash.clone(),
+        created_at: Utc::now(),
     };
-    storage.export_insert(&record).await
+    storage
+        .export_insert(&record)
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
 
     Ok(ExportMarkdownResult {
-        export_id:     record.id.to_string(),
-        output_path:   input.output_path,
-        bytes:         stats.bytes,
-        part_count:    stats.part_count,
+        export_id: record.id.to_string(),
+        output_path: input.output_path,
+        bytes: stats.bytes,
+        part_count: stats.part_count,
         chapter_count: stats.chapter_count,
-        scene_count:   stats.scene_count,
-        word_count:    stats.word_count,
+        scene_count: stats.scene_count,
+        word_count: stats.word_count,
         hash,
     })
 }
@@ -145,7 +158,7 @@ pub async fn export_markdown(
 #[tauri::command]
 pub async fn export_run(
     input: ExportRunInput,
-    app:   tauri::AppHandle,
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<ExportRunResult, BooksForgeError> {
     let project = {
@@ -154,14 +167,14 @@ pub async fn export_run(
     }
     .ok_or_else(|| BooksForgeError::internal("no project is open".to_owned()))?;
 
-    let profile = ExportProfile::from_str(&input.profile)
-        .ok_or_else(|| BooksForgeError::validation(format!(
-            "unknown export profile: {}", input.profile
-        )))?;
+    let profile = ExportProfile::from_str(&input.profile).ok_or_else(|| {
+        BooksForgeError::validation(format!("unknown export profile: {}", input.profile))
+    })?;
 
     // Resolve the genre-aware typography profile.  Empty / unknown
     // values fall back to the default (FictionTradeStandard).
-    let format_profile = input.format_profile
+    let format_profile = input
+        .format_profile
         .as_deref()
         .and_then(FormatProfile::from_str)
         .unwrap_or_default();
@@ -176,60 +189,100 @@ pub async fn export_run(
 
     // Atomic-write helper used by all branches.
     let outcome = match profile {
-        ExportProfile::Markdown    => export_markdown_inline(&project, &input.output_path).await?,
-        ExportProfile::GenericEpub
-        | ExportProfile::KdpEbook  => export_epub_inline(&project, &input.output_path, profile, format_profile, font_bundle_dir.as_deref()).await?,
-        ExportProfile::Docx
-        | ExportProfile::TradePdf5x8
-        | ExportProfile::TradePdf6x9 => export_via_pandoc(&project, &input.output_path, profile, format_profile, font_bundle_dir.as_deref()).await?,
+        ExportProfile::Markdown => export_markdown_inline(&project, &input.output_path).await?,
+        ExportProfile::GenericEpub | ExportProfile::KdpEbook => {
+            export_epub_inline(
+                &project,
+                &input.output_path,
+                profile,
+                format_profile,
+                font_bundle_dir.as_deref(),
+            )
+            .await?
+        }
+        ExportProfile::Docx => {
+            export_via_pandoc(
+                &project,
+                &input.output_path,
+                profile,
+                format_profile,
+                font_bundle_dir.as_deref(),
+            )
+            .await?
+        }
+        ExportProfile::TradePdf5x8 | ExportProfile::TradePdf6x9 => {
+            // BACKLOG §A11 — prefer typst (Apache-2.0, no LaTeX dependency,
+            // ships as a single ~30 MB binary) over pandoc-via-LaTeX,
+            // which fails out-of-the-box on macOS without a TeX install.
+            // Pandoc-via-LaTeX remains the fallback when typst is missing.
+            if typst_on_path().is_some() {
+                export_via_typst(&project, &input.output_path, profile).await?
+            } else {
+                export_via_pandoc(
+                    &project,
+                    &input.output_path,
+                    profile,
+                    format_profile,
+                    font_bundle_dir.as_deref(),
+                )
+                .await?
+            }
+        }
     };
 
     // Persist export row.
     let record = booksforge_domain::ExportRecord {
-        id:          Ulid::new(),
+        id: Ulid::new(),
         profile,
         output_path: outcome.output_path.clone(),
-        hash:        outcome.hash.clone(),
-        created_at:  Utc::now(),
+        hash: outcome.hash.clone(),
+        created_at: Utc::now(),
     };
-    project.storage.export_insert(&record).await
+    project
+        .storage
+        .export_insert(&record)
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
 
     // For EPUB profiles, attempt EPUBCheck validation.  KDP profile
     // additionally runs the structural KDP checks (G3) against the
     // built bytes — cover image, file size band, nav health, image
     // size band — and folds those findings into the same message.
-    let (validation_ok, validation_message, error_count, warning_count) =
-        if matches!(profile, ExportProfile::GenericEpub | ExportProfile::KdpEbook) {
-            let (mut ok, mut msg, mut errs, mut warns) =
-                run_epubcheck_if_available(&outcome.output_path).await;
-            if matches!(profile, ExportProfile::KdpEbook) {
-                let (kdp_ok, kdp_msg, kdp_errs, kdp_warns) =
-                    run_kdp_checks_for(&outcome.output_path).await;
-                ok    = ok && kdp_ok;
-                errs  = errs.saturating_add(kdp_errs);
-                warns = warns.saturating_add(kdp_warns);
-                msg = match (msg, kdp_msg) {
-                    (Some(a), Some(b)) => Some(format!("{a}  ·  {b}")),
-                    (Some(a), None)    => Some(a),
-                    (None,    Some(b)) => Some(b),
-                    (None,    None)    => None,
-                };
-            }
-            (ok, msg, errs, warns)
-        } else {
-            (true, None, 0u32, 0u32)
-        };
+    let (validation_ok, validation_message, error_count, warning_count) = if matches!(
+        profile,
+        ExportProfile::GenericEpub | ExportProfile::KdpEbook
+    ) {
+        let (mut ok, mut msg, mut errs, mut warns) =
+            run_epubcheck_if_available(&outcome.output_path).await;
+        if matches!(profile, ExportProfile::KdpEbook) {
+            let (kdp_ok, kdp_msg, kdp_errs, kdp_warns) =
+                run_kdp_checks_for(&outcome.output_path).await;
+            ok = ok && kdp_ok;
+            errs = errs.saturating_add(kdp_errs);
+            warns = warns.saturating_add(kdp_warns);
+            msg = match (msg, kdp_msg) {
+                (Some(a), Some(b)) => Some(format!("{a}  ·  {b}")),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            };
+        }
+        (ok, msg, errs, warns)
+    } else {
+        (true, None, 0u32, 0u32)
+    };
 
-    let bytes = tokio::fs::metadata(&outcome.output_path).await
-        .map(|m| m.len()).unwrap_or(0);
+    let bytes = tokio::fs::metadata(&outcome.output_path)
+        .await
+        .map(|m| m.len())
+        .unwrap_or(0);
 
     Ok(ExportRunResult {
-        export_id:          record.id.to_string(),
-        profile:            profile.as_str().to_owned(),
-        output_path:        outcome.output_path,
+        export_id: record.id.to_string(),
+        profile: profile.as_str().to_owned(),
+        output_path: outcome.output_path,
         bytes,
-        hash:               outcome.hash,
+        hash: outcome.hash,
         validation_ok,
         validation_message,
         error_count,
@@ -238,24 +291,24 @@ pub async fn export_run(
 }
 
 async fn export_markdown_inline(
-    project:     &std::sync::Arc<crate::state::OpenProject>,
+    project: &std::sync::Arc<crate::state::OpenProject>,
     output_path: &str,
 ) -> Result<booksforge_export::ExportOutcome, BooksForgeError> {
     let manuscript = build_manuscript_input(project, /* html */ false).await?;
     let (rendered, _stats) = manuscript_to_markdown(&manuscript);
     write_atomic(output_path, rendered.as_bytes()).await?;
     Ok(booksforge_export::ExportOutcome {
-        profile:     ExportProfile::Markdown,
+        profile: ExportProfile::Markdown,
         output_path: output_path.to_owned(),
-        hash:        blake3::hash(rendered.as_bytes()).to_hex().to_string(),
+        hash: blake3::hash(rendered.as_bytes()).to_hex().to_string(),
     })
 }
 
-async fn export_epub_inline(
-    project:         &std::sync::Arc<crate::state::OpenProject>,
-    output_path:     &str,
-    profile:         ExportProfile,
-    format_profile:  FormatProfile,
+pub(crate) async fn export_epub_inline(
+    project: &std::sync::Arc<crate::state::OpenProject>,
+    output_path: &str,
+    profile: ExportProfile,
+    format_profile: FormatProfile,
     font_bundle_dir: Option<&str>,
 ) -> Result<booksforge_export::ExportOutcome, BooksForgeError> {
     let manuscript = build_manuscript_input(project, /* html */ true).await?;
@@ -265,23 +318,24 @@ async fn export_epub_inline(
             "manuscript has no chapters — write some content before exporting an EPUB".to_owned(),
         ));
     }
-    let chapters: Vec<booksforge_export_epub::HtmlChapter> = html_chapters.iter()
+    let chapters: Vec<booksforge_export_epub::HtmlChapter> = html_chapters
+        .iter()
         .map(|c| booksforge_export_epub::HtmlChapter {
-            node_id:   c.node_id.to_string(),
-            title:     c.title.clone(),
+            node_id: c.node_id.to_string(),
+            title: c.title.clone(),
             html_body: c.html_body.clone(),
         })
         .collect();
     let metadata = EpubMetadata {
-        title:       project.title.clone(),
-        authors:     vec![project.author.clone()],
-        language:    "en".to_owned(),
-        publisher:   None,
+        title: project.title.clone(),
+        authors: vec![project.author.clone()],
+        language: "en".to_owned(),
+        publisher: None,
         description: None,
-        isbn:        None,
-        book_id:     project.project_id.to_string(),
-        dedication:       None,
-        epigraph:         None,
+        isbn: None,
+        book_id: project.project_id.to_string(),
+        dedication: None,
+        epigraph: None,
         copyright_notice: None,
     };
     let outcome = booksforge_export_epub::build_epub(EpubPackageInput {
@@ -291,21 +345,24 @@ async fn export_epub_inline(
         output_path: output_path.to_owned(),
         format_profile,
         font_bundle_dir: font_bundle_dir.map(|s| s.to_owned()),
-    }).await
-        .map_err(|e| BooksForgeError::internal(format!("EPUB build failed: {e}")))?;
+    })
+    .await
+    .map_err(|e| BooksForgeError::internal(format!("EPUB build failed: {e}")))?;
     Ok(outcome)
 }
 
-async fn export_via_pandoc(
-    project:         &std::sync::Arc<crate::state::OpenProject>,
-    output_path:     &str,
-    profile:         ExportProfile,
-    format_profile:  FormatProfile,
+pub(crate) async fn export_via_pandoc(
+    project: &std::sync::Arc<crate::state::OpenProject>,
+    output_path: &str,
+    profile: ExportProfile,
+    format_profile: FormatProfile,
     font_bundle_dir: Option<&str>,
 ) -> Result<booksforge_export::ExportOutcome, BooksForgeError> {
-    let pandoc = pandoc_on_path().ok_or_else(|| BooksForgeError::validation(
-        "Pandoc not found on PATH.  Install Pandoc 3.x to use DOCX / PDF export.".to_owned(),
-    ))?;
+    let pandoc = pandoc_on_path().ok_or_else(|| {
+        BooksForgeError::validation(
+            "Pandoc not found on PATH.  Install Pandoc 3.x to use DOCX / PDF export.".to_owned(),
+        )
+    })?;
     let manuscript = build_manuscript_input(project, /* html */ false).await?;
     let (markdown, _stats) = manuscript_to_markdown(&manuscript);
 
@@ -331,19 +388,66 @@ async fn export_via_pandoc(
         } else {
             Some(write_generated_docx_template(project, format_profile).await?)
         }
-    } else { None };
+    } else {
+        None
+    };
 
     let outcome = run_pandoc(PandocInput {
-        pandoc_binary:   pandoc,
+        pandoc_binary: pandoc,
         markdown_source: markdown,
         docx_template,
         profile,
-        output_path:     output_path.to_owned(),
+        output_path: output_path.to_owned(),
         format_profile,
         font_bundle_dir: font_bundle_dir.map(|s| s.to_owned()),
-    }).await
-        .map_err(|e| BooksForgeError::internal(format!("Pandoc export failed: {e}")))?;
+    })
+    .await
+    .map_err(|e| BooksForgeError::internal(format!("Pandoc export failed: {e}")))?;
     Ok(outcome)
+}
+
+/// PDF export via the `typst` sidecar (BACKLOG §A11).
+///
+/// Used in preference to pandoc-via-LaTeX for the `TradePdf*` profiles
+/// when the typst binary is on PATH. Typst ships as a single ~30 MB
+/// binary, has no LaTeX dependency, and is what the BF-E2E test
+/// successfully used to render `manuscript.pdf` in the audit run.
+pub(crate) async fn export_via_typst(
+    project: &std::sync::Arc<crate::state::OpenProject>,
+    output_path: &str,
+    profile: ExportProfile,
+) -> Result<booksforge_export::ExportOutcome, BooksForgeError> {
+    let typst = typst_on_path().ok_or_else(|| {
+        BooksForgeError::validation(
+            "Typst not found on PATH. Install typst 0.14+ or fall back to Pandoc + LaTeX."
+                .to_owned(),
+        )
+    })?;
+    let manuscript = build_manuscript_input(project, /* html */ false).await?;
+    let (markdown, _stats) = manuscript_to_markdown(&manuscript);
+    let trim = match profile {
+        ExportProfile::TradePdf5x8 => TypstTrim::Trade5x8,
+        // TradePdf6x9 (and any other PDF trim that routes here) defaults
+        // to the 6x9 trade profile.
+        _ => TypstTrim::Trade6x9,
+    };
+    let outcome = run_typst(TypstInput {
+        typst_binary: typst,
+        markdown_source: markdown,
+        output_path: output_path.to_owned(),
+        trim,
+        title: project.title.clone(),
+        author: project.author.clone(),
+    })
+    .await
+    .map_err(|e| BooksForgeError::internal(format!("Typst export failed: {e}")))?;
+    Ok(booksforge_export::ExportOutcome {
+        // Override profile so the audit row reflects what the caller asked for
+        // (the typst crate hard-codes 6x9 in its own outcome shape).
+        profile,
+        output_path: outcome.output_path,
+        hash: outcome.hash,
+    })
 }
 
 /// Resolve the bundled Google Font directory at runtime (BACKLOG
@@ -360,7 +464,9 @@ fn resolve_font_bundle_dir(app: &tauri::AppHandle) -> Option<String> {
     use tauri::Manager as _;
     if let Ok(env_path) = std::env::var("BOOKSFORGE_FONT_BUNDLE_DIR") {
         let p = std::path::Path::new(&env_path);
-        if p.is_dir() { return Some(env_path); }
+        if p.is_dir() {
+            return Some(env_path);
+        }
     }
     let resource_dir = app.path().resource_dir().ok()?;
     let candidate = resource_dir.join("resources").join("fonts");
@@ -387,13 +493,14 @@ fn resolve_font_bundle_dir(app: &tauri::AppHandle) -> Option<String> {
 ///     we skip the rewrite when the bytes already match — keeps mtime
 ///     stable for git-tracking the bundle.
 async fn write_generated_docx_template(
-    project:        &std::sync::Arc<crate::state::OpenProject>,
+    project: &std::sync::Arc<crate::state::OpenProject>,
     format_profile: FormatProfile,
 ) -> Result<String, BooksForgeError> {
     let bytes = booksforge_export_pandoc::build_reference_docx(format_profile);
     let dir = project.bundle.exports().join("templates");
     if !dir.exists() {
-        tokio::fs::create_dir_all(&dir).await
+        tokio::fs::create_dir_all(&dir)
+            .await
             .map_err(|e| BooksForgeError::internal(format!("create templates dir: {e}")))?;
     }
     let path = dir.join(format!(".generated-{}.docx", format_profile.as_str()));
@@ -402,13 +509,15 @@ async fn write_generated_docx_template(
     // — keeps mtime stable and avoids needless disk churn.
     let needs_write = match tokio::fs::read(&path).await {
         Ok(existing) => existing != bytes,
-        Err(_)       => true,
+        Err(_) => true,
     };
     if needs_write {
         let tmp = path.with_extension("docx.tmp");
-        tokio::fs::write(&tmp, &bytes).await
+        tokio::fs::write(&tmp, &bytes)
+            .await
             .map_err(|e| BooksForgeError::internal(format!("write generated docx: {e}")))?;
-        tokio::fs::rename(&tmp, &path).await
+        tokio::fs::rename(&tmp, &path)
+            .await
             .map_err(|e| BooksForgeError::internal(format!("rename generated docx: {e}")))?;
     }
     Ok(path.to_string_lossy().into_owned())
@@ -434,7 +543,7 @@ async fn write_generated_docx_template(
 /// references in their bundle today and have BooksForge pick the
 /// right one automatically.
 fn resolve_docx_template(
-    project:        &std::sync::Arc<crate::state::OpenProject>,
+    project: &std::sync::Arc<crate::state::OpenProject>,
     format_profile: FormatProfile,
 ) -> Option<String> {
     if let Ok(env_path) = std::env::var("BOOKSFORGE_DOCX_TEMPLATE") {
@@ -451,7 +560,10 @@ fn resolve_docx_template(
     }
 
     // (3) Per-genre fallback.
-    let by_genre = templates.join(format!("reference-{}.docx", format_profile.genre().as_str()));
+    let by_genre = templates.join(format!(
+        "reference-{}.docx",
+        format_profile.genre().as_str()
+    ));
     if by_genre.is_file() {
         return Some(by_genre.to_string_lossy().into_owned());
     }
@@ -466,11 +578,14 @@ fn resolve_docx_template(
 
 /// Build the in-memory manuscript input.  When `html=true`, scene
 /// bodies are rendered as HTML fragments; otherwise plain Markdown.
-async fn build_manuscript_input(
+pub(crate) async fn build_manuscript_input(
     project: &std::sync::Arc<crate::state::OpenProject>,
-    html:    bool,
+    html: bool,
 ) -> Result<ManuscriptInput, BooksForgeError> {
-    let nodes = project.storage.list_nodes().await
+    let nodes = project
+        .storage
+        .list_nodes()
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
     if nodes.is_empty() {
         return Err(BooksForgeError::validation(
@@ -478,12 +593,18 @@ async fn build_manuscript_input(
                 .to_owned(),
         ));
     }
-    let scene_rows = project.storage.list_all_scene_content().await
+    let scene_rows = project
+        .storage
+        .list_all_scene_content()
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
     let mut scene_texts: BTreeMap<Ulid, String> = BTreeMap::new();
     for row in scene_rows {
-        let text = if html { pm_doc_to_html(&row.pm_doc) }
-                   else    { pm_doc_to_markdown(&row.pm_doc) };
+        let text = if html {
+            pm_doc_to_html(&row.pm_doc)
+        } else {
+            pm_doc_to_markdown(&row.pm_doc)
+        };
         if !text.trim().is_empty() {
             scene_texts.insert(row.node_id, text);
         }
@@ -491,7 +612,7 @@ async fn build_manuscript_input(
     Ok(ManuscriptInput {
         nodes,
         scene_texts,
-        title:  project.title.clone(),
+        title: project.title.clone(),
         author: project.author.clone(),
     })
 }
@@ -501,44 +622,94 @@ async fn write_atomic(output_path: &str, bytes: &[u8]) -> Result<(), BooksForgeE
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() && !parent.exists() {
             return Err(BooksForgeError::validation(format!(
-                "output directory does not exist: {}", parent.display()
+                "output directory does not exist: {}",
+                parent.display()
             )));
         }
     }
     let tmp = format!("{output_path}.tmp");
-    tokio::fs::write(&tmp, bytes).await
+    tokio::fs::write(&tmp, bytes)
+        .await
         .map_err(|e| BooksForgeError::internal(format!("write failed: {e}")))?;
-    tokio::fs::rename(&tmp, path).await
+    tokio::fs::rename(&tmp, path)
+        .await
         .map_err(|e| BooksForgeError::internal(format!("rename failed: {e}")))?;
     Ok(())
+}
+
+/// Locate the EPUBCheck JAR. Tries the explicit env override first,
+/// then a small set of conventional sidecar install paths so the
+/// out-of-the-box experience works after `brew install epubcheck`
+/// (macOS) or the equivalent on Linux/Windows. Returns `None` when
+/// no JAR can be located — the caller should treat that as
+/// "validation skipped, export still succeeds."
+fn resolve_epubcheck_jar() -> Option<String> {
+    if let Ok(j) = std::env::var("BOOKSFORGE_EPUBCHECK_JAR") {
+        if std::path::Path::new(&j).is_file() {
+            return Some(j);
+        }
+    }
+    // Sidecar default install paths in priority order. Limited to JAR
+    // files installed by mainstream package managers — never scans
+    // arbitrary filesystem locations.
+    const DEFAULTS: &[&str] = &[
+        // Homebrew on Apple Silicon (most common dev setup).
+        "/opt/homebrew/opt/epubcheck/libexec/epubcheck.jar",
+        // Homebrew on Intel macOS.
+        "/usr/local/opt/epubcheck/libexec/epubcheck.jar",
+        // Common Linux package manager destinations.
+        "/usr/share/epubcheck/epubcheck.jar",
+        "/usr/local/share/epubcheck/epubcheck.jar",
+    ];
+    for p in DEFAULTS {
+        if std::path::Path::new(p).is_file() {
+            return Some((*p).to_owned());
+        }
+    }
+    None
 }
 
 /// Best-effort EPUBCheck.  Returns `(validation_ok, message, errors,
 /// warnings)` — `validation_ok = true` when EPUBCheck passed OR when
 /// it isn't installed (the export itself is reliable; validation is
 /// extra assurance).
-async fn run_epubcheck_if_available(epub_path: &str) -> (bool, Option<String>, u32, u32) {
+pub(crate) async fn run_epubcheck_if_available(
+    epub_path: &str,
+) -> (bool, Option<String>, u32, u32) {
     // Look for EPUBCheck JAR via env override (BOOKSFORGE_EPUBCHECK_JAR)
-    // or in standard sidecar locations.  No bundled JAR yet — see
-    // BACKLOG §M4.
-    let jar = std::env::var("BOOKSFORGE_EPUBCHECK_JAR").ok();
+    // first, then fall back to the conventional Homebrew install
+    // location on macOS so a `brew install epubcheck` works out of the
+    // box without requiring users to set an env var. Bundled JAR shipping
+    // is BACKLOG §M4 (deferred to release engineering).
+    let jar = resolve_epubcheck_jar();
     let java = java_on_path();
     let (jar, java) = match (jar, java) {
         (Some(j), Some(jv)) => (j, jv),
-        _ => return (true, Some(
-            "EPUBCheck not configured — export succeeded but was not validated. \
-             Set BOOKSFORGE_EPUBCHECK_JAR + install Java to enable validation.".into()
-        ), 0, 0),
+        _ => {
+            return (
+                true,
+                Some(
+                    "EPUBCheck not configured — export succeeded but was not validated. \
+             Install via `brew install epubcheck` or set BOOKSFORGE_EPUBCHECK_JAR + install Java."
+                        .into(),
+                ),
+                0,
+                0,
+            )
+        }
     };
     match run_epubcheck(epub_path, &jar, &java).await {
         Ok(report) => {
-            let errors   = report.error_count() as u32;
+            let errors = report.error_count() as u32;
             let warnings = report.warning_count() as u32;
             let ok = report.is_valid();
             let msg = if ok && warnings == 0 {
                 Some(format!("Validated by EPUBCheck {}", report.checker_version))
             } else if ok {
-                Some(format!("EPUBCheck {} found {warnings} warning(s)", report.checker_version))
+                Some(format!(
+                    "EPUBCheck {} found {warnings} warning(s)",
+                    report.checker_version
+                ))
             } else {
                 Some(format!(
                     "EPUBCheck {} flagged {errors} error(s) and {warnings} warning(s)",
@@ -568,18 +739,21 @@ async fn run_epubcheck_if_available(epub_path: &str) -> (bool, Option<String>, u
 ///                  conventional install path; users opt in explicitly).
 #[tauri::command]
 pub async fn export_check_dependencies() -> Result<ExportDependencyReport, BooksForgeError> {
-    use booksforge_export_pandoc::{pandoc_on_path, probe_pandoc};
     use booksforge_epubcheck::java_on_path;
+    use booksforge_export_pandoc::{pandoc_on_path, probe_pandoc};
 
     let mut items = Vec::new();
 
     // ── Pandoc ──
-    let pandoc_path = std::env::var("BOOKSFORGE_PANDOC_BIN").ok()
+    let pandoc_path = std::env::var("BOOKSFORGE_PANDOC_BIN")
+        .ok()
         .filter(|p| std::path::Path::new(p).is_file())
         .or_else(pandoc_on_path);
     let pandoc_version = if let Some(ref p) = pandoc_path {
         probe_pandoc(p).await.ok().unwrap_or_default()
-    } else { String::new() };
+    } else {
+        String::new()
+    };
     items.push(ExportDependencyStatus {
         id:           "pandoc".into(),
         name:         "Pandoc".into(),
@@ -590,19 +764,58 @@ pub async fn export_check_dependencies() -> Result<ExportDependencyReport, Books
         install_hint: "Download from https://pandoc.org/installing.html or your OS package manager (brew install pandoc / choco install pandoc / apt install pandoc).".into(),
     });
 
+    // ── Typst (BACKLOG §A11) ──
+    // Preferred PDF engine for Trade PDF profiles when present. Falls
+    // back to Pandoc + LaTeX when missing.
+    {
+        use booksforge_export_typst::{probe_typst, typst_on_path};
+        let typst_path = std::env::var("BOOKSFORGE_TYPST_BIN")
+            .ok()
+            .filter(|p| std::path::Path::new(p).is_file())
+            .or_else(typst_on_path);
+        let typst_version = if let Some(ref p) = typst_path {
+            probe_typst(p).await.ok().unwrap_or_default()
+        } else {
+            String::new()
+        };
+        items.push(ExportDependencyStatus {
+            id:           "typst".into(),
+            name:         "Typst".into(),
+            found:        typst_path.is_some(),
+            path:         typst_path.unwrap_or_default(),
+            version:      typst_version,
+            unlocks:      vec!["trade_pdf_5x8".into(), "trade_pdf_6x9".into()],
+            install_hint: "Apache-2.0 single-binary PDF engine. brew install typst (macOS) / scoop install typst (Windows) / cargo install typst-cli (any). Replaces Pandoc + LaTeX for the Trade PDF profiles.".into(),
+        });
+    }
+
     // ── Java ──
-    let java_path: Option<String> = std::env::var("BOOKSFORGE_JAVA_BIN").ok()
+    let java_path: Option<String> = std::env::var("BOOKSFORGE_JAVA_BIN")
+        .ok()
         .filter(|p| std::path::Path::new(p).is_file())
-        .or_else(|| std::env::var("JAVA_HOME").ok().and_then(|home| {
-            let candidate = std::path::Path::new(&home).join("bin").join(
-                if cfg!(target_os = "windows") { "java.exe" } else { "java" }
-            );
-            if candidate.is_file() { Some(candidate.to_string_lossy().into_owned()) } else { None }
-        }))
+        .or_else(|| {
+            std::env::var("JAVA_HOME").ok().and_then(|home| {
+                let candidate =
+                    std::path::Path::new(&home)
+                        .join("bin")
+                        .join(if cfg!(target_os = "windows") {
+                            "java.exe"
+                        } else {
+                            "java"
+                        });
+                if candidate.is_file() {
+                    Some(candidate.to_string_lossy().into_owned())
+                } else {
+                    None
+                }
+            })
+        })
         .or_else(java_on_path);
     let java_version = if let Some(ref p) = java_path {
         probe_java(p).await.unwrap_or_default()
-    } else { String::new() };
+    } else {
+        String::new()
+    };
     items.push(ExportDependencyStatus {
         id:           "java".into(),
         name:         "Java (JRE)".into(),
@@ -614,8 +827,7 @@ pub async fn export_check_dependencies() -> Result<ExportDependencyReport, Books
     });
 
     // ── EPUBCheck JAR ──
-    let jar = std::env::var("BOOKSFORGE_EPUBCHECK_JAR").ok()
-        .filter(|p| std::path::Path::new(p).is_file());
+    let jar = resolve_epubcheck_jar();
     items.push(ExportDependencyStatus {
         id:           "epubcheck".into(),
         name:         "EPUBCheck".into(),
@@ -623,7 +835,7 @@ pub async fn export_check_dependencies() -> Result<ExportDependencyReport, Books
         path:         jar.unwrap_or_default(),
         version:      String::new(),
         unlocks:      vec!["epub_validation".into()],
-        install_hint: "Download EPUBCheck from https://www.w3.org/publishing/epubcheck/ and set BOOKSFORGE_EPUBCHECK_JAR to the .jar path.  Optional — EPUB export still works without it.".into(),
+        install_hint: "Install via `brew install epubcheck` (auto-detected) or set BOOKSFORGE_EPUBCHECK_JAR to the .jar path.  Optional — EPUB export still works without it.".into(),
     });
 
     Ok(ExportDependencyReport { items })
@@ -638,18 +850,33 @@ pub async fn export_check_dependencies() -> Result<ExportDependencyReport, Books
 async fn run_kdp_checks_for(epub_path: &str) -> (bool, Option<String>, u32, u32) {
     use booksforge_export_epub::{run_kdp_checks, KdpSeverity};
     let bytes = match tokio::fs::read(epub_path).await {
-        Ok(b)  => b,
-        Err(e) => return (true, Some(format!("KDP checks skipped — could not re-read EPUB: {e}")), 0, 0),
+        Ok(b) => b,
+        Err(e) => {
+            return (
+                true,
+                Some(format!("KDP checks skipped — could not re-read EPUB: {e}")),
+                0,
+                0,
+            )
+        }
     };
     let findings = run_kdp_checks(&bytes);
-    let errors:   u32 = findings.iter().filter(|f| f.severity == KdpSeverity::Error).count() as u32;
-    let warnings: u32 = findings.iter().filter(|f| f.severity == KdpSeverity::Warning).count() as u32;
+    let errors: u32 = findings
+        .iter()
+        .filter(|f| f.severity == KdpSeverity::Error)
+        .count() as u32;
+    let warnings: u32 = findings
+        .iter()
+        .filter(|f| f.severity == KdpSeverity::Warning)
+        .count() as u32;
     let ok = errors == 0;
     let msg = if findings.is_empty() {
         Some("KDP structural checks: clean.".to_owned())
     } else {
         // Render up to 3 findings inline; surface the rest as a count.
-        let preview: Vec<String> = findings.iter().take(3)
+        let preview: Vec<String> = findings
+            .iter()
+            .take(3)
             .map(|f| format!("[{:?} {}] {}", f.severity, f.code, f.message))
             .collect();
         let extra = findings.len().saturating_sub(preview.len());
@@ -670,6 +897,94 @@ async fn probe_java(java: &str) -> Option<String> {
     s.lines().next().map(|l| l.trim().to_owned())
 }
 
+// ── publishing_targets_list ───────────────────────────────────────────────────
+
+/// One publishing-target row for the UI picker. Mirrors
+/// `booksforge_domain::TargetSpec` but flattens the parts the UI
+/// needs into a JSON-friendly shape (no `&'static [...]` slices).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PublishingTargetRow {
+    pub id: String,
+    pub label: String,
+    pub blurb: String,
+    pub user_briefing: String,
+    pub artifact_formats: Vec<String>,
+    pub allowed_trims: Vec<TrimRow>,
+    pub identifier_scheme: String,
+    pub toc_depth_max: u8,
+    pub image_min_dpi: u32,
+    pub cover_min_px: (u32, u32),
+    pub cover_aspect_x100: u32,
+    pub fonts_embedded_required: bool,
+    pub pdfx_required: bool,
+    pub accessibility_required: bool,
+    pub epubcheck_required: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TrimRow {
+    pub label: String,
+    pub width_in: f32,
+    pub height_in: f32,
+}
+
+/// List every supported `PublishingTarget` with its compliance spec
+/// flattened for the UI. Read-only; no project context required.
+#[tauri::command]
+pub async fn publishing_targets_list() -> Result<Vec<PublishingTargetRow>, BooksForgeError> {
+    use booksforge_domain::PublishingTarget;
+    let mut out = Vec::with_capacity(PublishingTarget::all().len());
+    for t in PublishingTarget::all() {
+        let s = t.spec();
+        out.push(PublishingTargetRow {
+            id: t.as_str().to_owned(),
+            label: s.label.to_owned(),
+            blurb: s.blurb.to_owned(),
+            user_briefing: s.user_briefing.to_owned(),
+            artifact_formats: s
+                .artifact_formats
+                .iter()
+                .map(|a| {
+                    match a {
+                        booksforge_domain::ArtifactFormat::PdfX1a => "pdf_x1a",
+                        booksforge_domain::ArtifactFormat::Pdf => "pdf",
+                        booksforge_domain::ArtifactFormat::Epub3 => "epub3",
+                        booksforge_domain::ArtifactFormat::Epub2 => "epub2",
+                        booksforge_domain::ArtifactFormat::Docx => "docx",
+                        booksforge_domain::ArtifactFormat::Markdown => "markdown",
+                    }
+                    .to_owned()
+                })
+                .collect(),
+            allowed_trims: s
+                .allowed_trims
+                .iter()
+                .map(|(l, w, h)| TrimRow {
+                    label: (*l).to_owned(),
+                    width_in: *w,
+                    height_in: *h,
+                })
+                .collect(),
+            identifier_scheme: match s.identifier_scheme {
+                booksforge_domain::IdentifierScheme::UrnIsbn => "urn_isbn".to_owned(),
+                booksforge_domain::IdentifierScheme::UrnIsbnPreferred => {
+                    "urn_isbn_preferred".to_owned()
+                }
+                booksforge_domain::IdentifierScheme::UrnBfProject => "urn_bf_project".to_owned(),
+            },
+            toc_depth_max: s.toc_depth_max,
+            image_min_dpi: s.image_min_dpi,
+            cover_min_px: s.cover_min_px,
+            cover_aspect_x100: s.cover_aspect_x100,
+            fonts_embedded_required: s.fonts_embedded_required,
+            pdfx_required: s.pdfx_required,
+            accessibility_required: s.accessibility_required,
+            epubcheck_required: s.epubcheck_required,
+        });
+    }
+    Ok(out)
+}
+
 // ── export_history ────────────────────────────────────────────────────────────
 
 /// List previous exports for the open project, newest first.
@@ -682,13 +997,19 @@ pub async fn export_history(
         guard.as_ref().cloned()
     }
     .ok_or_else(|| BooksForgeError::internal("no project is open".to_owned()))?;
-    let rows = project.storage.list_exports().await
+    let rows = project
+        .storage
+        .list_exports()
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
-    Ok(rows.into_iter().map(|r| ExportHistoryEntry {
-        id:          r.id.to_string(),
-        profile:     r.profile.as_str().to_owned(),
-        output_path: r.output_path,
-        hash:        r.hash,
-        created_at:  r.created_at.to_rfc3339(),
-    }).collect())
+    Ok(rows
+        .into_iter()
+        .map(|r| ExportHistoryEntry {
+            id: r.id.to_string(),
+            profile: r.profile.as_str().to_owned(),
+            output_path: r.output_path,
+            hash: r.hash,
+            created_at: r.created_at.to_rfc3339(),
+        })
+        .collect())
 }

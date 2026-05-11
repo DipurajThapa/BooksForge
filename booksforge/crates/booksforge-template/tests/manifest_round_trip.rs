@@ -9,15 +9,19 @@
 //! preserved, and `TemplateError` carries enough information for
 //! upstream layers to surface useful messages.
 
+// Integration tests live in a separate `tests/` crate, so the workspace's
+// `cfg(test) allow expect_used` does not apply automatically. Opt in here.
+#![allow(clippy::expect_used, clippy::unwrap_used)]
+
 use booksforge_template::{TemplateError, TemplateId, TemplateManifest};
 
 fn sample() -> TemplateManifest {
     TemplateManifest {
-        id:           TemplateId("fiction-literary".to_string()),
-        version:      "1.0.0".to_string(),
+        id: TemplateId("fiction-literary".to_string()),
+        version: "1.0.0".to_string(),
         display_name: "Fiction — Literary".to_string(),
-        mode:         "fiction".to_string(),
-        description:  "Three-act / character-arc / sensory passes.".to_string(),
+        mode: "fiction".to_string(),
+        description: "Three-act / character-arc / sensory passes.".to_string(),
     }
 }
 
@@ -30,7 +34,10 @@ fn template_manifest_round_trips_through_json() {
     assert_eq!(back.version, "1.0.0");
     assert_eq!(back.display_name, "Fiction — Literary");
     assert_eq!(back.mode, "fiction");
-    assert_eq!(back.description, "Three-act / character-arc / sensory passes.");
+    assert_eq!(
+        back.description,
+        "Three-act / character-arc / sensory passes."
+    );
 }
 
 #[test]

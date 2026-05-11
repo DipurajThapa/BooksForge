@@ -21,10 +21,10 @@ pub use booksforge_domain::vocab::{
 
 // ── Shipped TOML dictionaries (compile-time embed) ────────────────────────────
 
-const AI_TELLS_V1:        &str = include_str!("../dictionaries/ai-tells.toml");
-const FANTASY_V1:         &str = include_str!("../dictionaries/genre-fantasy.toml");
-const ROMANCE_V1:         &str = include_str!("../dictionaries/genre-romance.toml");
-const NONFICTION_V1:      &str = include_str!("../dictionaries/mode-non-fiction.toml");
+const AI_TELLS_V1: &str = include_str!("../dictionaries/ai-tells.toml");
+const FANTASY_V1: &str = include_str!("../dictionaries/genre-fantasy.toml");
+const ROMANCE_V1: &str = include_str!("../dictionaries/genre-romance.toml");
+const NONFICTION_V1: &str = include_str!("../dictionaries/mode-non-fiction.toml");
 
 /// All shipped starter layers, in load order.  The seed loader writes them
 /// once at project creation; users can later override any row.
@@ -40,9 +40,9 @@ pub fn starter_layers() -> Vec<&'static str> {
 /// Source bytes for a starter layer slug, or `None` if unknown.
 pub fn starter_source(layer: &str) -> Option<&'static str> {
     match layer {
-        "ai_tells"        => Some(AI_TELLS_V1),
-        "genre:fantasy"   => Some(FANTASY_V1),
-        "genre:romance"   => Some(ROMANCE_V1),
+        "ai_tells" => Some(AI_TELLS_V1),
+        "genre:fantasy" => Some(FANTASY_V1),
+        "genre:romance" => Some(ROMANCE_V1),
         "mode:non_fiction" => Some(NONFICTION_V1),
         _ => None,
     }
@@ -52,17 +52,22 @@ pub fn starter_source(layer: &str) -> Option<&'static str> {
 /// with `EntrySource::Starter`.  Lower-cased term + display term are both
 /// preserved.
 pub fn starter_entries(layer: &str) -> Result<Vec<VocabEntry>, VocabLoadError> {
-    let raw = starter_source(layer).ok_or_else(|| VocabLoadError::UnknownLayer(layer.to_owned()))?;
-    let parsed: TomlDictionary = toml::from_str(raw)
-        .map_err(|e| VocabLoadError::Parse(format!("layer '{layer}': {e}")))?;
+    let raw =
+        starter_source(layer).ok_or_else(|| VocabLoadError::UnknownLayer(layer.to_owned()))?;
+    let parsed: TomlDictionary =
+        toml::from_str(raw).map_err(|e| VocabLoadError::Parse(format!("layer '{layer}': {e}")))?;
 
     let mut out = Vec::with_capacity(parsed.entries.len());
     for raw_entry in parsed.entries {
         let kind = EntryKind::from_str(&raw_entry.kind)
             .ok_or_else(|| VocabLoadError::Parse(format!("invalid kind '{}'", raw_entry.kind)))?;
         let mut entry = VocabEntry::new(layer, &raw_entry.term, kind, EntrySource::Starter);
-        if let Some(r) = raw_entry.replacement { entry = entry.with_replacement(r); }
-        if let Some(r) = raw_entry.rationale   { entry = entry.with_rationale(r); }
+        if let Some(r) = raw_entry.replacement {
+            entry = entry.with_replacement(r);
+        }
+        if let Some(r) = raw_entry.rationale {
+            entry = entry.with_rationale(r);
+        }
         out.push(entry);
     }
     Ok(out)
@@ -88,12 +93,12 @@ struct TomlDictionary {
 
 #[derive(Debug, Deserialize)]
 struct TomlEntry {
-    term:        String,
-    kind:        String,
+    term: String,
+    kind: String,
     #[serde(default)]
     replacement: Option<String>,
     #[serde(default)]
-    rationale:   Option<String>,
+    rationale: Option<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -119,7 +124,11 @@ mod tests {
     #[test]
     fn ai_tells_layer_has_at_least_a_dozen_entries() {
         let entries = starter_entries("ai_tells").unwrap();
-        assert!(entries.len() >= 12, "expected ≥12 ai-tells entries, got {}", entries.len());
+        assert!(
+            entries.len() >= 12,
+            "expected ≥12 ai-tells entries, got {}",
+            entries.len()
+        );
     }
 
     #[test]

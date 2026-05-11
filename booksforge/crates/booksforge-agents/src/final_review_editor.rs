@@ -48,17 +48,29 @@
 use booksforge_prompt::PromptTemplateId;
 
 use crate::spec::{
-    AgentSpec, ContextBudget, CrossCuttingValidator, FailureMode, ModelFamily, ModelPreference,
-    ModelSizeHint, UserGate, WhenToRun,
+    AgentSpec, ContextBudget, CrossCuttingValidator, DefaultThinking, FailureMode, ModelFamily,
+    ModelPreference, ModelSizeHint, UserGate, WhenToRun,
 };
 
 /// Stable model pin for the Final Review Editor.
 pub const PINNED_MODEL: &str = "qwen3.6:latest";
 
 const FAILURE_MODES: &[FailureMode] = &[
-    FailureMode { id: "voice-drift",       description: "Polished prose loses the author's voice.",         recoverable: true },
-    FailureMode { id: "fact-invention",    description: "Edit introduces facts not present in source.",     recoverable: false },
-    FailureMode { id: "model-unavailable", description: "Pinned qwen3.6 model not pulled locally.",          recoverable: false },
+    FailureMode {
+        id: "voice-drift",
+        description: "Polished prose loses the author's voice.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "fact-invention",
+        description: "Edit introduces facts not present in source.",
+        recoverable: false,
+    },
+    FailureMode {
+        id: "model-unavailable",
+        description: "Pinned qwen3.6 model not pulled locally.",
+        recoverable: false,
+    },
 ];
 
 pub fn spec() -> AgentSpec {
@@ -89,6 +101,7 @@ pub fn spec() -> AgentSpec {
         failure_modes: FAILURE_MODES,
         when_to_run: WhenToRun::OnDemand,
         user_gate:   UserGate::Required,
+        default_thinking: DefaultThinking::Disabled,
     }
 }
 

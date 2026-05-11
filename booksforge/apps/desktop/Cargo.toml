@@ -22,10 +22,13 @@ booksforge-snapshot     = { path = "../../crates/booksforge-snapshot" }
 booksforge-export       = { path = "../../crates/booksforge-export" }
 booksforge-export-epub  = { path = "../../crates/booksforge-export-epub" }
 booksforge-export-pandoc = { path = "../../crates/booksforge-export-pandoc" }
+booksforge-export-typst = { path = "../../crates/booksforge-export-typst" }
 booksforge-epubcheck    = { path = "../../crates/booksforge-epubcheck" }
+booksforge-voice        = { path = "../../crates/booksforge-voice" }
+booksforge-anti-ai-tells = { path = "../../crates/booksforge-anti-ai-tells" }
+booksforge-genre-packs  = { path = "../../crates/booksforge-genre-packs" }
 booksforge-vocab        = { path = "../../crates/booksforge-vocab" }
 booksforge-validator    = { path = "../../crates/booksforge-validator" }
-booksforge-agents       = { path = "../../crates/booksforge-agents" }
 ulid.workspace          = true
 
 tauri.workspace               = true
@@ -34,7 +37,6 @@ blake3.workspace              = true
 chrono.workspace              = true
 serde.workspace              = true
 serde_json.workspace         = true
-thiserror.workspace          = true
 tokio.workspace              = true
 tracing.workspace            = true
 tracing-subscriber.workspace = true
@@ -42,6 +44,9 @@ tracing-appender.workspace   = true
 dirs.workspace               = true
 zip.workspace                = true
 ts-rs.workspace              = true
+
+[dev-dependencies]
+tempfile = "3"
 
 [lints]
 workspace = true

@@ -1,0 +1,74 @@
+# metaphor-polish/v1.toml
+#
+# Specialist polish stage. Replaces clichéd images, tunes metaphor density,
+# enforces character-specific imagery (no generic-AI metaphors). Voice-
+# preserving: only changes images, leaves dialogue + plot beats untouched.
+
+schema_version  = 1
+description     = "Metaphor specialist — replace clichés, tune density, enforce character-specific imagery."
+
+[input.required]
+chapter_text   = { kind = "string" }
+genre_label    = { kind = "string" }
+pov_character  = { kind = "string" }   # so the polisher knows whose lived world to draw from
+
+[input.optional]
+character_card     = { kind = "json", default = {}, schema = "CharacterCard" }
+banned_metaphors   = { kind = "json", default = [], schema = "string[]" }
+prompt_guard       = { kind = "string", default = "" }
+creative_profile   = { kind = "string", default = "" }
+
+[render.system]
+text = """
+You are a craft editor specialising in figurative language for {{ genre_label }}.
+
+Your job: replace clichéd metaphors and dead similes with fresh,
+character-specific images.
+
+Density targets:
+  - literary_fiction : 1-2 fresh images per 500 words.
+  - genre_fiction    : 0.5-1 fresh images per 500 words.
+  - non_fiction      : 0.5 fresh images per 500 words; only when it sharpens
+                       the argument.
+
+EVERY metaphor must come from the POV character's lived experience —
+a baker thinks in terms of dough, a soldier in terms of weight of armour,
+a grandmother in terms of waiting rooms. Generic-AI metaphors are
+forbidden:
+  - tapestry, symphony, kaleidoscope, dance, journey
+  - "It was as if X"
+  - any cliché image (cold as ice, heart of stone, blood ran cold)
+{% if banned_metaphors %}
+  Plus this project's banned list: {{ banned_metaphors | join(", ") }}.
+{% endif %}
+
+Hard rules:
+  - Touch only metaphor + simile + image. Leave dialogue, plot beats,
+    character actions exactly.
+  - Preserve word count within ±5%.
+  - If you cannot improve a clichéd image, CUT it (often better than a
+    forced replacement).
+
+{{ creative_profile }}
+
+{{ prompt_guard }}
+
+Return ONLY the revised chapter — no commentary.
+"""
+
+[render.user]
+text = """
+POV character: {{ pov_character }}
+{% if character_card %}
+Character card (use to derive lived-world imagery):
+{{ character_card | tojson }}
+{% endif %}
+
+Chapter:
+---
+{{ chapter_text }}
+---
+"""
+
+[render.json_schema]
+ref = ""

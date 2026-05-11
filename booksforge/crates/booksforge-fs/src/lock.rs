@@ -12,7 +12,10 @@ pub enum LockError {
     AlreadyLocked { pid: u32 },
 
     #[error("I/O error acquiring lock at {path}: {source}")]
-    Io { path: String, source: std::io::Error },
+    Io {
+        path: String,
+        source: std::io::Error,
+    },
 }
 
 /// RAII guard that holds a lock file for the duration of its lifetime.
@@ -81,7 +84,10 @@ fn try_create_lock(path: &PathBuf) -> Result<(), LockError> {
             if e.kind() == std::io::ErrorKind::AlreadyExists {
                 LockError::AlreadyLocked { pid: 0 }
             } else {
-                LockError::Io { path: path.display().to_string(), source: e }
+                LockError::Io {
+                    path: path.display().to_string(),
+                    source: e,
+                }
             }
         })?;
 
@@ -114,8 +120,8 @@ fn pid_is_alive(pid: u32) -> bool {
 
     #[cfg(windows)]
     {
-        use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
         use windows::Win32::Foundation::CloseHandle;
+        use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
         // SAFETY: `OpenProcess` with `PROCESS_QUERY_LIMITED_INFORMATION` is the
         // minimum-privilege handle that lets us test process existence on
         // Windows.  We immediately close the handle (or never receive one) so

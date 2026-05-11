@@ -65,12 +65,18 @@ fn http_clients_are_only_in_allowlisted_crates() {
 
     for entry in fs::read_dir(&crates_dir).expect("read crates/") {
         let entry = entry.expect("crate entry");
-        if !entry.file_type().expect("ft").is_dir() { continue; }
+        if !entry.file_type().expect("ft").is_dir() {
+            continue;
+        }
         let crate_name = entry.file_name().to_string_lossy().to_string();
-        if HTTP_ALLOWLIST.contains(&crate_name.as_str()) { continue; }
+        if HTTP_ALLOWLIST.contains(&crate_name.as_str()) {
+            continue;
+        }
 
         let cargo_toml = entry.path().join("Cargo.toml");
-        if !cargo_toml.exists() { continue; }
+        if !cargo_toml.exists() {
+            continue;
+        }
         let content = fs::read_to_string(&cargo_toml).expect("read Cargo.toml");
         for dep in HTTP_DEPS {
             // Match `dep = "…"` or `dep = { … }` or `dep.workspace`, but not
@@ -78,9 +84,10 @@ fn http_clients_are_only_in_allowlisted_crates() {
             // a comment) — we anchor on a line start or a TOML value boundary.
             for line in content.lines() {
                 let trimmed = line.trim_start();
-                if trimmed.starts_with(&format!("{dep} ")) ||
-                   trimmed.starts_with(&format!("{dep}.")) ||
-                   trimmed.starts_with(&format!("{dep}=")) {
+                if trimmed.starts_with(&format!("{dep} "))
+                    || trimmed.starts_with(&format!("{dep}."))
+                    || trimmed.starts_with(&format!("{dep}="))
+                {
                     violations.push(format!("{crate_name} depends on {dep}: {line}"));
                 }
             }
@@ -99,14 +106,24 @@ fn http_clients_are_only_in_allowlisted_crates() {
 // ── 3. No telemetry / analytics SDKs anywhere ───────────────────────────────
 
 const TELEMETRY_BLOCKLIST: &[&str] = &[
-    "sentry", "sentry-core", "sentry-anyhow",
-    "posthog", "posthog-rs",
-    "mixpanel", "amplitude",
-    "datadog", "ddtrace", "dd-trace",
-    "segment", "segment-rs",
-    "rollbar", "bugsnag",
-    "honeycomb", "newrelic",
-    "google-analytics", "umami",
+    "sentry",
+    "sentry-core",
+    "sentry-anyhow",
+    "posthog",
+    "posthog-rs",
+    "mixpanel",
+    "amplitude",
+    "datadog",
+    "ddtrace",
+    "dd-trace",
+    "segment",
+    "segment-rs",
+    "rollbar",
+    "bugsnag",
+    "honeycomb",
+    "newrelic",
+    "google-analytics",
+    "umami",
 ];
 
 #[test]
@@ -117,10 +134,11 @@ fn no_telemetry_sdks_in_workspace() {
         for blocked in TELEMETRY_BLOCKLIST {
             for line in content.lines() {
                 let trimmed = line.trim_start();
-                if trimmed.starts_with(&format!("{blocked} ")) ||
-                   trimmed.starts_with(&format!("{blocked}.")) ||
-                   trimmed.starts_with(&format!("{blocked}=")) ||
-                   trimmed.starts_with(&format!("\"{blocked}\"")) {
+                if trimmed.starts_with(&format!("{blocked} "))
+                    || trimmed.starts_with(&format!("{blocked}."))
+                    || trimmed.starts_with(&format!("{blocked}="))
+                    || trimmed.starts_with(&format!("\"{blocked}\""))
+                {
                     found.push(format!("{}: {}", path.display(), line.trim()));
                 }
             }
@@ -132,14 +150,15 @@ fn no_telemetry_sdks_in_workspace() {
         "PRIVACY REGRESSION: telemetry / analytics SDK detected.  BooksForge \
          is local-first; no third-party telemetry is permitted.\n\
          Found:\n  {}",
-         found.join("\n  "),
+        found.join("\n  "),
     );
 }
 
 // ── 4. No external URLs in registered prompt templates ──────────────────────
 
 const URL_ALLOWLIST: &[&str] = &[
-    "127.0.0.1", "localhost",
+    "127.0.0.1",
+    "localhost",
     // Documentation references that may legitimately appear in template
     // *comments* but never get rendered to the model:
     "https://www.w3.org",
@@ -152,7 +171,9 @@ const URL_ALLOWLIST: &[&str] = &[
 #[test]
 fn prompt_templates_contain_no_external_urls() {
     let templates_dir = workspace_root()
-        .join("crates").join("booksforge-prompt").join("templates");
+        .join("crates")
+        .join("booksforge-prompt")
+        .join("templates");
     let mut violations = Vec::new();
 
     walk_files(&templates_dir, "toml", &mut |path, content| {
@@ -160,14 +181,17 @@ fn prompt_templates_contain_no_external_urls() {
             for proto in &["http://", "https://"] {
                 if let Some(idx) = line.find(proto) {
                     let rest = &line[idx..];
-                    let url_end = rest.find(|c: char| c.is_whitespace() || c == '"' || c == ')')
+                    let url_end = rest
+                        .find(|c: char| c.is_whitespace() || c == '"' || c == ')')
                         .unwrap_or(rest.len());
                     let url = &rest[..url_end];
                     let allowed = URL_ALLOWLIST.iter().any(|a| url.contains(a));
                     if !allowed {
                         violations.push(format!(
                             "{}:{} — {url}",
-                            path.strip_prefix(workspace_root()).unwrap_or(path).display(),
+                            path.strip_prefix(workspace_root())
+                                .unwrap_or(path)
+                                .display(),
                             lineno + 1,
                         ));
                     }
@@ -190,7 +214,9 @@ fn prompt_templates_contain_no_external_urls() {
 #[test]
 fn tauri_capabilities_match_privacy_contract() {
     let path = workspace_root()
-        .join("apps").join("desktop").join("capabilities");
+        .join("apps")
+        .join("desktop")
+        .join("capabilities");
     if !path.exists() {
         // Capability files may not be split out yet — soft skip.
         return;
@@ -202,7 +228,7 @@ fn tauri_capabilities_match_privacy_contract() {
             // allow lists and assert each is loopback or a known doc domain.
             for proto in &["\"http://", "\"https://"] {
                 if let Some(idx) = line.find(proto) {
-                    let rest = &line[idx + 1..];  // skip leading quote
+                    let rest = &line[idx + 1..]; // skip leading quote
                     let url_end = rest.find('"').unwrap_or(rest.len());
                     let url = &rest[..url_end];
                     let allowed = URL_ALLOWLIST.iter().any(|a| url.contains(a));
@@ -227,19 +253,20 @@ fn tauri_capabilities_match_privacy_contract() {
 
 #[tokio::test]
 async fn default_originality_provider_is_local_only() {
-    use std::sync::Arc;
+    use booksforge_domain::OriginalityProviderId;
     use booksforge_orchestrator::originality_provider::active_provider;
     use booksforge_storage::{open_pool, run_migrations, SqliteStorage};
-    use booksforge_domain::OriginalityProviderId;
+    use std::sync::Arc;
 
-    let dir  = tempfile::tempdir().expect("tempdir");
+    let dir = tempfile::tempdir().expect("tempdir");
     let pool = open_pool(&dir.path().join("op.db")).await.unwrap();
     run_migrations(&pool).await.unwrap();
     let storage = Arc::new(SqliteStorage::new(pool));
 
     let active = active_provider(&storage).await;
     assert_eq!(
-        active, OriginalityProviderId::LocalOnly,
+        active,
+        OriginalityProviderId::LocalOnly,
         "PRIVACY REGRESSION: a fresh project must default to the LocalOnly \
          originality provider.  An off-device provider would send manuscript \
          content to a third party without explicit consent."
@@ -255,9 +282,13 @@ fn workspace_root() -> PathBuf {
         let candidate = p.join("Cargo.toml");
         if candidate.exists() {
             let content = fs::read_to_string(&candidate).unwrap_or_default();
-            if content.contains("[workspace]") { return p; }
+            if content.contains("[workspace]") {
+                return p;
+            }
         }
-        if !p.pop() { panic!("workspace Cargo.toml not found"); }
+        if !p.pop() {
+            panic!("workspace Cargo.toml not found");
+        }
     }
 }
 
@@ -267,7 +298,9 @@ fn walk_cargo_tomls(root: &Path, visit: &mut dyn FnMut(&Path, &str)) {
         if p.file_name().and_then(|s| s.to_str()) == Some("Cargo.toml")
             && visited.insert(p.to_path_buf())
         {
-            if let Ok(c) = fs::read_to_string(p) { visit(p, &c); }
+            if let Ok(c) = fs::read_to_string(p) {
+                visit(p, &c);
+            }
         }
     });
 }
@@ -275,14 +308,21 @@ fn walk_cargo_tomls(root: &Path, visit: &mut dyn FnMut(&Path, &str)) {
 fn walk_files(root: &Path, extension: &str, visit: &mut dyn FnMut(&Path, &str)) {
     walk(root, &mut |p| {
         if p.extension().and_then(|s| s.to_str()) == Some(extension) {
-            if let Ok(c) = fs::read_to_string(p) { visit(p, &c); }
+            if let Ok(c) = fs::read_to_string(p) {
+                visit(p, &c);
+            }
         }
     });
 }
 
 fn walk(root: &Path, f: &mut dyn FnMut(&Path)) {
-    if !root.exists() { return; }
-    let entries = match fs::read_dir(root) { Ok(e) => e, Err(_) => return };
+    if !root.exists() {
+        return;
+    }
+    let entries = match fs::read_dir(root) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
@@ -290,7 +330,10 @@ fn walk(root: &Path, f: &mut dyn FnMut(&Path)) {
         if name == "target" || name == "node_modules" || name == ".git" || name == ".sqlx" {
             continue;
         }
-        if path.is_dir() { walk(&path, f); }
-        else { f(&path); }
+        if path.is_dir() {
+            walk(&path, f);
+        } else {
+            f(&path);
+        }
     }
 }

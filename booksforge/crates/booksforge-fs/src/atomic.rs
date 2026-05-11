@@ -1,7 +1,7 @@
 //! Atomic file/directory operations (tmp + rename).
 
-use std::path::Path;
 use crate::FsError;
+use std::path::Path;
 
 /// Atomically rename `src` to `dst`.
 ///
@@ -27,10 +27,12 @@ pub fn atomic_rename(src: &Path, dst: &Path) -> Result<(), FsError> {
 /// Used for `manifest.toml`, `settings.toml`, and other human-editable files.
 pub async fn atomic_write(path: &Path, content: &[u8]) -> Result<(), FsError> {
     let tmp = path.with_extension("tmp");
-    tokio::fs::write(&tmp, content).await.map_err(|e| FsError::Io {
-        path: tmp.display().to_string(),
-        source: e,
-    })?;
+    tokio::fs::write(&tmp, content)
+        .await
+        .map_err(|e| FsError::Io {
+            path: tmp.display().to_string(),
+            source: e,
+        })?;
     std::fs::rename(&tmp, path).map_err(|e| FsError::Io {
         path: format!("{} → {}", tmp.display(), path.display()),
         source: e,

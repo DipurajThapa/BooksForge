@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
 use booksforge_domain::project::{BookMode, ProjectMeta};
+use booksforge_domain::BookKind;
 
 use crate::FsError;
 
@@ -15,20 +16,27 @@ use crate::FsError;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BundleManifest {
     pub project: ManifestProject,
-    pub meta:    ProjectMeta,
+    pub meta: ProjectMeta,
 }
 
 /// `[project]` section of `manifest.toml`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ManifestProject {
-    pub id:               String, // ULID as string
-    pub schema_version:   u32,
-    pub mode:             BookMode,
-    pub template_id:      String,
+    pub id: String, // ULID as string
+    pub schema_version: u32,
+    pub mode: BookMode,
+    /// Finer-grained classification (Phase 4 of PRODUCT_ROADMAP_E2E.md).
+    /// Optional for backwards compatibility — projects created before
+    /// this field existed deserialise with `book_kind = None`. The
+    /// desktop app surfaces an onboarding overlay to backfill in that
+    /// case. New projects always set it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub book_kind: Option<BookKind>,
+    pub template_id: String,
     pub template_version: String,
-    pub ai_enabled:       bool,
-    pub created_at:       DateTime<Utc>,
-    pub updated_at:       DateTime<Utc>,
+    pub ai_enabled: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl BundleManifest {
@@ -44,12 +52,16 @@ impl BundleManifest {
             .map_err(|e| FsError::Serialization(format!("manifest parse error: {e}")))
     }
 
-    /// Create a new manifest for a freshly created project.
+    /// Create a new manifest for a freshly created project. Per Phase 4
+    /// of PRODUCT_ROADMAP_E2E.md, the wizard supplies `book_kind`
+    /// upfront; pass `None` only when migrating older projects (the
+    /// onboarding overlay then asks the user to pick).
     pub fn new(
         title: String,
         author: String,
         genre: Option<String>,
         mode: BookMode,
+        book_kind: Option<BookKind>,
     ) -> Self {
         let now = Utc::now();
         let id = Ulid::new().to_string();
@@ -58,6 +70,7 @@ impl BundleManifest {
                 id,
                 schema_version: 1,
                 mode,
+                book_kind,
                 template_id: "default".to_owned(),
                 template_version: "1.0.0".to_owned(),
                 ai_enabled: false,
@@ -72,6 +85,14 @@ impl BundleManifest {
                 target_words: None,
             },
         }
+    }
+
+    /// Set or change the project's `book_kind` field. Returns the new
+    /// manifest (callers persist via `to_toml` + atomic write). Use
+    /// from the SettingsPanel and the migration onboarding overlay.
+    pub fn set_book_kind(&mut self, book_kind: BookKind) {
+        self.project.book_kind = Some(book_kind);
+        self.project.updated_at = Utc::now();
     }
 
     /// Read `manifest.toml` from a bundle directory.

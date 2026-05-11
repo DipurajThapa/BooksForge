@@ -27,23 +27,26 @@
 #![forbid(unsafe_code)]
 // BACKLOG §C4: tests freely use `.unwrap()` / `.expect()` against canned
 // fixtures; the workspace-level clippy lints fire only on shipped code.
-#![cfg_attr(test, allow(
-    clippy::unwrap_used, clippy::expect_used, clippy::panic,
-    clippy::print_stderr, clippy::print_stdout,
-))]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::print_stderr,
+        clippy::print_stdout,
+    )
+)]
 
 use std::io::{Cursor, Write};
 
 pub mod kdp_checks;
-pub use kdp_checks::{KdpFinding, KdpSeverity, run_kdp_checks};
+pub use kdp_checks::{run_kdp_checks, KdpFinding, KdpSeverity};
 
 use booksforge_domain::FormatProfile;
 use booksforge_export::{ExportOutcome, ExportProfile};
 use serde::{Deserialize, Serialize};
-use zip::{
-    write::SimpleFileOptions,
-    CompressionMethod, DateTime, ZipWriter,
-};
+use zip::{write::SimpleFileOptions, CompressionMethod, DateTime, ZipWriter};
 
 /// Input to the EPUB packager.
 #[derive(Debug, Clone)]
@@ -79,8 +82,8 @@ pub struct EpubPackageInput {
 /// One chapter's canonical HTML for inclusion in the EPUB manifest.
 #[derive(Debug, Clone)]
 pub struct HtmlChapter {
-    pub node_id:   String,
-    pub title:     String,
+    pub node_id: String,
+    pub title: String,
     /// HTML *body* — the packager wraps it in the XHTML envelope (head,
     /// stylesheet link, etc).  Must be well-formed XHTML.
     pub html_body: String,
@@ -89,19 +92,19 @@ pub struct HtmlChapter {
 /// EPUB metadata block derived from `ProjectMeta`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EpubMetadata {
-    pub title:       String,
-    pub authors:     Vec<String>,
+    pub title: String,
+    pub authors: Vec<String>,
     /// BCP-47 language code (e.g. `"en"`).  Defaults to `"en"` when blank.
-    pub language:    String,
-    pub publisher:   Option<String>,
+    pub language: String,
+    pub publisher: Option<String>,
     pub description: Option<String>,
     /// ISBN — copied into `<dc:identifier>` if provided; otherwise a
     /// `urn:uuid:` is generated from `book_id`.
-    pub isbn:        Option<String>,
+    pub isbn: Option<String>,
     /// Stable book id used as the package's `unique-identifier`.  Caller
     /// supplies a project-stable ULID so subsequent exports of the same
     /// project share an id.
-    pub book_id:     String,
+    pub book_id: String,
     /// Optional dedication line ("For my parents") for the
     /// auto-generated dedication page.  Only emitted when the
     /// `format_profile` includes `FrontMatterPage::Dedication`.
@@ -130,7 +133,10 @@ pub enum EpubError {
     InvalidMetadata { message: String },
 
     #[error("I/O error writing EPUB to {path}: {source}")]
-    Io { path: String, source: std::io::Error },
+    Io {
+        path: String,
+        source: std::io::Error,
+    },
 
     #[error("ZIP construction failed: {0}")]
     Zip(#[from] zip::result::ZipError),
@@ -145,8 +151,13 @@ pub fn build_epub_bytes(input: &EpubPackageInput) -> Result<Vec<u8>, EpubError> 
     if input.chapters.is_empty() {
         return Err(EpubError::NoChapters);
     }
-    if !matches!(input.profile, ExportProfile::KdpEbook | ExportProfile::GenericEpub) {
-        return Err(EpubError::UnsupportedProfile { profile: input.profile });
+    if !matches!(
+        input.profile,
+        ExportProfile::KdpEbook | ExportProfile::GenericEpub
+    ) {
+        return Err(EpubError::UnsupportedProfile {
+            profile: input.profile,
+        });
     }
     if input.metadata.title.trim().is_empty() {
         return Err(EpubError::InvalidMetadata {
@@ -163,7 +174,9 @@ pub fn build_epub_bytes(input: &EpubPackageInput) -> Result<Vec<u8>, EpubError> 
 
     let language = if input.metadata.language.trim().is_empty() {
         "en".to_owned()
-    } else { input.metadata.language.clone() };
+    } else {
+        input.metadata.language.clone()
+    };
 
     // Fixed timestamp = ZIP epoch (1980-01-01 00:00:00).
     let zip_dt = DateTime::default();
@@ -196,7 +209,7 @@ pub fn build_epub_bytes(input: &EpubPackageInput) -> Result<Vec<u8>, EpubError> 
         // Google Fonts CDN @import.
         let bundled_fonts: Vec<BundledFont> = match input.font_bundle_dir.as_deref() {
             Some(dir) => collect_bundled_fonts(dir, input.format_profile),
-            None      => Vec::new(),
+            None => Vec::new(),
         };
         for f in &bundled_fonts {
             zip.start_file(format!("OEBPS/fonts/{}", f.epub_name), entry_opts)?;
@@ -214,7 +227,9 @@ pub fn build_epub_bytes(input: &EpubPackageInput) -> Result<Vec<u8>, EpubError> 
         // / epigraph / TOC).  Skipped entirely if the caller's first
         // chapter already looks like a title page — authors who
         // supply their own front-matter take precedence.
-        let supplied_first_title = input.chapters.first()
+        let supplied_first_title = input
+            .chapters
+            .first()
             .map(|c| c.title.to_lowercase())
             .unwrap_or_default();
         let author_provided_frontmatter = matches!(
@@ -223,7 +238,7 @@ pub fn build_epub_bytes(input: &EpubPackageInput) -> Result<Vec<u8>, EpubError> 
         );
 
         let mut chapter_filenames: Vec<String> = Vec::with_capacity(input.chapters.len() + 4);
-        let mut spine_chapters:    Vec<HtmlChapter> = Vec::with_capacity(input.chapters.len() + 4);
+        let mut spine_chapters: Vec<HtmlChapter> = Vec::with_capacity(input.chapters.len() + 4);
 
         if !author_provided_frontmatter {
             for page in input.format_profile.front_matter_pages() {
@@ -242,16 +257,34 @@ pub fn build_epub_bytes(input: &EpubPackageInput) -> Result<Vec<u8>, EpubError> 
                     FrontMatterPage::Dedication => {
                         // Skip if the author hasn't supplied one — better
                         // than a stub "For ___" placeholder.
-                        let Some(text) = input.metadata.dedication.as_ref()
+                        let Some(text) = input
+                            .metadata
+                            .dedication
+                            .as_ref()
                             .filter(|s| !s.trim().is_empty())
-                        else { continue };
-                        ("dedication.xhtml", "Dedication".to_owned(), render_dedication_body(text))
+                        else {
+                            continue;
+                        };
+                        (
+                            "dedication.xhtml",
+                            "Dedication".to_owned(),
+                            render_dedication_body(text),
+                        )
                     }
                     FrontMatterPage::Epigraph => {
-                        let Some((text, source)) = input.metadata.epigraph.as_ref()
+                        let Some((text, source)) = input
+                            .metadata
+                            .epigraph
+                            .as_ref()
                             .filter(|(t, _)| !t.trim().is_empty())
-                        else { continue };
-                        ("epigraph.xhtml", "Epigraph".to_owned(), render_epigraph_body(text, source))
+                        else {
+                            continue;
+                        };
+                        (
+                            "epigraph.xhtml",
+                            "Epigraph".to_owned(),
+                            render_epigraph_body(text, source),
+                        )
                     }
                     FrontMatterPage::TableOfContents => {
                         // The EPUB nav.xhtml IS the table of contents in
@@ -266,7 +299,7 @@ pub fn build_epub_bytes(input: &EpubPackageInput) -> Result<Vec<u8>, EpubError> 
                 zip.write_all(xhtml.as_bytes())?;
                 chapter_filenames.push(fname.to_owned());
                 spine_chapters.push(HtmlChapter {
-                    node_id:   fname.trim_end_matches(".xhtml").to_owned(),
+                    node_id: fname.trim_end_matches(".xhtml").to_owned(),
                     title,
                     html_body: body,
                 });
@@ -292,8 +325,12 @@ pub fn build_epub_bytes(input: &EpubPackageInput) -> Result<Vec<u8>, EpubError> 
         // ── 7. OEBPS/content.opf
         zip.start_file("OEBPS/content.opf", entry_opts)?;
         let opf = render_content_opf(
-            &input.metadata, &language, input.profile,
-            &chapter_filenames, &spine_chapters, &bundled_fonts,
+            &input.metadata,
+            &language,
+            input.profile,
+            &chapter_filenames,
+            &spine_chapters,
+            &bundled_fonts,
         );
         zip.write_all(opf.as_bytes())?;
 
@@ -307,8 +344,8 @@ pub fn build_epub_bytes(input: &EpubPackageInput) -> Result<Vec<u8>, EpubError> 
 /// avoid stalling the async runtime on large books.
 pub async fn build_epub(input: EpubPackageInput) -> Result<ExportOutcome, EpubError> {
     let bytes = build_epub_bytes(&input)?;
-    let path  = input.output_path.clone();
-    let hash  = blake3::hash(&bytes).to_hex().to_string();
+    let path = input.output_path.clone();
+    let hash = blake3::hash(&bytes).to_hex().to_string();
 
     let path_blocking = path.clone();
     let bytes_for_write = bytes;
@@ -328,9 +365,16 @@ pub async fn build_epub(input: EpubPackageInput) -> Result<ExportOutcome, EpubEr
         path: path.clone(),
         source: std::io::Error::other(e),
     })?
-    .map_err(|e| EpubError::Io { path: path.clone(), source: e })?;
+    .map_err(|e| EpubError::Io {
+        path: path.clone(),
+        source: e,
+    })?;
 
-    Ok(ExportOutcome { profile: input.profile, output_path: path, hash })
+    Ok(ExportOutcome {
+        profile: input.profile,
+        output_path: path,
+        hash,
+    })
 }
 
 // ── XML / XHTML / OPF rendering ─────────────────────────────────────────────
@@ -350,13 +394,13 @@ const CONTAINER_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 pub struct BundledFont {
     /// Family name as it appears in `FormatProfile::google_body_family`
     /// (e.g. `"EB Garamond"`).
-    pub family:    String,
+    pub family: String,
     /// File name inside the EPUB (e.g. `"EBGaramond[wght].ttf"`).
     pub epub_name: String,
     /// CSS `font-style` — `"normal"` or `"italic"`.
-    pub style:     &'static str,
+    pub style: &'static str,
     /// Raw font bytes.
-    pub bytes:     Vec<u8>,
+    pub bytes: Vec<u8>,
 }
 
 impl BundledFont {
@@ -365,7 +409,9 @@ impl BundledFont {
         // recommended type for both .otf and .ttf files.
         "application/font-sfnt"
     }
-    fn opf_id(&self, idx: usize) -> String { format!("font-{idx}") }
+    fn opf_id(&self, idx: usize) -> String {
+        format!("font-{idx}")
+    }
 }
 
 /// Walk `dir` (the bundled-font directory laid down by
@@ -392,29 +438,35 @@ fn collect_bundled_fonts(dir: &str, profile: FormatProfile) -> Vec<BundledFont> 
         wanted.push(profile.google_heading_family());
     }
     for family in wanted {
-        let dir_name = family.replace(' ', "_");                // "EB Garamond" → "EB_Garamond"
-        let stem     = family.replace(' ', "");                 // "EB Garamond" → "EBGaramond"
+        let dir_name = family.replace(' ', "_"); // "EB Garamond" → "EB_Garamond"
+        let stem = family.replace(' ', ""); // "EB Garamond" → "EBGaramond"
         let family_dir = Path::new(dir).join(&dir_name);
 
         // Variable-weight families ship as `<Stem>[wght].ttf` /
         // `<Stem>-Italic[wght].ttf`; some (Source Serif 4 / Inter)
         // also expose the `opsz` axis.  Try the candidates in order.
         let candidates: [(&str, Vec<String>); 2] = [
-            ("normal", vec![
-                format!("{stem}[wght].ttf"),
-                format!("{stem}[opsz,wght].ttf"),
-            ]),
-            ("italic", vec![
-                format!("{stem}-Italic[wght].ttf"),
-                format!("{stem}-Italic[opsz,wght].ttf"),
-            ]),
+            (
+                "normal",
+                vec![
+                    format!("{stem}[wght].ttf"),
+                    format!("{stem}[opsz,wght].ttf"),
+                ],
+            ),
+            (
+                "italic",
+                vec![
+                    format!("{stem}-Italic[wght].ttf"),
+                    format!("{stem}-Italic[opsz,wght].ttf"),
+                ],
+            ),
         ];
         for (style, names) in candidates.iter() {
             for name in names {
                 let path = family_dir.join(name);
                 if let Ok(bytes) = std::fs::read(&path) {
                     out.push(BundledFont {
-                        family:    family.to_owned(),
+                        family: family.to_owned(),
                         epub_name: name.clone(),
                         style,
                         bytes,
@@ -439,14 +491,14 @@ fn collect_bundled_fonts(dir: &str, profile: FormatProfile) -> Vec<BundledFont> 
 /// Static fallback (the original `BOOK_CSS` const) lives below as a
 /// reference but is no longer used directly.
 fn render_book_css(profile: FormatProfile, bundled_fonts: &[BundledFont]) -> String {
-    let body_family    = profile.body_font_family();
+    let body_family = profile.body_font_family();
     let heading_family = profile.heading_font_family();
-    let body_size      = profile.body_em();
-    let line_height    = profile.line_height();
-    let scene_glyph    = profile.scene_break_glyph();
-    let ornament_svg   = profile.ornament_svg();
-    let para_indent    = profile.paragraph_indent_em();
-    let google_body    = profile.google_body_family();
+    let body_size = profile.body_em();
+    let line_height = profile.line_height();
+    let scene_glyph = profile.scene_break_glyph();
+    let ornament_svg = profile.ornament_svg();
+    let para_indent = profile.paragraph_indent_em();
+    let google_body = profile.google_body_family();
     let google_heading = profile.google_heading_family();
 
     // Font import block — two paths:
@@ -472,7 +524,10 @@ fn render_book_css(profile: FormatProfile, bundled_fonts: &[BundledFont]) -> Str
         s
     } else {
         let google_url = |family: &str| -> String {
-            let slug: String = family.chars().map(|c| if c == ' ' { '+' } else { c }).collect();
+            let slug: String = family
+                .chars()
+                .map(|c| if c == ' ' { '+' } else { c })
+                .collect();
             format!(
                 "https://fonts.googleapis.com/css2?family={slug}:ital,wght@0,400;0,700;1,400;1,700&display=swap"
             )
@@ -499,13 +554,17 @@ p.drop::first-letter {
   padding: 0.05em 0.08em 0 0;
   font-weight: 600;
 }"#
-    } else { "" };
+    } else {
+        ""
+    };
 
     // For non-fiction practical we want block paragraphs (no indent +
     // gap between paragraphs).  For everything else, indented paras.
     let block_paragraph_extras = if matches!(profile, FormatProfile::NonFictionPractical) {
         "p { margin-bottom: 0.6em; }"
-    } else { "" };
+    } else {
+        ""
+    };
 
     // Scene-break rendering — three-tier fallback.
     //
@@ -555,7 +614,8 @@ hr::before {{ content: \"{scene_glyph}\"; }}",
     // Practical non-fiction gets a callout-box utility class.  YA gets
     // a softer paragraph rhythm.  Memoir gets footnote rule styling.
     let profile_extras = match profile {
-        FormatProfile::NonFictionPractical => r#"
+        FormatProfile::NonFictionPractical => {
+            r#"
 .callout {
   margin: 1em 0;
   padding: 0.8em 1em;
@@ -569,8 +629,10 @@ hr::before {{ content: \"{scene_glyph}\"; }}",
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}"#,
-        FormatProfile::NonFictionMemoir => r#"
+}"#
+        }
+        FormatProfile::NonFictionMemoir => {
+            r#"
 .footnote {
   font-size: 0.85em;
   margin: 0.4em 0 0.4em 1em;
@@ -588,8 +650,10 @@ hr::before {{ content: \"{scene_glyph}\"; }}",
   font-style: italic;
   margin-top: 0.4em;
   opacity: 0.85;
-}"#,
-        FormatProfile::Academic => r#"
+}"#
+        }
+        FormatProfile::Academic => {
+            r#"
 .footnote-ref { vertical-align: super; font-size: 0.75em; }
 table {
   border-collapse: collapse;
@@ -600,16 +664,19 @@ table th, table td {
   border: 1px solid #999;
   padding: 0.3em 0.6em;
 }
-.bibliography p { text-indent: -1.2em; padding-left: 1.2em; }"#,
-        FormatProfile::FictionYoungAdult => r#"
+.bibliography p { text-indent: -1.2em; padding-left: 1.2em; }"#
+        }
+        FormatProfile::FictionYoungAdult => {
+            r#"
 /* Softer chapter heading rhythm — YA conventionally has more air. */
 h1 { margin-top: 3em; }
-h2 { margin-top: 2em; }"#,
+h2 { margin-top: 2em; }"#
+        }
         _ => "",
     };
 
     format!(
-r#"@charset "utf-8";
+        r#"@charset "utf-8";
 /* ── BooksForge EPUB stylesheet — profile: {profile_str} ─────────────
  *
  * Generated per `FormatProfile`.  See
@@ -863,7 +930,7 @@ fn render_chapter_xhtml(title: &str, body: &str) -> String {
 /// and back-matter where the body chapters get `bodymatter`.
 fn render_chapter_xhtml_with_role(title: &str, body: &str, role: &str) -> String {
     format!(
-r#"<?xml version="1.0" encoding="UTF-8"?>
+        r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en" lang="en">
 <head>
@@ -879,8 +946,8 @@ r#"<?xml version="1.0" encoding="UTF-8"?>
 </html>
 "#,
         title = xml_escape(title),
-        role  = xml_escape(role),
-        body  = body,
+        role = xml_escape(role),
+        body = body,
     )
 }
 
@@ -891,12 +958,16 @@ r#"<?xml version="1.0" encoding="UTF-8"?>
 /// precedence — this only fires when there's no chapter with title
 /// "Title Page" or similar already in the input.
 fn render_title_page_body(md: &EpubMetadata) -> String {
-    let authors = md.authors.iter()
+    let authors = md
+        .authors
+        .iter()
         .filter(|a| !a.trim().is_empty())
         .map(|a| xml_escape(a))
         .collect::<Vec<_>>()
         .join(" &amp; ");
-    let publisher_line = md.publisher.as_deref()
+    let publisher_line = md
+        .publisher
+        .as_deref()
         .filter(|s| !s.trim().is_empty())
         .map(|p| format!("<p class=\"copyright\">{}</p>\n", xml_escape(p)))
         .unwrap_or_default();
@@ -916,14 +987,22 @@ fn render_copyright_body(md: &EpubMetadata) -> String {
     use chrono::Datelike;
     let notice = md.copyright_notice.clone().unwrap_or_else(|| {
         let year = chrono::Utc::now().year();
-        let author = md.authors.first().cloned().unwrap_or_else(|| "the author".to_owned());
+        let author = md
+            .authors
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "the author".to_owned());
         format!("© {year} {author}.  All rights reserved.")
     });
-    let publisher_line = md.publisher.as_deref()
+    let publisher_line = md
+        .publisher
+        .as_deref()
         .filter(|s| !s.trim().is_empty())
         .map(|p| format!("<p>{}</p>", xml_escape(p)))
         .unwrap_or_default();
-    let isbn_line = md.isbn.as_deref()
+    let isbn_line = md
+        .isbn
+        .as_deref()
         .filter(|s| !s.trim().is_empty())
         .map(|i| format!("<p>ISBN {}</p>", xml_escape(i)))
         .unwrap_or_default();
@@ -969,7 +1048,7 @@ fn render_nav_xhtml(book_title: &str, chapters: &[HtmlChapter], fnames: &[String
         ));
     }
     format!(
-r#"<?xml version="1.0" encoding="UTF-8"?>
+        r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en" lang="en">
 <head>
@@ -991,12 +1070,12 @@ r#"<?xml version="1.0" encoding="UTF-8"?>
 }
 
 fn render_content_opf(
-    md:        &EpubMetadata,
-    language:  &str,
-    profile:   ExportProfile,
-    fnames:    &[String],
-    chapters:  &[HtmlChapter],
-    fonts:     &[BundledFont],
+    md: &EpubMetadata,
+    language: &str,
+    profile: ExportProfile,
+    fnames: &[String],
+    chapters: &[HtmlChapter],
+    fonts: &[BundledFont],
 ) -> String {
     let identifier = md.isbn.as_deref().unwrap_or("");
     let identifier = if identifier.is_empty() {
@@ -1014,8 +1093,8 @@ fn render_content_opf(
     #[allow(clippy::match_same_arms)]
     let dcterms_modified = match profile {
         ExportProfile::GenericEpub => "1970-01-01T00:00:00Z",
-        ExportProfile::KdpEbook    => "2026-01-01T00:00:00Z",
-        _                          => "1970-01-01T00:00:00Z",
+        ExportProfile::KdpEbook => "2026-01-01T00:00:00Z",
+        _ => "1970-01-01T00:00:00Z",
     };
 
     let mut creators = String::new();
@@ -1026,12 +1105,16 @@ fn render_content_opf(
         ));
     }
 
-    let publisher_line = md.publisher.as_deref()
+    let publisher_line = md
+        .publisher
+        .as_deref()
         .filter(|s| !s.trim().is_empty())
         .map(|p| format!("    <dc:publisher>{}</dc:publisher>\n", xml_escape(p)))
         .unwrap_or_default();
 
-    let description_line = md.description.as_deref()
+    let description_line = md
+        .description
+        .as_deref()
         .filter(|s| !s.trim().is_empty())
         .map(|d| format!("    <dc:description>{}</dc:description>\n", xml_escape(d)))
         .unwrap_or_default();
@@ -1042,9 +1125,9 @@ fn render_content_opf(
     for (idx, f) in fonts.iter().enumerate() {
         manifest.push_str(&format!(
             "    <item id=\"{id}\" href=\"fonts/{name}\" media-type=\"{mt}\"/>\n",
-            id   = f.opf_id(idx),
+            id = f.opf_id(idx),
             name = xml_escape(&f.epub_name),
-            mt   = f.media_type(),
+            mt = f.media_type(),
         ));
     }
     for (i, fname) in fnames.iter().enumerate() {
@@ -1060,7 +1143,7 @@ fn render_content_opf(
     }
 
     format!(
-r#"<?xml version="1.0" encoding="UTF-8"?>
+        r#"<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf"
          version="3.0"
          xml:lang="{language}"
@@ -1077,15 +1160,15 @@ r#"<?xml version="1.0" encoding="UTF-8"?>
 {spine}  </spine>
 </package>
 "#,
-        language    = xml_escape(language),
-        identifier  = xml_escape(&identifier),
-        title       = xml_escape(&md.title),
-        creators    = creators,
-        publisher   = publisher_line,
+        language = xml_escape(language),
+        identifier = xml_escape(&identifier),
+        title = xml_escape(&md.title),
+        creators = creators,
+        publisher = publisher_line,
         description = description_line,
-        modified    = dcterms_modified,
-        manifest    = manifest,
-        spine       = spine,
+        modified = dcterms_modified,
+        manifest = manifest,
+        spine = spine,
     )
 }
 
@@ -1093,12 +1176,12 @@ fn xml_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {
-            '&'  => out.push_str("&amp;"),
-            '<'  => out.push_str("&lt;"),
-            '>'  => out.push_str("&gt;"),
-            '"'  => out.push_str("&quot;"),
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
             '\'' => out.push_str("&apos;"),
-            _    => out.push(c),
+            _ => out.push(c),
         }
     }
     out
@@ -1112,32 +1195,32 @@ mod tests {
         EpubPackageInput {
             chapters: vec![
                 HtmlChapter {
-                    node_id:   "01HX1".into(),
-                    title:     "Chapter 1".into(),
+                    node_id: "01HX1".into(),
+                    title: "Chapter 1".into(),
                     html_body: "<h1>Chapter 1</h1><p>Once upon a time.</p>".into(),
                 },
                 HtmlChapter {
-                    node_id:   "01HX2".into(),
-                    title:     "Chapter 2".into(),
+                    node_id: "01HX2".into(),
+                    title: "Chapter 2".into(),
                     html_body: "<h1>Chapter 2</h1><p>The next morning.</p>".into(),
                 },
             ],
             metadata: EpubMetadata {
-                title:       "Test Book".into(),
-                authors:     vec!["Jane Doe".into()],
-                language:    "en".into(),
-                publisher:   Some("BooksForge".into()),
+                title: "Test Book".into(),
+                authors: vec!["Jane Doe".into()],
+                language: "en".into(),
+                publisher: Some("BooksForge".into()),
                 description: None,
-                isbn:        None,
-                book_id:     "01H0000000000000000000000A".into(),
-                dedication:       None,
-                epigraph:         None,
+                isbn: None,
+                book_id: "01H0000000000000000000000A".into(),
+                dedication: None,
+                epigraph: None,
                 copyright_notice: None,
             },
-            profile:        ExportProfile::GenericEpub,
-            output_path:    "/tmp/ignored.epub".into(),
+            profile: ExportProfile::GenericEpub,
+            output_path: "/tmp/ignored.epub".into(),
             format_profile: FormatProfile::FictionTradeStandard,
-        font_bundle_dir: None,
+            font_bundle_dir: None,
         }
     }
 
@@ -1166,11 +1249,20 @@ mod tests {
         // the bundle isn't on disk (e.g. before `scripts/fetch-fonts.sh`
         // has run) so CI without the bundle still passes.
         let bundle = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .ancestors().nth(2)
-            .map(|root| root.join("apps").join("desktop").join("resources").join("fonts"));
+            .ancestors()
+            .nth(2)
+            .map(|root| {
+                root.join("apps")
+                    .join("desktop")
+                    .join("resources")
+                    .join("fonts")
+            });
         let bundle = match bundle {
             Some(p) if p.is_dir() => p,
-            _ => { eprintln!("font bundle not present — skipping"); return; }
+            _ => {
+                eprintln!("font bundle not present — skipping");
+                return;
+            }
         };
 
         let mut input = sample_input();
@@ -1179,15 +1271,19 @@ mod tests {
         let bytes = build_epub_bytes(&input).expect("build");
 
         let mut zip = zip::ZipArchive::new(std::io::Cursor::new(&bytes[..])).expect("re-open zip");
-        let mut found_body    = false;
+        let mut found_body = false;
         let mut found_heading = false;
         for i in 0..zip.len() {
             let entry = zip.by_index(i).expect("entry");
             let name = entry.name();
-            if name.starts_with("OEBPS/fonts/EBGaramond")  { found_body    = true; }
-            if name.starts_with("OEBPS/fonts/Inter")       { found_heading = true; }
+            if name.starts_with("OEBPS/fonts/EBGaramond") {
+                found_body = true;
+            }
+            if name.starts_with("OEBPS/fonts/Inter") {
+                found_heading = true;
+            }
         }
-        assert!(found_body,    "expected EBGaramond entry under OEBPS/fonts/");
+        assert!(found_body, "expected EBGaramond entry under OEBPS/fonts/");
         assert!(found_heading, "expected Inter entry under OEBPS/fonts/");
     }
 
@@ -1203,7 +1299,10 @@ mod tests {
     fn rejects_no_chapters() {
         let mut input = sample_input();
         input.chapters.clear();
-        assert!(matches!(build_epub_bytes(&input), Err(EpubError::NoChapters)));
+        assert!(matches!(
+            build_epub_bytes(&input),
+            Err(EpubError::NoChapters)
+        ));
     }
 
     #[test]
@@ -1220,19 +1319,28 @@ mod tests {
     fn rejects_blank_title() {
         let mut input = sample_input();
         input.metadata.title = "   ".into();
-        assert!(matches!(build_epub_bytes(&input), Err(EpubError::InvalidMetadata { .. })));
+        assert!(matches!(
+            build_epub_bytes(&input),
+            Err(EpubError::InvalidMetadata { .. })
+        ));
     }
 
     #[test]
     fn rejects_no_authors() {
         let mut input = sample_input();
         input.metadata.authors = vec![];
-        assert!(matches!(build_epub_bytes(&input), Err(EpubError::InvalidMetadata { .. })));
+        assert!(matches!(
+            build_epub_bytes(&input),
+            Err(EpubError::InvalidMetadata { .. })
+        ));
     }
 
     #[test]
     fn xml_escape_handles_special_chars() {
-        assert_eq!(xml_escape("a&b<c>d\"e'f"), "a&amp;b&lt;c&gt;d&quot;e&apos;f");
+        assert_eq!(
+            xml_escape("a&b<c>d\"e'f"),
+            "a&amp;b&lt;c&gt;d&quot;e&apos;f"
+        );
     }
 
     #[tokio::test]

@@ -1,0 +1,91 @@
+# scene-critic/v1.toml
+#
+# New BooksForge agent template for the per-scene critique-revise loop.
+# Reads a drafted scene + the genre's critic axes, returns a JSON object with
+# per-axis scores (1-10) and concrete edit instructions. The orchestrator
+# then runs a narrow-scope revision pass that incorporates those edits
+# without rewriting the rest of the scene.
+#
+# This template is referenced from `booksforge-agents/src/scene_critic.rs`
+# (planned crate, BACKLOG §A13). It deliberately ASKS for the critic axes
+# at runtime rather than hard-coding them — fiction (literary vs genre) and
+# non-fiction get different axes, sourced from the genre pack.
+
+schema_version  = 1
+description     = "Per-scene critic — score on the genre's craft axes, return targeted edit instructions."
+
+[input.required]
+scene_text       = { kind = "string" }
+scene_goal       = { kind = "string" }
+scene_conflict   = { kind = "string" }
+scene_reveal     = { kind = "string" }
+critic_axes      = { kind = "json", schema = "string[]" }   # 4-6 axis names from the genre pack
+genre_label      = { kind = "string" }                       # "literary_fiction" | "genre_fiction" | "non_fiction"
+
+[input.optional]
+voice_constraints = { kind = "string", default = "" }
+prior_summary     = { kind = "string", default = "" }
+prompt_guard      = { kind = "string", default = "" }
+creative_profile  = { kind = "string", default = "" }
+
+[render.system]
+text = """
+You are a craft critic for {{ genre_label }}. Score honestly. Be specific —
+quote the actual prose. The orchestrator will use your `specific_edits` to
+run a narrow-scope revision pass, so each edit must be a quote-based
+problem and a quote-based fix that the reviser can apply mechanically.
+
+Scoring rules:
+- 10/10 is reserved for masterwork-level execution that humans agree on.
+- Inflated scoring is forbidden. If the scene scores below 6 on any axis,
+  surface that honestly.
+- Specific is better than vague — "weak" is not a useful note; "this
+  paragraph repeats the previous chapter's reveal" is.
+
+You may NOT invent characters, settings, or events absent from the scene.
+
+When scoring `originality` / `voice_distinct`, use the CREATIVE PROFILE
+below as the *intended* signature — anything generic that contradicts it
+should score lower, not higher.
+
+{{ creative_profile }}
+
+{{ prompt_guard }}
+"""
+
+[render.user]
+text = """
+GENRE: {{ genre_label }}
+SCENE GOAL: {{ scene_goal }}
+SCENE CONFLICT: {{ scene_conflict }}
+SCENE REVEAL: {{ scene_reveal }}
+
+PRIOR-CHAPTER SUMMARY (for continuity check):
+{{ prior_summary }}
+
+VOICE CONSTRAINTS the draft was supposed to honour:
+{{ voice_constraints }}
+
+CRITIC AXES (1-10 each):
+{% for axis in critic_axes %}- {{ axis }}
+{% endfor %}
+
+DRAFT:
+---
+{{ scene_text }}
+---
+
+Return JSON only.
+"""
+
+[render.json_schema]
+ref = "SceneCritiqueProposal"
+
+# Output struct (defined in booksforge-domain when the crate lands):
+#   pub struct SceneCritiqueProposal {
+#       pub scores: HashMap<String, u8>,           // axis -> 1..10
+#       pub weakest_axis: String,
+#       pub specific_edits: Vec<TargetedEdit>,
+#       pub overall_one_liner: String,
+#   }
+#   pub struct TargetedEdit { pub problem_quote: String, pub fix: String, pub axis: String }
