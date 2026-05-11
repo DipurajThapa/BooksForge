@@ -13,6 +13,17 @@ serde_json.workspace = true
 thiserror.workspace  = true
 ulid.workspace       = true
 chrono.workspace     = true
+# `BookKind` (Phase 4) needs ts-rs so the IPC layer's codegen-drift
+# test can emit the TypeScript binding. The rest of the domain types
+# don't use ts-rs directly — IPC wraps them in DTOs that do.
+ts-rs.workspace      = true
+
+# `CharacterBibleProposal::voice_target` carries a numeric voice contract
+# (FEATURE_HARDENING_PLAN.md §1.6). booksforge-voice is a sibling L3 crate
+# with no domain dep, so the dependency direction is safe (one-way, no
+# cycle). Without this the bible cannot persist a voice contract for the
+# scene drafter to render into the prompt.
+booksforge-voice = { path = "../booksforge-voice" }
 
 [dev-dependencies]
 proptest.workspace = true

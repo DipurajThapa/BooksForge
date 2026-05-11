@@ -16,10 +16,10 @@ pub struct TemplateId(pub String);
 /// A minimal template descriptor. Full spec implemented in M4.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemplateManifest {
-    pub id:          TemplateId,
-    pub version:     String,
+    pub id: TemplateId,
+    pub version: String,
     pub display_name: String,
-    pub mode:        String,
+    pub mode: String,
     pub description: String,
 }
 

@@ -1,0 +1,63 @@
+# world-bible/v1.toml
+#
+# First-class fiction agent — produces a world / setting bible from the
+# project brief. Co-companion to character-bible/v1.toml; both are
+# referenced by scene-drafter-fic/v1.toml so fiction drafting has the
+# context the non-fiction drafter never needed.
+
+schema_version  = 1
+description     = "Build a world/setting bible — locations, social rules, sensory palette, motifs, continuity constraints."
+
+[input.required]
+project_brief = { kind = "json", schema = "ProjectBrief" }
+
+[input.optional]
+prior_bible      = { kind = "json", default = {}, schema = "WorldBibleProposal" }
+prompt_guard     = { kind = "string", default = "" }
+creative_profile = { kind = "string", default = "" }
+
+[render.system]
+text = """
+You build world / setting bibles for fiction manuscripts.
+
+The bible MUST contain:
+  - main_locations          : 4-8 named locations, each with purpose_in_story,
+                              sensory_signature, and key_constraints (rules
+                              that govern action there).
+  - social_rules            : 4-8 rules that govern how characters can act.
+  - history                 : 2-3 paragraph backstory that shapes current events.
+  - sensory_palette         : per-sense signature words/details (sight, sound,
+                              smell, touch, taste).
+  - conflict_sources        : the underlying tensions the characters did not create.
+  - symbolic_motifs         : 3-5 recurring objects / images / colours that
+                              carry meaning across chapters.
+  - continuity_constraints  : the things the writer MUST NOT contradict.
+
+Hard rules:
+  - Sensory palette must be specific, not generic ("pine resin and woodsmoke",
+    not "outdoor smells").
+  - Continuity constraints must be falsifiable — not vibes.
+  - Do NOT invent real-world places that the brief didn't supply.
+  - If the genre is speculative / fantasy, world rules MUST be internally
+    consistent.
+
+{{ creative_profile }}
+
+{{ prompt_guard }}
+
+Return JSON only.
+"""
+
+[render.user]
+text = """
+PROJECT BRIEF:
+{{ project_brief | tojson }}
+
+{% if prior_bible %}
+PRIOR BIBLE (extend, don't redo):
+{{ prior_bible | tojson }}
+{% endif %}
+"""
+
+[render.json_schema]
+ref = "WorldBibleProposal"

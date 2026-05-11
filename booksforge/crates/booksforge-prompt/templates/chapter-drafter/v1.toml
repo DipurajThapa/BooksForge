@@ -14,6 +14,7 @@ prior_summary   = { kind = "string" }
 [input.optional]
 voice_fingerprint = { kind = "json",   default = {} }
 prompt_guard      = { kind = "string", default = "" }
+creative_profile  = { kind = "string", default = "" }
 genre             = { kind = "string", default = "" }
 tone              = { kind = "string", default = "" }
 
@@ -38,6 +39,8 @@ Your draft must:
 
 Output is a ProseMirror JSON document.  Wrap each paragraph as a `paragraph`
 node containing one or more `text` nodes.  No prose outside the JSON object.
+
+{{ creative_profile }}
 """
 
 [render.user]

@@ -43,19 +43,19 @@ pub enum NodeStatus {
 /// ordered lexicographically.  Rebalancing is handled in the storage layer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node {
-    pub id:           Ulid,
-    pub parent_id:    Option<Ulid>,
-    pub kind:         NodeKind,
-    pub title:        String,
+    pub id: Ulid,
+    pub parent_id: Option<Ulid>,
+    pub kind: NodeKind,
+    pub title: String,
     /// LexoRank string — lexicographic ordering.  Default: `"0|hzzzzz:"`.
-    pub position:     String,
-    pub status:       NodeStatus,
-    pub pov:          Option<String>,
-    pub beat:         Option<String>,
+    pub position: String,
+    pub status: NodeStatus,
+    pub pov: Option<String>,
+    pub beat: Option<String>,
     pub target_words: Option<u32>,
-    pub created_at:   DateTime<Utc>,
-    pub updated_at:   DateTime<Utc>,
-    pub deleted_at:   Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 impl Node {
@@ -75,12 +75,12 @@ impl Node {
 /// every save.  It is used for snapshot deduplication and change detection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SceneContent {
-    pub node_id:    Ulid,
-    pub pm_doc:     serde_json::Value,
+    pub node_id: Ulid,
+    pub pm_doc: serde_json::Value,
     pub word_count: u32,
     pub char_count: u32,
     /// blake3 hex hash of `pm_doc` (updated on every save).
-    pub hash:       String,
+    pub hash: String,
     pub updated_at: DateTime<Utc>,
 }
 

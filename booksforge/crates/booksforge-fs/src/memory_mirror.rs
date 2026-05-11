@@ -47,10 +47,12 @@ pub async fn write_memory_mirror(
 ) -> Result<(), FsError> {
     let path = memory_path(bundle, scope, key);
     if let Some(parent) = path.parent() {
-        tokio::fs::create_dir_all(parent).await.map_err(|e| FsError::Io {
-            path: parent.display().to_string(),
-            source: e,
-        })?;
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| FsError::Io {
+                path: parent.display().to_string(),
+                source: e,
+            })?;
     }
     let body = render(scope, key, agent_id, value_json, updated_at_iso);
     tokio::fs::write(&path, body.as_bytes())
@@ -62,7 +64,11 @@ pub async fn write_memory_mirror(
 }
 
 /// Remove the on-disk mirror for `(scope, key)`.  Missing files are not an error.
-pub async fn delete_memory_mirror(bundle: &BundlePath, scope: &str, key: &str) -> Result<(), FsError> {
+pub async fn delete_memory_mirror(
+    bundle: &BundlePath,
+    scope: &str,
+    key: &str,
+) -> Result<(), FsError> {
     let path = memory_path(bundle, scope, key);
     match tokio::fs::remove_file(&path).await {
         Ok(()) => Ok(()),
@@ -112,7 +118,13 @@ mod tests {
 
     #[test]
     fn render_includes_frontmatter() {
-        let body = render("book", "title", "outline-architect", &serde_json::json!({"v": 1}), "2026-05-07T00:00:00Z");
+        let body = render(
+            "book",
+            "title",
+            "outline-architect",
+            &serde_json::json!({"v": 1}),
+            "2026-05-07T00:00:00Z",
+        );
         assert!(body.contains("scope: book"));
         assert!(body.contains("key: title"));
         assert!(body.contains("\"v\": 1"));

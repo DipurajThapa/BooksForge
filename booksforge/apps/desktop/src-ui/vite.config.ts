@@ -1,10 +1,14 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { internalIpV4 } from "internal-ip";
 import { visualizer } from "rollup-plugin-visualizer";
 import path from "node:path";
 
 const mobile = !!/android|ios/.exec(process.env.TAURI_ENV_PLATFORM ?? "");
+
+// Mobile HMR needs the LAN IP via `internal-ip`. Mobile is out of scope for
+// v1; on desktop the `internal-ip` import is unused, so it is dropped from
+// the dependency list. If/when mobile is added back, reinstate the import
+// inside the `mobile` branch only.
 
 // Audit #52 — bundle-size visualisation.  When BOOKSFORGE_BUNDLE_REPORT=1
 // (or running under CI), emit a treemap to `dist/bundle-report.html`.
@@ -30,7 +34,7 @@ export default defineConfig(async () => ({
     strictPort: true,
     host: mobile ? "0.0.0.0" : false,
     hmr: mobile
-      ? { protocol: "ws", host: await internalIpV4(), port: 5183 }
+      ? { protocol: "ws", host: "localhost", port: 5183 }
       : undefined,
     watch: {
       ignored: ["**/src-tauri/**"],

@@ -14,13 +14,17 @@ use std::io::{Cursor, Read};
 /// dependency-free of `booksforge-domain` (no cycle risk) and the
 /// caller maps it to whatever error/warning surface they expose.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KdpSeverity { Info, Warning, Error }
+pub enum KdpSeverity {
+    Info,
+    Warning,
+    Error,
+}
 
 #[derive(Debug, Clone)]
 pub struct KdpFinding {
     pub severity: KdpSeverity,
-    pub code:     &'static str,
-    pub message:  String,
+    pub code: &'static str,
+    pub message: String,
 }
 
 /// KDP recommended ceiling for fast-delivery royalty (50 MB).
@@ -48,8 +52,8 @@ pub fn run_kdp_checks(bytes: &[u8]) -> Vec<KdpFinding> {
     if total > KDP_HARD_MAX_BYTES {
         out.push(KdpFinding {
             severity: KdpSeverity::Error,
-            code:     "KDP06",
-            message:  format!(
+            code: "KDP06",
+            message: format!(
                 "EPUB is {:.1} MB — KDP rejects files over 650 MB.",
                 total as f64 / (1024.0 * 1024.0)
             ),
@@ -57,8 +61,8 @@ pub fn run_kdp_checks(bytes: &[u8]) -> Vec<KdpFinding> {
     } else if total > KDP_RECOMMENDED_MAX_BYTES {
         out.push(KdpFinding {
             severity: KdpSeverity::Warning,
-            code:     "KDP07",
-            message:  format!(
+            code: "KDP07",
+            message: format!(
                 "EPUB is {:.1} MB — KDP delivery cost reduces royalty above 50 MB.",
                 total as f64 / (1024.0 * 1024.0)
             ),
@@ -67,12 +71,12 @@ pub fn run_kdp_checks(bytes: &[u8]) -> Vec<KdpFinding> {
 
     // ── Open as ZIP ──
     let mut zip = match zip::ZipArchive::new(Cursor::new(bytes)) {
-        Ok(z)  => z,
+        Ok(z) => z,
         Err(e) => {
             out.push(KdpFinding {
                 severity: KdpSeverity::Error,
-                code:     "KDP08",
-                message:  format!("Built EPUB cannot be re-opened as a ZIP: {e}"),
+                code: "KDP08",
+                message: format!("Built EPUB cannot be re-opened as a ZIP: {e}"),
             });
             return out;
         }
@@ -82,13 +86,13 @@ pub fn run_kdp_checks(bytes: &[u8]) -> Vec<KdpFinding> {
     //   - the OPF document (for cover-image + spine/nav references)
     //   - the nav document (for TOC presence)
     //   - per-image entry sizes
-    let mut opf_xml:  Option<String> = None;
-    let mut nav_xml:  Option<String> = None;
+    let mut opf_xml: Option<String> = None;
+    let mut nav_xml: Option<String> = None;
     let mut large_images: Vec<(String, u64)> = Vec::new();
 
     for i in 0..zip.len() {
         let mut entry = match zip.by_index(i) {
-            Ok(e)  => e,
+            Ok(e) => e,
             Err(_) => continue,
         };
         let name = entry.name().to_owned();
@@ -97,8 +101,10 @@ pub fn run_kdp_checks(bytes: &[u8]) -> Vec<KdpFinding> {
         // Per-image soft cap (KDP08 used above for ZIP error; image cap
         // surfaces as KDP09).
         let lower = name.to_ascii_lowercase();
-        if (lower.ends_with(".jpg") || lower.ends_with(".jpeg")
-            || lower.ends_with(".png") || lower.ends_with(".gif")
+        if (lower.ends_with(".jpg")
+            || lower.ends_with(".jpeg")
+            || lower.ends_with(".png")
+            || lower.ends_with(".gif")
             || lower.ends_with(".webp"))
             && size > KDP_IMAGE_SOFT_MAX_BYTES
         {
@@ -138,15 +144,15 @@ pub fn run_kdp_checks(bytes: &[u8]) -> Vec<KdpFinding> {
         Some(xml) if xml.contains("properties=\"cover-image\"") => { /* ok */ }
         Some(_) => out.push(KdpFinding {
             severity: KdpSeverity::Warning,
-            code:     "KDP10",
-            message:
-                "No cover image declared in the EPUB.  KDP will fall back to a generated \
-                 placeholder; bundle a cover via assets/cover.{jpg,png} for retail listings.".into(),
+            code: "KDP10",
+            message: "No cover image declared in the EPUB.  KDP will fall back to a generated \
+                 placeholder; bundle a cover via assets/cover.{jpg,png} for retail listings."
+                .into(),
         }),
         None => out.push(KdpFinding {
             severity: KdpSeverity::Error,
-            code:     "KDP11",
-            message:  "No OPF package document found in the EPUB — the archive is malformed.".into(),
+            code: "KDP11",
+            message: "No OPF package document found in the EPUB — the archive is malformed.".into(),
         }),
     }
 
@@ -157,15 +163,15 @@ pub fn run_kdp_checks(bytes: &[u8]) -> Vec<KdpFinding> {
         Some(xml) if xml.contains("epub:type=\"toc\"") => { /* ok */ }
         Some(_) => out.push(KdpFinding {
             severity: KdpSeverity::Warning,
-            code:     "KDP12",
-            message:
-                "nav.xhtml is present but lacks a `<nav epub:type=\"toc\">` element — \
-                 KDP readers fall back to an inferred TOC which may misorder chapters.".into(),
+            code: "KDP12",
+            message: "nav.xhtml is present but lacks a `<nav epub:type=\"toc\">` element — \
+                 KDP readers fall back to an inferred TOC which may misorder chapters."
+                .into(),
         }),
         None => out.push(KdpFinding {
             severity: KdpSeverity::Error,
-            code:     "KDP13",
-            message:  "nav.xhtml missing — EPUB-3 (and KDP) require a navigation document.".into(),
+            code: "KDP13",
+            message: "nav.xhtml missing — EPUB-3 (and KDP) require a navigation document.".into(),
         }),
     }
 
@@ -188,8 +194,8 @@ mod tests {
         let mut buf: Vec<u8> = Vec::new();
         {
             let mut w = zip::ZipWriter::new(Cursor::new(&mut buf));
-            let opts: zip::write::FileOptions<()> =
-                zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+            let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
             // OPF stub with a cover-image declaration so KDP10 doesn't
             // also fire — we want a single-finding test.
             w.start_file("OEBPS/content.opf", opts).unwrap();
@@ -200,14 +206,18 @@ mod tests {
                   </manifest></package>",
             ).unwrap();
             w.start_file("OEBPS/big.jpg", opts).unwrap();
-            w.write_all(&vec![0u8; (KDP_IMAGE_SOFT_MAX_BYTES + 1) as usize]).unwrap();
+            w.write_all(&vec![0u8; (KDP_IMAGE_SOFT_MAX_BYTES + 1) as usize])
+                .unwrap();
             w.start_file("OEBPS/nav.xhtml", opts).unwrap();
-            w.write_all(b"<html><body><nav epub:type=\"toc\"></nav></body></html>").unwrap();
+            w.write_all(b"<html><body><nav epub:type=\"toc\"></nav></body></html>")
+                .unwrap();
             w.finish().unwrap();
         }
         let findings = run_kdp_checks(&buf);
-        assert!(findings.iter().any(|f| f.code == "KDP09"),
-                "expected KDP09 for oversized image, got: {findings:#?}");
+        assert!(
+            findings.iter().any(|f| f.code == "KDP09"),
+            "expected KDP09 for oversized image, got: {findings:#?}"
+        );
     }
 
     #[test]
@@ -216,16 +226,22 @@ mod tests {
         let mut buf: Vec<u8> = Vec::new();
         {
             let mut w = zip::ZipWriter::new(Cursor::new(&mut buf));
-            let opts: zip::write::FileOptions<()> =
-                zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+            let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
             w.start_file("placeholder.txt", opts).unwrap();
             use std::io::Write as _;
             w.write_all(b"placeholder").unwrap();
             w.finish().unwrap();
         }
         let findings = run_kdp_checks(&buf);
-        assert!(findings.iter().any(|f| f.code == "KDP11"), "missing OPF should flag KDP11");
-        assert!(findings.iter().any(|f| f.code == "KDP13"), "missing nav should flag KDP13");
+        assert!(
+            findings.iter().any(|f| f.code == "KDP11"),
+            "missing OPF should flag KDP11"
+        );
+        assert!(
+            findings.iter().any(|f| f.code == "KDP13"),
+            "missing nav should flag KDP13"
+        );
     }
 
     #[test]
@@ -234,8 +250,8 @@ mod tests {
         let mut buf: Vec<u8> = Vec::new();
         {
             let mut w = zip::ZipWriter::new(Cursor::new(&mut buf));
-            let opts: zip::write::FileOptions<()> =
-                zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+            let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
             use std::io::Write as _;
             w.start_file("OEBPS/content.opf", opts).unwrap();
             w.write_all(
@@ -244,7 +260,8 @@ mod tests {
                   </manifest></package>",
             ).unwrap();
             w.start_file("OEBPS/nav.xhtml", opts).unwrap();
-            w.write_all(b"<nav epub:type=\"toc\"><ol><li>ch1</li></ol></nav>").unwrap();
+            w.write_all(b"<nav epub:type=\"toc\"><ol><li>ch1</li></ol></nav>")
+                .unwrap();
             w.finish().unwrap();
         }
         let findings = run_kdp_checks(&buf);

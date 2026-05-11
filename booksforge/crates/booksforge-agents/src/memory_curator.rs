@@ -8,14 +8,26 @@ use booksforge_domain::MemoryRefreshProposals;
 use booksforge_prompt::PromptTemplateId;
 
 use crate::spec::{
-    AgentSpec, ContextBudget, CrossCuttingValidator, FailureMode, ModelFamily, ModelPreference,
-    ModelSizeHint, UserGate, WhenToRun,
+    AgentSpec, ContextBudget, CrossCuttingValidator, DefaultThinking, FailureMode, ModelFamily,
+    ModelPreference, ModelSizeHint, UserGate, WhenToRun,
 };
 
 const FAILURE_MODES: &[FailureMode] = &[
-    FailureMode { id: "out-of-scope-write", description: "Proposed write outside book/chapter/entity scope.",          recoverable: true  },
-    FailureMode { id: "duplicate-entity",   description: "Suggested new entity name collides with an existing one.",   recoverable: true  },
-    FailureMode { id: "stale-summary",      description: "Summary describes events that aren't in the current text.",  recoverable: true  },
+    FailureMode {
+        id: "out-of-scope-write",
+        description: "Proposed write outside book/chapter/entity scope.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "duplicate-entity",
+        description: "Suggested new entity name collides with an existing one.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "stale-summary",
+        description: "Summary describes events that aren't in the current text.",
+        recoverable: true,
+    },
 ];
 
 pub fn spec() -> AgentSpec {
@@ -45,14 +57,15 @@ pub fn spec() -> AgentSpec {
         failure_modes: FAILURE_MODES,
         when_to_run:   WhenToRun::Scheduled,
         user_gate:     UserGate::NotRequired,
+        default_thinking: DefaultThinking::Disabled,
     }
 }
 
 /// Parse the model's raw output into a typed `MemoryRefreshProposals` and
 /// run its semantic validators.
 pub fn parse_and_validate(raw: &str) -> Result<MemoryRefreshProposals, String> {
-    let parsed: MemoryRefreshProposals = serde_json::from_str(raw)
-        .map_err(|e| format!("JSON parse error: {e}"))?;
+    let parsed: MemoryRefreshProposals =
+        serde_json::from_str(raw).map_err(|e| format!("JSON parse error: {e}"))?;
     let errs = parsed.validate();
     if !errs.is_empty() {
         return Err(format!("semantic validation failed: {}", errs.join("; ")));

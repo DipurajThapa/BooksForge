@@ -17,21 +17,25 @@ use std::collections::BTreeMap;
 
 use booksforge_domain::{Node, NodeKind, NodeStatus};
 use booksforge_export::{manuscript_to_html_chapters, ManuscriptInput};
-use booksforge_export_epub::{
-    build_epub_bytes, EpubMetadata, EpubPackageInput, HtmlChapter,
-};
+use booksforge_export_epub::{build_epub_bytes, EpubMetadata, EpubPackageInput, HtmlChapter};
 use chrono::Utc;
 use ulid::Ulid;
 
 fn make_node(id: Ulid, parent: Option<Ulid>, kind: NodeKind, title: &str, position: &str) -> Node {
     let now = Utc::now();
     Node {
-        id, parent_id: parent, kind,
+        id,
+        parent_id: parent,
+        kind,
         title: title.to_owned(),
         position: position.to_owned(),
         status: NodeStatus::Drafting,
-        pov: None, beat: None, target_words: None,
-        created_at: now, updated_at: now, deleted_at: None,
+        pov: None,
+        beat: None,
+        target_words: None,
+        created_at: now,
+        updated_at: now,
+        deleted_at: None,
     }
 }
 
@@ -48,32 +52,104 @@ fn stable_ulid(seed: u128) -> Ulid {
 /// deterministic across machines and runs.
 fn fixture_manuscript() -> ManuscriptInput {
     let project = stable_ulid(0x0000_0000_0000_0000_0000_0000_0000_0001);
-    let part1   = stable_ulid(0x0000_0000_0000_0000_0000_0000_0000_0010);
-    let part2   = stable_ulid(0x0000_0000_0000_0000_0000_0000_0000_0020);
-    let c1a     = stable_ulid(0x0000_0000_0000_0000_0000_0000_0000_0110);
-    let c1b     = stable_ulid(0x0000_0000_0000_0000_0000_0000_0000_0120);
-    let c2a     = stable_ulid(0x0000_0000_0000_0000_0000_0000_0000_0210);
-    let c2b     = stable_ulid(0x0000_0000_0000_0000_0000_0000_0000_0220);
+    let part1 = stable_ulid(0x0000_0000_0000_0000_0000_0000_0000_0010);
+    let part2 = stable_ulid(0x0000_0000_0000_0000_0000_0000_0000_0020);
+    let c1a = stable_ulid(0x0000_0000_0000_0000_0000_0000_0000_0110);
+    let c1b = stable_ulid(0x0000_0000_0000_0000_0000_0000_0000_0120);
+    let c2a = stable_ulid(0x0000_0000_0000_0000_0000_0000_0000_0210);
+    let c2b = stable_ulid(0x0000_0000_0000_0000_0000_0000_0000_0220);
 
     let scenes: Vec<(Ulid, Ulid, &str, &str, &str)> = vec![
-        (stable_ulid(0x1110), c1a, "Opening",     "0|i00000:", "<p>The <strong>door</strong> creaked open.</p>"),
-        (stable_ulid(0x1120), c1a, "Stakes",      "0|j00000:", "<p>She had until <em>dawn</em>.</p>"),
-        (stable_ulid(0x1210), c1b, "Reveal",      "0|i00000:", "<p>It was the <strong><em>letter</em></strong>.</p>"),
-        (stable_ulid(0x1220), c1b, "Cliffhanger", "0|j00000:", "<p>And then nothing.</p>"),
-        (stable_ulid(0x2110), c2a, "Recovery",    "0|i00000:", "<p>Morning came &amp; she rose.</p>"),
-        (stable_ulid(0x2120), c2a, "Plan",        "0|j00000:", "<p>Three steps: find, follow, finish.</p>"),
-        (stable_ulid(0x2210), c2b, "Confrontation", "0|i00000:", "<p>\"You knew,\" she said.</p>"),
-        (stable_ulid(0x2220), c2b, "Resolution", "0|j00000:", "<p>The case was closed.</p>"),
+        (
+            stable_ulid(0x1110),
+            c1a,
+            "Opening",
+            "0|i00000:",
+            "<p>The <strong>door</strong> creaked open.</p>",
+        ),
+        (
+            stable_ulid(0x1120),
+            c1a,
+            "Stakes",
+            "0|j00000:",
+            "<p>She had until <em>dawn</em>.</p>",
+        ),
+        (
+            stable_ulid(0x1210),
+            c1b,
+            "Reveal",
+            "0|i00000:",
+            "<p>It was the <strong><em>letter</em></strong>.</p>",
+        ),
+        (
+            stable_ulid(0x1220),
+            c1b,
+            "Cliffhanger",
+            "0|j00000:",
+            "<p>And then nothing.</p>",
+        ),
+        (
+            stable_ulid(0x2110),
+            c2a,
+            "Recovery",
+            "0|i00000:",
+            "<p>Morning came &amp; she rose.</p>",
+        ),
+        (
+            stable_ulid(0x2120),
+            c2a,
+            "Plan",
+            "0|j00000:",
+            "<p>Three steps: find, follow, finish.</p>",
+        ),
+        (
+            stable_ulid(0x2210),
+            c2b,
+            "Confrontation",
+            "0|i00000:",
+            "<p>\"You knew,\" she said.</p>",
+        ),
+        (
+            stable_ulid(0x2220),
+            c2b,
+            "Resolution",
+            "0|j00000:",
+            "<p>The case was closed.</p>",
+        ),
     ];
 
     let mut nodes = vec![
-        make_node(project, None,            NodeKind::Project, "Test Book",        "0|hzzzzz:"),
-        make_node(part1,   Some(project),   NodeKind::Part,    "Part 1 — Setup",   "0|i00000:"),
-        make_node(c1a,     Some(part1),     NodeKind::Chapter, "Beginnings",       "0|i00000:"),
-        make_node(c1b,     Some(part1),     NodeKind::Chapter, "Complications",    "0|j00000:"),
-        make_node(part2,   Some(project),   NodeKind::Part,    "Part 2 — Payoff",  "0|j00000:"),
-        make_node(c2a,     Some(part2),     NodeKind::Chapter, "Recovery",         "0|i00000:"),
-        make_node(c2b,     Some(part2),     NodeKind::Chapter, "Endings",          "0|j00000:"),
+        make_node(project, None, NodeKind::Project, "Test Book", "0|hzzzzz:"),
+        make_node(
+            part1,
+            Some(project),
+            NodeKind::Part,
+            "Part 1 — Setup",
+            "0|i00000:",
+        ),
+        make_node(
+            c1a,
+            Some(part1),
+            NodeKind::Chapter,
+            "Beginnings",
+            "0|i00000:",
+        ),
+        make_node(
+            c1b,
+            Some(part1),
+            NodeKind::Chapter,
+            "Complications",
+            "0|j00000:",
+        ),
+        make_node(
+            part2,
+            Some(project),
+            NodeKind::Part,
+            "Part 2 — Payoff",
+            "0|j00000:",
+        ),
+        make_node(c2a, Some(part2), NodeKind::Chapter, "Recovery", "0|i00000:"),
+        make_node(c2b, Some(part2), NodeKind::Chapter, "Endings", "0|j00000:"),
     ];
     let mut texts: BTreeMap<Ulid, String> = BTreeMap::new();
     for (id, parent, title, pos, body) in scenes {
@@ -84,7 +160,7 @@ fn fixture_manuscript() -> ManuscriptInput {
     ManuscriptInput {
         nodes,
         scene_texts: texts,
-        title:  "Test Book".into(),
+        title: "Test Book".into(),
         author: "Jane Doe".into(),
     }
 }
@@ -94,30 +170,31 @@ fn build_for_metadata(book_id: &str) -> Vec<u8> {
     let chapters: Vec<HtmlChapter> = manuscript_to_html_chapters(&manuscript)
         .into_iter()
         .map(|c| HtmlChapter {
-            node_id:   c.node_id.to_string(),
-            title:     c.title,
+            node_id: c.node_id.to_string(),
+            title: c.title,
             html_body: c.html_body,
         })
         .collect();
     build_epub_bytes(&EpubPackageInput {
         chapters,
         metadata: EpubMetadata {
-            title:       "Test Book".into(),
-            authors:     vec!["Jane Doe".into()],
-            language:    "en".into(),
-            publisher:   None,
+            title: "Test Book".into(),
+            authors: vec!["Jane Doe".into()],
+            language: "en".into(),
+            publisher: None,
             description: None,
-            isbn:        None,
-            book_id:     book_id.to_owned(),
-            dedication:       None,
-            epigraph:         None,
+            isbn: None,
+            book_id: book_id.to_owned(),
+            dedication: None,
+            epigraph: None,
             copyright_notice: None,
         },
         profile: booksforge_export::ExportProfile::GenericEpub,
         output_path: "/tmp/ignored.epub".into(),
         format_profile: booksforge_domain::FormatProfile::FictionTradeStandard,
         font_bundle_dir: None,
-    }).expect("build")
+    })
+    .expect("build")
 }
 
 #[test]

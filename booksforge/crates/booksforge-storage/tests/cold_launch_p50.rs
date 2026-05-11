@@ -1,4 +1,11 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::print_stdout, clippy::print_stderr, clippy::unimplemented)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::unimplemented
+)]
 
 //! C6 — Cold-launch p50 perf gate.
 //!
@@ -43,10 +50,10 @@ use booksforge_storage::{open_pool, run_migrations, SqliteStorage, StorageReposi
 use chrono::Utc;
 use ulid::Ulid;
 
-const ITERATIONS:        usize = 10;
-const CHAPTER_COUNT:     usize = 10;
+const ITERATIONS: usize = 10;
+const CHAPTER_COUNT: usize = 10;
 const SCENES_PER_CHAPTER: usize = 5;
-const WORDS_PER_SCENE:   usize = 200;
+const WORDS_PER_SCENE: usize = 200;
 
 /// Per-launch p50 budget.  The BACKLOG §C6 spec calls for ≤1000 ms p50
 /// on macos-14 for the *full* app cold launch; the storage slice gets
@@ -90,9 +97,15 @@ async fn cold_launch_p50_within_budget() {
 
         // Light correctness check so a regression in the storage layer
         // can't pretend to be fast by returning empty results.
-        let scenes = nodes.iter().filter(|n| matches!(n.kind, NodeKind::Scene)).count();
-        assert_eq!(scenes, CHAPTER_COUNT * SCENES_PER_CHAPTER,
-                   "iter {i}: scene count mismatch");
+        let scenes = nodes
+            .iter()
+            .filter(|n| matches!(n.kind, NodeKind::Scene))
+            .count();
+        assert_eq!(
+            scenes,
+            CHAPTER_COUNT * SCENES_PER_CHAPTER,
+            "iter {i}: scene count mismatch"
+        );
     }
 
     samples.sort();
@@ -122,12 +135,18 @@ async fn seed_10k(storage: &Arc<SqliteStorage>) {
     let now = Utc::now();
     let project_id = Ulid::new();
     let project = Node {
-        id: project_id, parent_id: None, kind: NodeKind::Project,
+        id: project_id,
+        parent_id: None,
+        kind: NodeKind::Project,
         title: "10k cold-launch fixture".into(),
         position: "0|hzzzzz:".into(),
         status: NodeStatus::Drafting,
-        pov: None, beat: None, target_words: Some(10_000),
-        created_at: now, updated_at: now, deleted_at: None,
+        pov: None,
+        beat: None,
+        target_words: Some(10_000),
+        created_at: now,
+        updated_at: now,
+        deleted_at: None,
     };
 
     let mut all_nodes: Vec<Node> = Vec::with_capacity(1 + CHAPTER_COUNT * (1 + SCENES_PER_CHAPTER));
@@ -137,43 +156,59 @@ async fn seed_10k(storage: &Arc<SqliteStorage>) {
     for c in 0..CHAPTER_COUNT {
         let chapter_id = Ulid::new();
         all_nodes.push(Node {
-            id: chapter_id, parent_id: Some(project_id),
+            id: chapter_id,
+            parent_id: Some(project_id),
             kind: NodeKind::Chapter,
             title: format!("Chapter {}", c + 1),
             position: format!("0|i{:05x}:", c + 1),
             status: NodeStatus::Drafting,
-            pov: None, beat: None, target_words: None,
-            created_at: now, updated_at: now, deleted_at: None,
+            pov: None,
+            beat: None,
+            target_words: None,
+            created_at: now,
+            updated_at: now,
+            deleted_at: None,
         });
         for s in 0..SCENES_PER_CHAPTER {
             let scene_id = Ulid::new();
             scene_ids.push(scene_id);
             all_nodes.push(Node {
-                id: scene_id, parent_id: Some(chapter_id),
+                id: scene_id,
+                parent_id: Some(chapter_id),
                 kind: NodeKind::Scene,
                 title: format!("Scene {}", s + 1),
                 position: format!("0|i{:05x}:", s + 1),
                 status: NodeStatus::Drafting,
-                pov: None, beat: None, target_words: Some(WORDS_PER_SCENE as u32),
-                created_at: now, updated_at: now, deleted_at: None,
+                pov: None,
+                beat: None,
+                target_words: Some(WORDS_PER_SCENE as u32),
+                created_at: now,
+                updated_at: now,
+                deleted_at: None,
             });
         }
     }
 
-    storage.insert_nodes_batch(&all_nodes).await.expect("insert nodes");
+    storage
+        .insert_nodes_batch(&all_nodes)
+        .await
+        .expect("insert nodes");
 
     let pm_doc = build_pm_doc(WORDS_PER_SCENE);
     let pm_doc_bytes = serde_json::to_vec(&pm_doc).expect("serialize pm_doc");
     let hash = blake3::hash(&pm_doc_bytes).to_hex().to_string();
     for scene_id in scene_ids {
-        storage.save_scene(&SceneContent {
-            node_id:    scene_id,
-            pm_doc:     pm_doc.clone(),
-            word_count: WORDS_PER_SCENE as u32,
-            char_count: (WORDS_PER_SCENE * 6) as u32,
-            hash:       hash.clone(),
-            updated_at: now,
-        }).await.expect("save scene");
+        storage
+            .save_scene(&SceneContent {
+                node_id: scene_id,
+                pm_doc: pm_doc.clone(),
+                word_count: WORDS_PER_SCENE as u32,
+                char_count: (WORDS_PER_SCENE * 6) as u32,
+                hash: hash.clone(),
+                updated_at: now,
+            })
+            .await
+            .expect("save scene");
     }
 }
 
@@ -185,7 +220,9 @@ fn build_pm_doc(word_count: usize) -> serde_json::Value {
         let n = remaining.min(WORDS_PER_PARA);
         let mut text = String::with_capacity(n * 6);
         for i in 0..n {
-            if i > 0 { text.push(' '); }
+            if i > 0 {
+                text.push(' ');
+            }
             text.push_str("alpha");
         }
         paragraphs.push(serde_json::json!({

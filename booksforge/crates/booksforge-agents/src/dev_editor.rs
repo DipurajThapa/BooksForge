@@ -8,15 +8,31 @@ use booksforge_domain::DevelopmentalNotes;
 use booksforge_prompt::PromptTemplateId;
 
 use crate::spec::{
-    AgentSpec, ContextBudget, CrossCuttingValidator, FailureMode, ModelFamily, ModelPreference,
-    ModelSizeHint, UserGate, WhenToRun,
+    AgentSpec, ContextBudget, CrossCuttingValidator, DefaultThinking, FailureMode, ModelFamily,
+    ModelPreference, ModelSizeHint, UserGate, WhenToRun,
 };
 
 const FAILURE_MODES: &[FailureMode] = &[
-    FailureMode { id: "axis-out-of-enum",     description: "Note axis is not in the closed enum.",          recoverable: true  },
-    FailureMode { id: "evidence-missing",     description: "Note has no evidence span.",                     recoverable: true  },
-    FailureMode { id: "vague-suggestion",     description: "Suggestion is non-actionable boilerplate.",      recoverable: true  },
-    FailureMode { id: "too-many-notes",       description: "More than 25 notes for one chapter.",            recoverable: true  },
+    FailureMode {
+        id: "axis-out-of-enum",
+        description: "Note axis is not in the closed enum.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "evidence-missing",
+        description: "Note has no evidence span.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "vague-suggestion",
+        description: "Suggestion is non-actionable boilerplate.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "too-many-notes",
+        description: "More than 25 notes for one chapter.",
+        recoverable: true,
+    },
 ];
 
 pub fn spec() -> AgentSpec {
@@ -45,12 +61,13 @@ pub fn spec() -> AgentSpec {
         failure_modes: FAILURE_MODES,
         when_to_run:   WhenToRun::OnDemand,
         user_gate:     UserGate::Required,
+        default_thinking: DefaultThinking::Enabled,
     }
 }
 
 pub fn parse_and_validate(raw: &str) -> Result<DevelopmentalNotes, String> {
-    let parsed: DevelopmentalNotes = serde_json::from_str(raw)
-        .map_err(|e| format!("JSON parse error: {e}"))?;
+    let parsed: DevelopmentalNotes =
+        serde_json::from_str(raw).map_err(|e| format!("JSON parse error: {e}"))?;
     let errs = parsed.validate();
     if !errs.is_empty() {
         return Err(format!("semantic validation failed: {}", errs.join("; ")));

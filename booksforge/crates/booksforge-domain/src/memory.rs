@@ -31,21 +31,21 @@ pub enum MemoryScope {
 impl MemoryScope {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Book    => "book",
+            Self::Book => "book",
             Self::Chapter => "chapter",
-            Self::Entity  => "entity",
-            Self::Style   => "style",
+            Self::Entity => "entity",
+            Self::Style => "style",
         }
     }
 
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
-            "book"    => Some(Self::Book),
+            "book" => Some(Self::Book),
             "chapter" => Some(Self::Chapter),
-            "entity"  => Some(Self::Entity),
-            "style"   => Some(Self::Style),
-            _         => None,
+            "entity" => Some(Self::Entity),
+            "style" => Some(Self::Style),
+            _ => None,
         }
     }
 }
@@ -53,13 +53,13 @@ impl MemoryScope {
 /// One row in the `memory_entries` table.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryEntry {
-    pub id:         Ulid,
-    pub scope:      MemoryScope,
+    pub id: Ulid,
+    pub scope: MemoryScope,
     /// Human-readable lookup key — e.g. `"protagonist"`, `"chapter:01:summary"`.
-    pub key:        String,
+    pub key: String,
     pub value_json: serde_json::Value,
     /// The agent that wrote this entry (for audit and out-of-scope checks).
-    pub agent_id:   String,
+    pub agent_id: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -70,7 +70,10 @@ pub struct MemoryEntry {
 #[derive(Debug, thiserror::Error)]
 pub enum MemoryError {
     #[error("write rejected: agent '{agent_id}' is not allowed to write to scope {scope:?}")]
-    OutOfScopeWrite { agent_id: String, scope: MemoryScope },
+    OutOfScopeWrite {
+        agent_id: String,
+        scope: MemoryScope,
+    },
     #[error("memory key not found: {scope:?} / {key}")]
     NotFound { scope: MemoryScope, key: String },
 }
@@ -86,21 +89,28 @@ pub fn allowed_write_scopes(agent_id: &str) -> &'static [MemoryScope] {
     match agent_id {
         // Memory Curator owns everything except style (which is the
         // copyeditor's territory).
-        "memory-curator"     => &[
-            MemoryScope::Book,
-            MemoryScope::Chapter,
-            MemoryScope::Entity,
-        ],
+        "memory-curator" => &[MemoryScope::Book, MemoryScope::Chapter, MemoryScope::Entity],
         // Vocabulary Dictionary writes style + entity (entity for character
         // voice / canonical names).
-        "vocab-dictionary"   => &[MemoryScope::Style, MemoryScope::Entity],
+        "vocab-dictionary" => &[MemoryScope::Style, MemoryScope::Entity],
         // Continuity reads everything but writes only entity facts it
-        // confirms (e.g. "Aidan's eye colour = hazel").
-        "continuity"         => &[MemoryScope::Entity],
+        // confirms. Character bible (BACKLOG §A13) writes one Entity per
+        // CharacterCard — same allowed-scope set.
+        "continuity" | "character-bible" => &[MemoryScope::Entity],
         // Copyeditor owns the style-book.
-        "copyeditor"         => &[MemoryScope::Style],
+        "copyeditor" => &[MemoryScope::Style],
         // Outline architect seeds book-level memory at intake time.
-        "outline-architect"  => &[MemoryScope::Book],
+        // Intake itself also writes the typed `project_brief` to book
+        // memory so downstream fiction agents (character-bible,
+        // world-bible, scene-drafter-fic) can pull it back via
+        // `memory_get(Book, "project_brief")` without re-running intake.
+        "outline-architect" | "intake" => &[MemoryScope::Book],
+        // World bible writes one Entity per WorldLocation plus Book-scope
+        // entries for social_rules / sensory_palette / motifs / continuity.
+        "world-bible" => &[MemoryScope::Book, MemoryScope::Entity],
+        // Scene drafter (fiction) writes a chapter-summary on accept so the
+        // next scene's drafter has prior_summary context.
+        "scene-drafter-fic" => &[MemoryScope::Chapter],
         // Everyone else: read-only by default.
         _ => &[],
     }
@@ -108,10 +118,7 @@ pub fn allowed_write_scopes(agent_id: &str) -> &'static [MemoryScope] {
 
 /// Check that `agent_id` may write to `scope`.  Returns `Ok` or a typed
 /// error suitable for surfacing through `OrchestratorError`.
-pub fn authorise_write(
-    agent_id: &str,
-    scope:    MemoryScope,
-) -> Result<(), MemoryError> {
+pub fn authorise_write(agent_id: &str, scope: MemoryScope) -> Result<(), MemoryError> {
     if allowed_write_scopes(agent_id).contains(&scope) {
         Ok(())
     } else {
@@ -128,7 +135,12 @@ mod tests {
 
     #[test]
     fn scope_roundtrip() {
-        for s in [MemoryScope::Book, MemoryScope::Chapter, MemoryScope::Entity, MemoryScope::Style] {
+        for s in [
+            MemoryScope::Book,
+            MemoryScope::Chapter,
+            MemoryScope::Entity,
+            MemoryScope::Style,
+        ] {
             assert_eq!(MemoryScope::from_str(s.as_str()), Some(s));
         }
     }
@@ -157,5 +169,38 @@ mod tests {
     fn unknown_agent_has_zero_write_scopes() {
         assert!(allowed_write_scopes("totally-made-up").is_empty());
         assert!(authorise_write("totally-made-up", MemoryScope::Book).is_err());
+    }
+
+    #[test]
+    fn character_bible_writes_entity_only() {
+        assert!(authorise_write("character-bible", MemoryScope::Entity).is_ok());
+        assert!(authorise_write("character-bible", MemoryScope::Book).is_err());
+        assert!(authorise_write("character-bible", MemoryScope::Style).is_err());
+    }
+
+    #[test]
+    fn world_bible_writes_book_and_entity() {
+        assert!(authorise_write("world-bible", MemoryScope::Book).is_ok());
+        assert!(authorise_write("world-bible", MemoryScope::Entity).is_ok());
+        assert!(authorise_write("world-bible", MemoryScope::Style).is_err());
+        assert!(authorise_write("world-bible", MemoryScope::Chapter).is_err());
+    }
+
+    #[test]
+    fn scene_drafter_fic_writes_chapter_only() {
+        assert!(authorise_write("scene-drafter-fic", MemoryScope::Chapter).is_ok());
+        assert!(authorise_write("scene-drafter-fic", MemoryScope::Book).is_err());
+        assert!(authorise_write("scene-drafter-fic", MemoryScope::Entity).is_err());
+    }
+
+    #[test]
+    fn intake_writes_book_only() {
+        // Per BACKLOG §A13 finish — intake persists the typed
+        // `project_brief` to book-scope memory so the bibles can find
+        // it without re-running intake.
+        assert!(authorise_write("intake", MemoryScope::Book).is_ok());
+        assert!(authorise_write("intake", MemoryScope::Chapter).is_err());
+        assert!(authorise_write("intake", MemoryScope::Entity).is_err());
+        assert!(authorise_write("intake", MemoryScope::Style).is_err());
     }
 }

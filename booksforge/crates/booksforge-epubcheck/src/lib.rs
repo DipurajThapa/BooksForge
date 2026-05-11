@@ -40,28 +40,29 @@ pub enum IssueSeverity {
 /// A single issue from the EPUBCheck JSON report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EpubCheckIssue {
-    pub severity:  IssueSeverity,
-    pub message:   String,
+    pub severity: IssueSeverity,
+    pub message: String,
     /// Path inside the EPUB archive (e.g. `OEBPS/text/chapter-001.xhtml`).
-    pub path:      Option<String>,
-    pub line:      Option<u32>,
-    pub column:    Option<u32>,
+    pub path: Option<String>,
+    pub line: Option<u32>,
+    pub column: Option<u32>,
 }
 
 /// The parsed EPUBCheck report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EpubCheckReport {
     pub checker_version: String,
-    pub epub_path:       String,
-    pub issues:          Vec<EpubCheckIssue>,
+    pub epub_path: String,
+    pub issues: Vec<EpubCheckIssue>,
 }
 
 impl EpubCheckReport {
     /// Returns `true` when there are no ERROR or FATAL issues.
     pub fn is_valid(&self) -> bool {
-        !self.issues.iter().any(|i| {
-            matches!(i.severity, IssueSeverity::Error | IssueSeverity::Fatal)
-        })
+        !self
+            .issues
+            .iter()
+            .any(|i| matches!(i.severity, IssueSeverity::Error | IssueSeverity::Fatal))
     }
 
     /// Count of issues at ERROR or FATAL severity.
@@ -133,21 +134,29 @@ struct WireMessage {
 struct WireLocation {
     #[serde(rename = "fileName")]
     file_name: Option<String>,
-    #[serde(default)] line: Option<u32>,
-    #[serde(default)] column: Option<u32>,
+    #[serde(default)]
+    line: Option<u32>,
+    #[serde(default)]
+    column: Option<u32>,
 }
 
 /// Locate `java` from PATH.  Useful when the caller hasn't pinned a
 /// specific JRE (developer workflow).
-pub fn java_on_path() -> Option<String> { which("java") }
+pub fn java_on_path() -> Option<String> {
+    which("java")
+}
 
 fn which(binary: &str) -> Option<String> {
     let path_var = std::env::var_os("PATH")?;
     for dir in std::env::split_paths(&path_var) {
         let candidate = dir.join(binary);
-        if candidate.is_file() { return Some(candidate.to_string_lossy().into_owned()); }
+        if candidate.is_file() {
+            return Some(candidate.to_string_lossy().into_owned());
+        }
         let exe = candidate.with_extension("exe");
-        if exe.is_file() { return Some(exe.to_string_lossy().into_owned()); }
+        if exe.is_file() {
+            return Some(exe.to_string_lossy().into_owned());
+        }
     }
     None
 }
@@ -158,15 +167,19 @@ fn which(binary: &str) -> Option<String> {
 /// Returns the parsed report.  Callers should check `report.is_valid()`
 /// before treating an export as shippable.
 pub async fn run_epubcheck(
-    epub_path:   &str,
-    jar_path:    &str,
+    epub_path: &str,
+    jar_path: &str,
     java_binary: &str,
 ) -> Result<EpubCheckReport, EpubCheckError> {
     if !Path::new(java_binary).is_file() {
-        return Err(EpubCheckError::JavaNotFound { path: java_binary.to_owned() });
+        return Err(EpubCheckError::JavaNotFound {
+            path: java_binary.to_owned(),
+        });
     }
     if !Path::new(jar_path).is_file() {
-        return Err(EpubCheckError::JarNotFound { path: jar_path.to_owned() });
+        return Err(EpubCheckError::JarNotFound {
+            path: jar_path.to_owned(),
+        });
     }
     if !Path::new(epub_path).is_file() {
         return Err(EpubCheckError::Io(std::io::Error::new(
@@ -179,9 +192,8 @@ pub async fn run_epubcheck(
     tracing::info!(epub = %epub_path, "running EPUBCheck");
     let out = Command::new(java_binary)
         .args([
-            "-jar", jar_path,
-            "--json", "-",      // JSON to stdout
-            "--quiet",          // suppress text output
+            "-jar", jar_path, "--json", "-",       // JSON to stdout
+            "--quiet", // suppress text output
             epub_path,
         ])
         .stdin(Stdio::null())
@@ -195,17 +207,16 @@ pub async fn run_epubcheck(
     let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
 
-    let report = parse_report(&stdout, epub_path).map_err(|reason| {
-        EpubCheckError::ReportParseError {
+    let report =
+        parse_report(&stdout, epub_path).map_err(|reason| EpubCheckError::ReportParseError {
             reason: format!("{reason}\nstderr={stderr}"),
-        }
-    })?;
+        })?;
 
     // If the parsed report is empty AND the process failed, treat as a
     // process-level failure (Java crash / unparseable input).
     if report.issues.is_empty() && !out.status.success() {
         return Err(EpubCheckError::ProcessFailed {
-            code:   out.status.code().unwrap_or(-1),
+            code: out.status.code().unwrap_or(-1),
             stderr: stderr.lines().take(20).collect::<Vec<_>>().join(" | "),
         });
     }
@@ -220,8 +231,8 @@ pub fn parse_report(json: &str, epub_path: &str) -> Result<EpubCheckReport, Stri
     if trimmed.is_empty() {
         return Err("empty EPUBCheck output".to_owned());
     }
-    let wire: WireReport = serde_json::from_str(trimmed)
-        .map_err(|e| format!("JSON parse error: {e}"))?;
+    let wire: WireReport =
+        serde_json::from_str(trimmed).map_err(|e| format!("JSON parse error: {e}"))?;
 
     let mut issues = Vec::with_capacity(wire.messages.len());
     for m in wire.messages {
@@ -231,15 +242,15 @@ pub fn parse_report(json: &str, epub_path: &str) -> Result<EpubCheckReport, Stri
         issues.push(EpubCheckIssue {
             severity,
             message: m.message,
-            path:    location.as_ref().and_then(|l| l.file_name.clone()),
-            line:    location.as_ref().and_then(|l| l.line),
-            column:  location.as_ref().and_then(|l| l.column),
+            path: location.as_ref().and_then(|l| l.file_name.clone()),
+            line: location.as_ref().and_then(|l| l.line),
+            column: location.as_ref().and_then(|l| l.column),
         });
     }
 
     Ok(EpubCheckReport {
         checker_version: wire.checker.checker_version,
-        epub_path:       if wire.checker.filename.is_empty() {
+        epub_path: if wire.checker.filename.is_empty() {
             epub_path.to_owned()
         } else {
             wire.checker.filename
@@ -251,12 +262,12 @@ pub fn parse_report(json: &str, epub_path: &str) -> Result<EpubCheckReport, Stri
 fn parse_severity(s: &str) -> Option<IssueSeverity> {
     match s.to_ascii_uppercase().as_str() {
         "SUPPRESSED" => Some(IssueSeverity::Suppressed),
-        "USAGE"      => Some(IssueSeverity::Usage),
-        "INFO"       => Some(IssueSeverity::Info),
-        "WARNING"    => Some(IssueSeverity::Warning),
-        "ERROR"      => Some(IssueSeverity::Error),
-        "FATAL"      => Some(IssueSeverity::Fatal),
-        _            => None,
+        "USAGE" => Some(IssueSeverity::Usage),
+        "INFO" => Some(IssueSeverity::Info),
+        "WARNING" => Some(IssueSeverity::Warning),
+        "ERROR" => Some(IssueSeverity::Error),
+        "FATAL" => Some(IssueSeverity::Fatal),
+        _ => None,
     }
 }
 
@@ -269,7 +280,7 @@ mod tests {
         "checker": {
             "path": "/x/book.epub",
             "filename": "/x/book.epub",
-            "checkerVersion": "5.1.0",
+            "checkerVersion": "5.3.0",
             "checkDate": "2026-05-07T12:00:00Z",
             "elapsedTime": 12,
             "nFatal": 0, "nError": 1, "nWarning": 2, "nUsage": 0
@@ -288,7 +299,7 @@ mod tests {
     #[test]
     fn parse_report_extracts_messages_and_locations() {
         let r = parse_report(SAMPLE_REPORT, "/x/book.epub").unwrap();
-        assert_eq!(r.checker_version, "5.1.0");
+        assert_eq!(r.checker_version, "5.3.0");
         assert_eq!(r.issues.len(), 4);
         assert_eq!(r.issues[0].severity, IssueSeverity::Error);
         assert_eq!(r.issues[0].path.as_deref(), Some("OEBPS/text/c1.xhtml"));
@@ -323,7 +334,7 @@ mod tests {
             "customMessageFileName": null,
             "checker": {
                 "path": "/y.epub", "filename": "/y.epub",
-                "checkerVersion": "5.1.0", "checkDate": "x", "elapsedTime": 1,
+                "checkerVersion": "5.3.0", "checkDate": "x", "elapsedTime": 1,
                 "nFatal": 0, "nError": 0, "nWarning": 1, "nUsage": 0
             },
             "messages": [
@@ -338,23 +349,19 @@ mod tests {
 
     #[tokio::test]
     async fn run_rejects_missing_java() {
-        let r = run_epubcheck(
-            "/tmp/x.epub",
-            "/tmp/x.jar",
-            "/nonexistent/java",
-        ).await;
+        let r = run_epubcheck("/tmp/x.epub", "/tmp/x.jar", "/nonexistent/java").await;
         assert!(matches!(r, Err(EpubCheckError::JavaNotFound { .. })));
     }
 
     #[tokio::test]
     async fn run_rejects_missing_jar() {
         // /usr/bin/true exists everywhere we run tests.
-        let java = if std::path::Path::new("/usr/bin/true").exists() { "/usr/bin/true" } else { "/bin/true" };
-        let r = run_epubcheck(
-            "/tmp/x.epub",
-            "/nonexistent/epubcheck.jar",
-            java,
-        ).await;
+        let java = if std::path::Path::new("/usr/bin/true").exists() {
+            "/usr/bin/true"
+        } else {
+            "/bin/true"
+        };
+        let r = run_epubcheck("/tmp/x.epub", "/nonexistent/epubcheck.jar", java).await;
         assert!(matches!(r, Err(EpubCheckError::JarNotFound { .. })));
     }
 }

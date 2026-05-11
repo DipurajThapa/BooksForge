@@ -1,0 +1,95 @@
+# character-bible/v1.toml
+#
+# First-class fiction agent — produces a character bible from the project
+# brief and (optionally) any accepted manuscript prose. Replaces the
+# naked-LLM character-card prompt that BF-E2E-LOCAL-LLM-FIRST-BOOK-001
+# Phase 5 had to use because no first-class fiction agent existed.
+#
+# Output schema (planned in booksforge-domain when the crate lands):
+#
+#   pub struct CharacterBibleProposal { pub characters: Vec<CharacterCard> }
+#   pub struct CharacterCard {
+#       pub name: String,
+#       pub role: String,                       // protagonist | antagonist | mentor | foil | ally
+#       pub external_objective: String,
+#       pub internal_need: String,
+#       pub fear_or_wound: String,
+#       pub secret_or_contradiction: String,
+#       pub voice_traits: Vec<String>,
+#       pub relationships: Vec<Relationship>,
+#       pub chapter_arc: Vec<String>,
+#       pub emotional_turning_points: Vec<String>,
+#   }
+
+schema_version  = 1
+description     = "Build a character bible — every character has objective, need, wound, secret, voice, and a per-chapter arc."
+
+[input.required]
+project_brief  = { kind = "json", schema = "ProjectBrief" }
+chapter_count  = { kind = "integer" }
+
+[input.optional]
+accepted_prose_samples = { kind = "json", default = [], schema = "string[]" }
+prior_bible            = { kind = "json", default = {}, schema = "CharacterBibleProposal" }
+prompt_guard           = { kind = "string", default = "" }
+creative_profile       = { kind = "string", default = "" }
+
+[render.system]
+text = """
+You build character bibles for fiction manuscripts.
+
+Each character card MUST have:
+  - external_objective : what they want and would tell anyone they want.
+  - internal_need     : what they actually need (often opposed to objective).
+  - fear_or_wound     : the formative thing they would not name.
+  - secret_or_contradiction : the thing that, if revealed, changes how
+                              other characters see them.
+  - voice_traits      : 3-6 specific traits — vocabulary tier, sentence
+                        length, evasion patterns, lexicon (NOT "kind",
+                        "smart" — those are not voice traits).
+  - chapter_arc       : exactly chapter_count entries — what changes for
+                        this character per chapter.
+  - emotional_turning_points : 2-4 named moments.
+
+Hard rules:
+  - Generate 4-6 characters: 1 protagonist, 1 antagonist, 2-3 supporting,
+    1 mentor or foil.
+  - No two characters share the same external_objective.
+  - The protagonist's internal_need MUST be opposed to (or distinct from)
+    their external_objective.
+  - Voice traits must be measurable — "speaks in sentences under 8 words"
+    is a voice trait; "is shy" is not.
+  - If accepted_prose_samples is non-empty, every voice trait you assign
+    must be derivable from those samples.
+
+{{ creative_profile }}
+
+{{ prompt_guard }}
+
+Return JSON only.
+"""
+
+[render.user]
+text = """
+PROJECT BRIEF:
+{{ project_brief | tojson }}
+
+CHAPTER COUNT: {{ chapter_count }}
+
+{% if accepted_prose_samples %}
+ACCEPTED PROSE SAMPLES (use to derive voice traits):
+{% for s in accepted_prose_samples %}
+---
+{{ s }}
+---
+{% endfor %}
+{% endif %}
+
+{% if prior_bible %}
+PRIOR BIBLE (extend, don't redo):
+{{ prior_bible | tojson }}
+{% endif %}
+"""
+
+[render.json_schema]
+ref = "CharacterBibleProposal"

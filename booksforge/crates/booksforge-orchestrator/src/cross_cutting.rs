@@ -9,7 +9,7 @@
 
 use booksforge_agents::CrossCuttingValidator;
 use booksforge_domain::{
-    Entity, ValidationAxis, ValidationCheck, ValidationOutcome, allowed_write_scopes,
+    allowed_write_scopes, Entity, ValidationAxis, ValidationCheck, ValidationOutcome,
 };
 
 /// Run a single cross-cutting validator and produce a `ValidationCheck`.
@@ -20,22 +20,24 @@ use booksforge_domain::{
 /// case is a no-op pass — never a false positive.
 #[allow(clippy::too_many_arguments)]
 pub fn run_validator(
-    validator:    CrossCuttingValidator,
-    raw_output:   &str,
-    parsed:       &serde_json::Value,
+    validator: CrossCuttingValidator,
+    raw_output: &str,
+    parsed: &serde_json::Value,
     entity_bible: &[Entity],
-    agent_id:     &str,
+    agent_id: &str,
     proposed_memory_scopes: &[String],
-    source_text:        Option<&str>,
+    source_text: Option<&str>,
     prior_scene_corpus: Option<&str>,
 ) -> ValidationCheck {
     match validator {
-        CrossCuttingValidator::Schema      => check_schema(parsed),
-        CrossCuttingValidator::Redaction   => check_redaction(raw_output),
-        CrossCuttingValidator::Length      => check_length(raw_output, parsed),
+        CrossCuttingValidator::Schema => check_schema(parsed),
+        CrossCuttingValidator::Redaction => check_redaction(raw_output),
+        CrossCuttingValidator::Length => check_length(raw_output, parsed),
         CrossCuttingValidator::EntitySanity => check_entity_sanity(parsed, entity_bible),
         CrossCuttingValidator::MemoryScope => check_memory_scope(agent_id, proposed_memory_scopes),
-        CrossCuttingValidator::Originality => check_originality(parsed, source_text, prior_scene_corpus),
+        CrossCuttingValidator::Originality => {
+            check_originality(parsed, source_text, prior_scene_corpus)
+        }
     }
 }
 
@@ -43,17 +45,30 @@ pub fn run_validator(
 /// output fields (same set as `EntitySanity`) and runs the local n-gram
 /// detector against the source text + prior-scene corpus.
 fn check_originality(
-    parsed:             &serde_json::Value,
-    source_text:        Option<&str>,
+    parsed: &serde_json::Value,
+    source_text: Option<&str>,
     prior_scene_corpus: Option<&str>,
 ) -> ValidationCheck {
     if source_text.is_none() && prior_scene_corpus.is_none() {
-        return ok(ValidationAxis::Originality, "no source corpus supplied — skipped");
+        return ok(
+            ValidationAxis::Originality,
+            "no source corpus supplied — skipped",
+        );
     }
     // Same prose-bearing field set the entity check uses, plus `excerpt`
     // and `text` for chapter-drafter outputs.
-    let prose_fields = ["excerpt", "before", "after", "diagnosis", "message",
-                        "notes", "summary", "text", "scene_text", "draft"];
+    let prose_fields = [
+        "excerpt",
+        "before",
+        "after",
+        "diagnosis",
+        "message",
+        "notes",
+        "summary",
+        "text",
+        "scene_text",
+        "draft",
+    ];
     let mut prose = String::new();
     walk_prose(parsed, &prose_fields, &mut |s: &str| {
         prose.push_str(s);
@@ -65,16 +80,23 @@ fn check_originality(
     let mut hits: Vec<booksforge_validator::OverlapHit> = Vec::new();
     if let Some(src) = source_text {
         hits.extend(booksforge_validator::detect_verbatim_overlap(
-            &prose, src, booksforge_validator::originality::DEFAULT_MIN_WORDS,
+            &prose,
+            src,
+            booksforge_validator::originality::DEFAULT_MIN_WORDS,
         ));
     }
     if let Some(prior) = prior_scene_corpus {
         hits.extend(booksforge_validator::detect_self_plagiarism(
-            &prose, prior, booksforge_validator::originality::DEFAULT_MIN_WORDS,
+            &prose,
+            prior,
+            booksforge_validator::originality::DEFAULT_MIN_WORDS,
         ));
     }
     if hits.is_empty() {
-        return ok(ValidationAxis::Originality, "no verbatim overlap above threshold");
+        return ok(
+            ValidationAxis::Originality,
+            "no verbatim overlap above threshold",
+        );
     }
     // Fail when any hit is ≥20 words (clearly copy-paste, not coincidence).
     // Warn for shorter (12–19 words) hits — could be legitimate idioms or a
@@ -86,11 +108,17 @@ fn check_originality(
         q = hits.first().map(|h| h.quote.as_str()).unwrap_or(""),
     );
     if max_words >= 20 {
-        fail(ValidationAxis::Originality, evidence,
-             "rewrite the flagged span(s) in original phrasing; quote and attribute if intentional")
+        fail(
+            ValidationAxis::Originality,
+            evidence,
+            "rewrite the flagged span(s) in original phrasing; quote and attribute if intentional",
+        )
     } else {
-        warn(ValidationAxis::Originality, evidence,
-             "review the flagged span(s); short overlaps may be incidental but should be checked")
+        warn(
+            ValidationAxis::Originality,
+            evidence,
+            "review the flagged span(s); short overlaps may be incidental but should be checked",
+        )
     }
 }
 
@@ -100,9 +128,11 @@ fn check_schema(parsed: &serde_json::Value) -> ValidationCheck {
     if parsed.is_object() {
         ok(ValidationAxis::Schema, "output parsed as JSON object")
     } else {
-        fail(ValidationAxis::Schema,
-             "output is not a JSON object",
-             "request the agent retry with the JSON-mode reminder")
+        fail(
+            ValidationAxis::Schema,
+            "output is not a JSON object",
+            "request the agent retry with the JSON-mode reminder",
+        )
     }
 }
 
@@ -125,9 +155,11 @@ fn check_redaction(raw: &str) -> ValidationCheck {
     ];
     for phrase in suspicious_phrases {
         if lower.contains(phrase) {
-            return warn(ValidationAxis::Redaction,
-                        format!("contains suspicious phrase: {phrase:?}"),
-                        "the model leaked the system prompt or chain-of-thought");
+            return warn(
+                ValidationAxis::Redaction,
+                format!("contains suspicious phrase: {phrase:?}"),
+                "the model leaked the system prompt or chain-of-thought",
+            );
         }
     }
     ok(ValidationAxis::Redaction, "no leakage indicators found")
@@ -137,19 +169,27 @@ fn check_redaction(raw: &str) -> ValidationCheck {
 fn check_length(raw: &str, parsed: &serde_json::Value) -> ValidationCheck {
     let bytes = raw.len();
     if bytes < 4 {
-        return fail(ValidationAxis::Length,
-                    format!("output is too short ({bytes} bytes)"),
-                    "agent returned empty or near-empty output");
+        return fail(
+            ValidationAxis::Length,
+            format!("output is too short ({bytes} bytes)"),
+            "agent returned empty or near-empty output",
+        );
     }
     if bytes > 65_536 {
-        return warn(ValidationAxis::Length,
-                    format!("output is very large ({bytes} bytes)"),
-                    "consider tightening the prompt or capping output earlier");
+        return warn(
+            ValidationAxis::Length,
+            format!("output is very large ({bytes} bytes)"),
+            "consider tightening the prompt or capping output earlier",
+        );
     }
     // Soft check: empty top-level object is suspicious.
     if let Some(obj) = parsed.as_object() {
         if obj.is_empty() {
-            return warn(ValidationAxis::Length, "parsed object is empty", "no fields populated");
+            return warn(
+                ValidationAxis::Length,
+                "parsed object is empty",
+                "no fields populated",
+            );
         }
     }
     ok(ValidationAxis::Length, format!("output {bytes} bytes"))
@@ -166,22 +206,38 @@ fn check_entity_sanity(parsed: &serde_json::Value, bible: &[Entity]) -> Validati
     let mut known: std::collections::HashSet<String> = std::collections::HashSet::new();
     for e in bible {
         known.insert(e.name.to_lowercase());
-        for a in &e.aliases { known.insert(a.to_lowercase()); }
+        for a in &e.aliases {
+            known.insert(a.to_lowercase());
+        }
     }
     // Common allowlist for English prose so we don't flag e.g. "I", "Dr.", days.
     for w in ALLOWLIST_PROPER {
         known.insert((*w).to_lowercase());
     }
-    let prose_fields = ["excerpt", "before", "after", "diagnosis", "message", "notes", "summary"];
+    let prose_fields = [
+        "excerpt",
+        "before",
+        "after",
+        "diagnosis",
+        "message",
+        "notes",
+        "summary",
+    ];
     let mut unknown = Vec::new();
     walk_prose(parsed, &prose_fields, &mut |s: &str| {
         for token in s.split_whitespace() {
             let trimmed = token.trim_matches(|c: char| !c.is_alphabetic());
-            if trimmed.len() < 2 { continue; }
+            if trimmed.len() < 2 {
+                continue;
+            }
             let first = trimmed.chars().next().unwrap_or(' ');
-            if !first.is_uppercase() { continue; }
+            if !first.is_uppercase() {
+                continue;
+            }
             // Exclude all-caps acronyms.
-            if trimmed.chars().all(|c| c.is_uppercase()) { continue; }
+            if trimmed.chars().all(|c| c.is_uppercase()) {
+                continue;
+            }
             if !known.contains(&trimmed.to_lowercase()) {
                 unknown.push(trimmed.to_owned());
             }
@@ -191,22 +247,58 @@ fn check_entity_sanity(parsed: &serde_json::Value, bible: &[Entity]) -> Validati
         ok(ValidationAxis::EntitySanity, "all proper nouns recognised")
     } else if unknown.len() > 6 {
         // Lots of unknowns → likely false-positive scan; downgrade to warn.
-        warn(ValidationAxis::EntitySanity,
-             format!("{} unknown proper nouns (sample: {:?})", unknown.len(), &unknown[..6]),
-             "verify these aren't drifted aliases of entities in the bible")
+        warn(
+            ValidationAxis::EntitySanity,
+            format!(
+                "{} unknown proper nouns (sample: {:?})",
+                unknown.len(),
+                &unknown[..6]
+            ),
+            "verify these aren't drifted aliases of entities in the bible",
+        )
     } else {
-        warn(ValidationAxis::EntitySanity,
-             format!("unknown proper nouns: {unknown:?}"),
-             "extend the entity bible or correct the agent's output")
+        warn(
+            ValidationAxis::EntitySanity,
+            format!("unknown proper nouns: {unknown:?}"),
+            "extend the entity bible or correct the agent's output",
+        )
     }
 }
 
 const ALLOWLIST_PROPER: &[&str] = &[
-    "I", "Mr", "Mrs", "Ms", "Dr", "St", "Mt", "Lord", "Lady", "Sir",
-    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-    "God", "Heaven", "Hell", "Earth",
+    "I",
+    "Mr",
+    "Mrs",
+    "Ms",
+    "Dr",
+    "St",
+    "Mt",
+    "Lord",
+    "Lady",
+    "Sir",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+    "God",
+    "Heaven",
+    "Hell",
+    "Earth",
 ];
 
 /// MemoryScope: every proposed memory write must be within the agent's
@@ -222,24 +314,52 @@ fn check_memory_scope(agent_id: &str, proposed: &[String]) -> ValidationCheck {
         }
     }
     if violations.is_empty() {
-        ok(ValidationAxis::MemoryScope, format!("all writes within scopes: {allowed_strs:?}"))
+        ok(
+            ValidationAxis::MemoryScope,
+            format!("all writes within scopes: {allowed_strs:?}"),
+        )
     } else {
-        fail(ValidationAxis::MemoryScope,
-             format!("agent '{agent_id}' attempted out-of-scope writes: {violations:?}"),
-             "drop those entries or escalate to memory-curator")
+        fail(
+            ValidationAxis::MemoryScope,
+            format!("agent '{agent_id}' attempted out-of-scope writes: {violations:?}"),
+            "drop those entries or escalate to memory-curator",
+        )
     }
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 fn ok(axis: ValidationAxis, evidence: impl Into<String>) -> ValidationCheck {
-    ValidationCheck { axis, outcome: ValidationOutcome::Pass, evidence: evidence.into(), remediation: None }
+    ValidationCheck {
+        axis,
+        outcome: ValidationOutcome::Pass,
+        evidence: evidence.into(),
+        remediation: None,
+    }
 }
-fn warn(axis: ValidationAxis, evidence: impl Into<String>, remediation: impl Into<String>) -> ValidationCheck {
-    ValidationCheck { axis, outcome: ValidationOutcome::Warn, evidence: evidence.into(), remediation: Some(remediation.into()) }
+fn warn(
+    axis: ValidationAxis,
+    evidence: impl Into<String>,
+    remediation: impl Into<String>,
+) -> ValidationCheck {
+    ValidationCheck {
+        axis,
+        outcome: ValidationOutcome::Warn,
+        evidence: evidence.into(),
+        remediation: Some(remediation.into()),
+    }
 }
-fn fail(axis: ValidationAxis, evidence: impl Into<String>, remediation: impl Into<String>) -> ValidationCheck {
-    ValidationCheck { axis, outcome: ValidationOutcome::Fail, evidence: evidence.into(), remediation: Some(remediation.into()) }
+fn fail(
+    axis: ValidationAxis,
+    evidence: impl Into<String>,
+    remediation: impl Into<String>,
+) -> ValidationCheck {
+    ValidationCheck {
+        axis,
+        outcome: ValidationOutcome::Fail,
+        evidence: evidence.into(),
+        remediation: Some(remediation.into()),
+    }
 }
 
 /// Recursively visit string-valued fields whose key is in `field_names`.
@@ -248,13 +368,17 @@ fn walk_prose<F: FnMut(&str)>(v: &serde_json::Value, field_names: &[&str], visit
         serde_json::Value::Object(map) => {
             for (k, val) in map {
                 if field_names.contains(&k.as_str()) {
-                    if let Some(s) = val.as_str() { visit(s); }
+                    if let Some(s) = val.as_str() {
+                        visit(s);
+                    }
                 }
                 walk_prose(val, field_names, visit);
             }
         }
         serde_json::Value::Array(arr) => {
-            for item in arr { walk_prose(item, field_names, visit); }
+            for item in arr {
+                walk_prose(item, field_names, visit);
+            }
         }
         _ => {}
     }

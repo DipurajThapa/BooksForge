@@ -34,60 +34,64 @@ async fn require_project(
 
 fn parse_node_kind(s: &str) -> Result<NodeKind, BooksForgeError> {
     match s {
-        "project"      => Ok(NodeKind::Project),
-        "part"         => Ok(NodeKind::Part),
-        "chapter"      => Ok(NodeKind::Chapter),
-        "scene"        => Ok(NodeKind::Scene),
+        "project" => Ok(NodeKind::Project),
+        "part" => Ok(NodeKind::Part),
+        "chapter" => Ok(NodeKind::Chapter),
+        "scene" => Ok(NodeKind::Scene),
         "front_matter" => Ok(NodeKind::FrontMatter),
-        "back_matter"  => Ok(NodeKind::BackMatter),
-        other => Err(BooksForgeError::validation(format!("unknown node kind: {other}"))),
+        "back_matter" => Ok(NodeKind::BackMatter),
+        other => Err(BooksForgeError::validation(format!(
+            "unknown node kind: {other}"
+        ))),
     }
 }
 
 fn parse_node_status(s: &str) -> Result<NodeStatus, BooksForgeError> {
     match s {
-        "planned"  => Ok(NodeStatus::Planned),
+        "planned" => Ok(NodeStatus::Planned),
         "drafting" => Ok(NodeStatus::Drafting),
-        "revised"  => Ok(NodeStatus::Revised),
-        "final"    => Ok(NodeStatus::Final),
-        other => Err(BooksForgeError::validation(format!("unknown node status: {other}"))),
+        "revised" => Ok(NodeStatus::Revised),
+        "final" => Ok(NodeStatus::Final),
+        other => Err(BooksForgeError::validation(format!(
+            "unknown node status: {other}"
+        ))),
     }
 }
 
 fn node_kind_str(k: NodeKind) -> &'static str {
     match k {
-        NodeKind::Project     => "project",
-        NodeKind::Part        => "part",
-        NodeKind::Chapter     => "chapter",
-        NodeKind::Scene       => "scene",
+        NodeKind::Project => "project",
+        NodeKind::Part => "part",
+        NodeKind::Chapter => "chapter",
+        NodeKind::Scene => "scene",
         NodeKind::FrontMatter => "front_matter",
-        NodeKind::BackMatter  => "back_matter",
+        NodeKind::BackMatter => "back_matter",
     }
 }
 
 fn node_status_str_local(s: NodeStatus) -> &'static str {
     match s {
-        NodeStatus::Planned  => "planned",
+        NodeStatus::Planned => "planned",
         NodeStatus::Drafting => "drafting",
-        NodeStatus::Revised  => "revised",
-        NodeStatus::Final    => "final",
+        NodeStatus::Revised => "revised",
+        NodeStatus::Final => "final",
     }
 }
 
 fn node_to_info(node: Node) -> NodeInfo {
     NodeInfo {
-        id:           node.id.to_string(),
-        parent_id:    node.parent_id.map(|id| id.to_string()),
-        kind:         node_kind_str(node.kind).to_owned(),
-        title:        node.title,
-        position:     node.position,
-        status:       node_status_str_local(node.status).to_owned(),
-        pov:          node.pov,
-        beat:         node.beat,
+        id: node.id.to_string(),
+        parent_id: node.parent_id.map(|id| id.to_string()),
+        kind: node_kind_str(node.kind).to_owned(),
+        title: node.title,
+        position: node.position,
+        status: node_status_str_local(node.status).to_owned(),
+        pov: node.pov,
+        beat: node.beat,
         target_words: node.target_words,
-        word_count:   0,
-        created_at:   node.created_at.to_rfc3339(),
-        updated_at:   node.updated_at.to_rfc3339(),
+        word_count: 0,
+        created_at: node.created_at.to_rfc3339(),
+        updated_at: node.updated_at.to_rfc3339(),
     }
 }
 
@@ -128,8 +132,8 @@ pub async fn node_list(state: State<'_, AppState>) -> Result<Vec<NodeInfo>, Book
     }
 
     fn aggregate(
-        node_id:     Ulid,
-        by_parent:   &HashMap<Option<Ulid>, Vec<Ulid>>,
+        node_id: Ulid,
+        by_parent: &HashMap<Option<Ulid>, Vec<Ulid>>,
         leaf_counts: &HashMap<Ulid, u32>,
     ) -> u32 {
         let mut total = leaf_counts.get(&node_id).copied().unwrap_or(0);
@@ -171,18 +175,18 @@ pub async fn node_create(
         .map_err(|e| BooksForgeError::validation(format!("invalid parent_id: {e}")))?;
 
     let node = Node {
-        id:           Ulid::new(),
+        id: Ulid::new(),
         parent_id,
-        kind:         parse_node_kind(&input.kind)?,
-        title:        input.title,
-        position:     input.position,
-        status:       parse_node_status(&input.status)?,
-        pov:          None,
-        beat:         None,
+        kind: parse_node_kind(&input.kind)?,
+        title: input.title,
+        position: input.position,
+        status: parse_node_status(&input.status)?,
+        pov: None,
+        beat: None,
         target_words: input.target_words,
-        created_at:   now,
-        updated_at:   now,
-        deleted_at:   None,
+        created_at: now,
+        updated_at: now,
+        deleted_at: None,
     };
 
     project
@@ -219,12 +223,24 @@ pub async fn node_update(
         .find(|n| n.id == id)
         .ok_or_else(|| BooksForgeError::not_found(format!("node {}", input.id)))?;
 
-    if let Some(title) = input.title { node.title = title; }
-    if let Some(pos) = input.position { node.position = pos; }
-    if let Some(status) = input.status { node.status = parse_node_status(&status)?; }
-    if let Some(pov) = input.pov { node.pov = Some(pov); }
-    if let Some(beat) = input.beat { node.beat = Some(beat); }
-    if let Some(tw) = input.target_words { node.target_words = Some(tw); }
+    if let Some(title) = input.title {
+        node.title = title;
+    }
+    if let Some(pos) = input.position {
+        node.position = pos;
+    }
+    if let Some(status) = input.status {
+        node.status = parse_node_status(&status)?;
+    }
+    if let Some(pov) = input.pov {
+        node.pov = Some(pov);
+    }
+    if let Some(beat) = input.beat {
+        node.beat = Some(beat);
+    }
+    if let Some(tw) = input.target_words {
+        node.target_words = Some(tw);
+    }
     node.updated_at = Utc::now();
 
     project
@@ -240,10 +256,7 @@ pub async fn node_update(
 
 /// Soft-delete a node by ID.
 #[tauri::command]
-pub async fn node_delete(
-    id: String,
-    state: State<'_, AppState>,
-) -> Result<(), BooksForgeError> {
+pub async fn node_delete(id: String, state: State<'_, AppState>) -> Result<(), BooksForgeError> {
     let project = require_project(&state).await?;
     let ulid = Ulid::from_string(&id)
         .map_err(|e| BooksForgeError::validation(format!("invalid id: {e}")))?;
@@ -283,7 +296,7 @@ pub async fn scene_save(
 
     let content = SceneContent {
         node_id,
-        pm_doc:     input.pm_doc.clone(),
+        pm_doc: input.pm_doc.clone(),
         word_count: input.word_count,
         char_count: input.char_count,
         hash,
@@ -332,8 +345,8 @@ pub async fn scene_load(
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
 
     Ok(content.map(|c| SceneLoadResult {
-        node_id:    c.node_id.to_string(),
-        pm_doc:     c.pm_doc,
+        node_id: c.node_id.to_string(),
+        pm_doc: c.pm_doc,
         word_count: c.word_count,
         char_count: c.char_count,
         updated_at: c.updated_at.to_rfc3339(),
@@ -345,9 +358,7 @@ pub async fn scene_load(
 /// Check whether the open project has any uncommitted scene saves from a
 /// prior crash.
 #[tauri::command]
-pub async fn recovery_check(
-    state: State<'_, AppState>,
-) -> Result<RecoveryStatus, BooksForgeError> {
+pub async fn recovery_check(state: State<'_, AppState>) -> Result<RecoveryStatus, BooksForgeError> {
     let project = require_project(&state).await?;
 
     match recovery::check(&project.bundle)
@@ -356,13 +367,13 @@ pub async fn recovery_check(
     {
         None => Ok(RecoveryStatus {
             has_pending: false,
-            node_id:     None,
-            pending_at:  None,
+            node_id: None,
+            pending_at: None,
         }),
         Some((node_id, ts)) => Ok(RecoveryStatus {
             has_pending: true,
-            node_id:     Some(node_id),
-            pending_at:  Some(ts),
+            node_id: Some(node_id),
+            pending_at: Some(ts),
         }),
     }
 }
@@ -371,9 +382,7 @@ pub async fn recovery_check(
 
 /// Clear the recovery log after the user dismisses or applies recovery.
 #[tauri::command]
-pub async fn recovery_clear(
-    state: State<'_, AppState>,
-) -> Result<(), BooksForgeError> {
+pub async fn recovery_clear(state: State<'_, AppState>) -> Result<(), BooksForgeError> {
     let project = require_project(&state).await?;
     recovery::clear(&project.bundle)
         .await

@@ -3,7 +3,12 @@
     "allow": [
       "Bash(git init *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(cp -r booksforge-ollama-run booksforge-ollama-run-qwen9b)",
+      "Bash(rm -rf booksforge-ollama-run/*)",
+      "Bash(.venv/bin/python booksforge_ollama_driver.py llama3.1-storm:8b 1 2)",
+      "Bash(.venv/bin/python booksforge_ollama_driver.py qwen3.5:27b 1 2)",
+      "Bash(echo \"PID=$!\")"
     ]
   }
 }

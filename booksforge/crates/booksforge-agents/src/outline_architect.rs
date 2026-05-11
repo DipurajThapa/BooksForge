@@ -6,14 +6,26 @@
 use booksforge_prompt::PromptTemplateId;
 
 use crate::spec::{
-    AgentSpec, ContextBudget, CrossCuttingValidator, FailureMode, ModelFamily, ModelPreference,
-    ModelSizeHint, UserGate, WhenToRun,
+    AgentSpec, ContextBudget, CrossCuttingValidator, DefaultThinking, FailureMode, ModelFamily,
+    ModelPreference, ModelSizeHint, UserGate, WhenToRun,
 };
 
 const FAILURE_MODES: &[FailureMode] = &[
-    FailureMode { id: "premise-too-thin",    description: "Brief premise lacks enough detail to outline.",            recoverable: true  },
-    FailureMode { id: "duplicate-synopses",  description: "Two scene synopses share >40% tokens.",                    recoverable: true  },
-    FailureMode { id: "wrong-chapter-count", description: "Output chapter count off the requested target by >20%.",   recoverable: true  },
+    FailureMode {
+        id: "premise-too-thin",
+        description: "Brief premise lacks enough detail to outline.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "duplicate-synopses",
+        description: "Two scene synopses share >40% tokens.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "wrong-chapter-count",
+        description: "Output chapter count off the requested target by >20%.",
+        recoverable: true,
+    },
 ];
 
 pub fn spec() -> AgentSpec {
@@ -42,6 +54,7 @@ pub fn spec() -> AgentSpec {
         failure_modes: FAILURE_MODES,
         when_to_run: WhenToRun::OnDemand,
         user_gate:   UserGate::Required,
+        default_thinking: DefaultThinking::Disabled,
     }
 }
 
@@ -81,10 +94,16 @@ pub fn validate_semantic(
 fn synopsis_overlap(a: &str, b: &str) -> f64 {
     let tokens_a: std::collections::HashSet<&str> = a.split_whitespace().collect();
     let tokens_b: std::collections::HashSet<&str> = b.split_whitespace().collect();
-    if tokens_a.is_empty() && tokens_b.is_empty() { return 1.0; }
+    if tokens_a.is_empty() && tokens_b.is_empty() {
+        return 1.0;
+    }
     let intersection = tokens_a.intersection(&tokens_b).count();
-    let union        = tokens_a.union(&tokens_b).count();
-    if union == 0 { 0.0 } else { intersection as f64 / union as f64 }
+    let union = tokens_a.union(&tokens_b).count();
+    if union == 0 {
+        0.0
+    } else {
+        intersection as f64 / union as f64
+    }
 }
 
 #[cfg(test)]
@@ -95,7 +114,10 @@ mod tests {
     fn spec_fields_are_correct() {
         let s = spec();
         assert_eq!(s.id, "outline-architect");
-        assert_eq!(s.prompt_template, PromptTemplateId::new("outline-architect", "v1"));
+        assert_eq!(
+            s.prompt_template,
+            PromptTemplateId::new("outline-architect", "v1")
+        );
         assert_eq!(s.user_gate, UserGate::Required);
         assert_eq!(s.context_budget.max_context_tokens, 6_000);
         assert_eq!(s.context_budget.max_output_tokens, 8_000);
@@ -103,7 +125,9 @@ mod tests {
 
     #[test]
     fn identical_synopses_flagged_as_duplicate() {
-        assert!(synopsis_overlap("the hero meets the villain", "the hero meets the villain") > 0.40);
+        assert!(
+            synopsis_overlap("the hero meets the villain", "the hero meets the villain") > 0.40
+        );
     }
 
     #[test]

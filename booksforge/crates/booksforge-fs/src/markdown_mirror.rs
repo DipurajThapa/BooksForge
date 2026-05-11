@@ -52,10 +52,12 @@ pub async fn write_mirror(
 
     // Ensure parent exists (manuscript/ should already exist from bundle create).
     if let Some(parent) = path.parent() {
-        tokio::fs::create_dir_all(parent).await.map_err(|e| FsError::Io {
-            path: parent.display().to_string(),
-            source: e,
-        })?;
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| FsError::Io {
+                path: parent.display().to_string(),
+                source: e,
+            })?;
     }
 
     tokio::fs::write(&path, markdown.as_bytes())
@@ -221,7 +223,15 @@ fn render_inline(node: &Value, out: &mut String) {
                 out.push_str(text);
                 out.push('`');
             } else {
-                let prefix = if bold && italic { "***" } else if bold { "**" } else if italic { "*" } else { "" };
+                let prefix = if bold && italic {
+                    "***"
+                } else if bold {
+                    "**"
+                } else if italic {
+                    "*"
+                } else {
+                    ""
+                };
                 let suffix = prefix;
                 if let Some(href) = link {
                     out.push('[');

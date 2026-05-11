@@ -17,15 +17,31 @@ use booksforge_domain::{PeerConcernSeverity, PeerReviewResult, ValidationVerdict
 use booksforge_prompt::PromptTemplateId;
 
 use crate::spec::{
-    AgentSpec, ContextBudget, CrossCuttingValidator, FailureMode, ModelFamily, ModelPreference,
-    ModelSizeHint, UserGate, WhenToRun,
+    AgentSpec, ContextBudget, CrossCuttingValidator, DefaultThinking, FailureMode, ModelFamily,
+    ModelPreference, ModelSizeHint, UserGate, WhenToRun,
 };
 
 const FAILURE_MODES: &[FailureMode] = &[
-    FailureMode { id: "verdict-out-of-enum",  description: "Verdict not in pass/warn/block.",                         recoverable: true  },
-    FailureMode { id: "focus-out-of-enum",    description: "Focus axis not in the seven peer-review axes.",           recoverable: true  },
-    FailureMode { id: "concern-without-quote", description: "Concern row missing the source quote.",                   recoverable: true  },
-    FailureMode { id: "verdict-aggregate-mismatch", description: "Result verdict softer than concern severities imply.", recoverable: false },
+    FailureMode {
+        id: "verdict-out-of-enum",
+        description: "Verdict not in pass/warn/block.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "focus-out-of-enum",
+        description: "Focus axis not in the seven peer-review axes.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "concern-without-quote",
+        description: "Concern row missing the source quote.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "verdict-aggregate-mismatch",
+        description: "Result verdict softer than concern severities imply.",
+        recoverable: false,
+    },
 ];
 
 pub fn spec() -> AgentSpec {
@@ -54,6 +70,7 @@ pub fn spec() -> AgentSpec {
         failure_modes: FAILURE_MODES,
         when_to_run:   WhenToRun::Automatic,
         user_gate:     UserGate::NotRequired,
+        default_thinking: DefaultThinking::Enabled,
     }
 }
 
@@ -65,27 +82,29 @@ pub fn spec() -> AgentSpec {
 // them via `|` would hide the contract.
 #[allow(clippy::match_same_arms)]
 pub fn parse_and_validate(raw: &str) -> Result<PeerReviewResult, String> {
-    let parsed: PeerReviewResult = serde_json::from_str(raw)
-        .map_err(|e| format!("JSON parse error: {e}"))?;
+    let parsed: PeerReviewResult =
+        serde_json::from_str(raw).map_err(|e| format!("JSON parse error: {e}"))?;
 
     let mut implied = ValidationVerdict::Pass;
     for c in &parsed.concerns {
         match c.severity {
-            PeerConcernSeverity::Error   => { implied = ValidationVerdict::Block; }
+            PeerConcernSeverity::Error => {
+                implied = ValidationVerdict::Block;
+            }
             PeerConcernSeverity::Warning => {
                 if !matches!(implied, ValidationVerdict::Block) {
                     implied = ValidationVerdict::Warn;
                 }
             }
-            PeerConcernSeverity::Info    => {}
+            PeerConcernSeverity::Info => {}
         }
     }
     let consistent = match (parsed.verdict, implied) {
         (ValidationVerdict::Block, _) => true,
-        (ValidationVerdict::Warn,  ValidationVerdict::Block) => false,
-        (ValidationVerdict::Warn,  _) => true,
-        (ValidationVerdict::Pass,  ValidationVerdict::Pass) => true,
-        (ValidationVerdict::Pass,  _) => false,
+        (ValidationVerdict::Warn, ValidationVerdict::Block) => false,
+        (ValidationVerdict::Warn, _) => true,
+        (ValidationVerdict::Pass, ValidationVerdict::Pass) => true,
+        (ValidationVerdict::Pass, _) => false,
     };
     if !consistent {
         return Err(format!(
@@ -107,13 +126,13 @@ mod tests {
     fn pr(verdict: ValidationVerdict, sev: PeerConcernSeverity) -> String {
         let p = PeerReviewResult {
             reviewer_agent_id: "memory-curator".into(),
-            primary_task_id:   "01HX".into(),
-            focus:             PeerReviewFocus::FactFidelity,
+            primary_task_id: "01HX".into(),
+            focus: PeerReviewFocus::FactFidelity,
             verdict,
             concerns: vec![PeerReviewConcern {
                 severity: sev,
-                quote:    "x".into(),
-                reason:   "y".into(),
+                quote: "x".into(),
+                reason: "y".into(),
                 evidence: "z".into(),
             }],
             recommendation: "ok".into(),

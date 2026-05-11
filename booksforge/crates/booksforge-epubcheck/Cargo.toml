@@ -5,7 +5,6 @@ edition.workspace     = true
 rust-version.workspace = true
 
 [dependencies]
-booksforge-export  = { path = "../booksforge-export" }
 thiserror.workspace  = true
 tokio.workspace      = true
 tracing.workspace    = true

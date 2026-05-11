@@ -21,7 +21,7 @@ use ulid::Ulid;
 struct Harness {
     pub service: Arc<SnapshotService>,
     pub storage: Arc<SqliteStorage>,
-    pub _dir:    tempfile::TempDir, // kept alive for the lifetime of the harness
+    pub _dir: tempfile::TempDir, // kept alive for the lifetime of the harness
 }
 
 async fn setup_harness() -> Harness {
@@ -37,27 +37,31 @@ async fn setup_harness() -> Harness {
     let storage = Arc::new(SqliteStorage::new(pool));
 
     let storage_trait: Arc<dyn StorageRepository> = storage.clone();
-    let fs:           Arc<dyn BundleFilesystem>   = Arc::new(OsFilesystem);
+    let fs: Arc<dyn BundleFilesystem> = Arc::new(OsFilesystem);
     let service = Arc::new(SnapshotService::new(storage_trait, fs, bundle));
 
-    Harness { service, storage, _dir: dir }
+    Harness {
+        service,
+        storage,
+        _dir: dir,
+    }
 }
 
 fn make_scene(node_id: Ulid, title: &str) -> Node {
     let now = Utc::now();
     Node {
-        id:           node_id,
-        parent_id:    None,
-        kind:         NodeKind::Scene,
-        title:        title.to_owned(),
-        position:     Node::DEFAULT_POSITION.to_owned(),
-        status:       NodeStatus::Drafting,
-        pov:          None,
-        beat:         None,
+        id: node_id,
+        parent_id: None,
+        kind: NodeKind::Scene,
+        title: title.to_owned(),
+        position: Node::DEFAULT_POSITION.to_owned(),
+        status: NodeStatus::Drafting,
+        pov: None,
+        beat: None,
         target_words: None,
-        created_at:   now,
-        updated_at:   now,
-        deleted_at:   None,
+        created_at: now,
+        updated_at: now,
+        deleted_at: None,
     }
 }
 
@@ -87,7 +91,9 @@ async fn scene_bodies(storage: &SqliteStorage) -> std::collections::BTreeMap<Uli
     let nodes = storage.list_nodes().await.expect("list_nodes");
     let mut out = std::collections::BTreeMap::new();
     for node in nodes {
-        if node.kind != NodeKind::Scene { continue; }
+        if node.kind != NodeKind::Scene {
+            continue;
+        }
         let scene = storage.load_scene(node.id).await.expect("load_scene");
         let text = scene
             .and_then(|s| extract_first_text(&s.pm_doc))
@@ -98,9 +104,16 @@ async fn scene_bodies(storage: &SqliteStorage) -> std::collections::BTreeMap<Uli
 }
 
 fn extract_first_text(pm_doc: &serde_json::Value) -> Option<String> {
-    pm_doc.get("content")?.as_array()?
-        .first()?.get("content")?.as_array()?
-        .first()?.get("text")?.as_str().map(str::to_owned)
+    pm_doc
+        .get("content")?
+        .as_array()?
+        .first()?
+        .get("content")?
+        .as_array()?
+        .first()?
+        .get("text")?
+        .as_str()
+        .map(str::to_owned)
 }
 
 // ── Property test (criterion 3) ───────────────────────────────────────────────
@@ -117,16 +130,28 @@ fn run_round_trip(initial: Vec<String>, mutations: Vec<String>) {
         // Insert one scene per `initial` body.
         let ids: Vec<Ulid> = (0..initial.len()).map(|_| Ulid::new()).collect();
         for (id, body) in ids.iter().zip(&initial) {
-            h.storage.insert_node(&make_scene(*id, "scene")).await.expect("insert_node");
-            h.storage.save_scene(&make_scene_content(*id, body)).await.expect("save_scene");
+            h.storage
+                .insert_node(&make_scene(*id, "scene"))
+                .await
+                .expect("insert_node");
+            h.storage
+                .save_scene(&make_scene_content(*id, body))
+                .await
+                .expect("save_scene");
         }
 
         // Capture baseline state.
         let baseline = scene_bodies(&h.storage).await;
 
         // Take snapshot S.
-        let snap = h.service
-            .create(SnapshotScope::Project, None, Some("S".into()), SnapshotTrigger::Manual)
+        let snap = h
+            .service
+            .create(
+                SnapshotScope::Project,
+                None,
+                Some("S".into()),
+                SnapshotTrigger::Manual,
+            )
             .await
             .expect("create snapshot");
 
@@ -135,7 +160,10 @@ fn run_round_trip(initial: Vec<String>, mutations: Vec<String>) {
         if !mutations.is_empty() {
             for (i, id) in ids.iter().enumerate() {
                 let body = &mutations[i % mutations.len()];
-                h.storage.save_scene(&make_scene_content(*id, body)).await.expect("save_scene");
+                h.storage
+                    .save_scene(&make_scene_content(*id, body))
+                    .await
+                    .expect("save_scene");
             }
         }
 
@@ -185,29 +213,63 @@ async fn selective_restore_only_touches_chosen_nodes() {
     // Two scenes: A and B, each with a distinctive body.
     let id_a = Ulid::new();
     let id_b = Ulid::new();
-    h.storage.insert_node(&make_scene(id_a, "Scene A")).await.unwrap();
-    h.storage.insert_node(&make_scene(id_b, "Scene B")).await.unwrap();
-    h.storage.save_scene(&make_scene_content(id_a, "A original")).await.unwrap();
-    h.storage.save_scene(&make_scene_content(id_b, "B original")).await.unwrap();
+    h.storage
+        .insert_node(&make_scene(id_a, "Scene A"))
+        .await
+        .unwrap();
+    h.storage
+        .insert_node(&make_scene(id_b, "Scene B"))
+        .await
+        .unwrap();
+    h.storage
+        .save_scene(&make_scene_content(id_a, "A original"))
+        .await
+        .unwrap();
+    h.storage
+        .save_scene(&make_scene_content(id_b, "B original"))
+        .await
+        .unwrap();
 
-    let snap = h.service
-        .create(SnapshotScope::Project, None, Some("S".into()), SnapshotTrigger::Manual)
+    let snap = h
+        .service
+        .create(
+            SnapshotScope::Project,
+            None,
+            Some("S".into()),
+            SnapshotTrigger::Manual,
+        )
         .await
         .expect("create");
 
     // Mutate both.
-    h.storage.save_scene(&make_scene_content(id_a, "A mutated")).await.unwrap();
-    h.storage.save_scene(&make_scene_content(id_b, "B mutated")).await.unwrap();
+    h.storage
+        .save_scene(&make_scene_content(id_a, "A mutated"))
+        .await
+        .unwrap();
+    h.storage
+        .save_scene(&make_scene_content(id_b, "B mutated"))
+        .await
+        .unwrap();
 
     // Restore only A.
-    let report = h.service.restore(snap.id, Some(vec![id_a])).await.expect("selective restore");
+    let report = h
+        .service
+        .restore(snap.id, Some(vec![id_a]))
+        .await
+        .expect("selective restore");
     assert_eq!(report.nodes_restored, 1);
 
     let bodies = scene_bodies(&h.storage).await;
-    assert_eq!(bodies.get(&id_a).map(String::as_str), Some("A original"),
-               "A must revert to snapshot state");
-    assert_eq!(bodies.get(&id_b).map(String::as_str), Some("B mutated"),
-               "B must keep its post-mutation state — selective restore must not touch it");
+    assert_eq!(
+        bodies.get(&id_a).map(String::as_str),
+        Some("A original"),
+        "A must revert to snapshot state"
+    );
+    assert_eq!(
+        bodies.get(&id_b).map(String::as_str),
+        Some("B mutated"),
+        "B must keep its post-mutation state — selective restore must not touch it"
+    );
 }
 
 // ── Pre-restore safety snapshot is recorded ──────────────────────────────────
@@ -216,26 +278,52 @@ async fn selective_restore_only_touches_chosen_nodes() {
 async fn restore_takes_pre_restore_safety_snapshot_first() {
     let h = setup_harness().await;
     let id = Ulid::new();
-    h.storage.insert_node(&make_scene(id, "scene")).await.unwrap();
-    h.storage.save_scene(&make_scene_content(id, "v1")).await.unwrap();
+    h.storage
+        .insert_node(&make_scene(id, "scene"))
+        .await
+        .unwrap();
+    h.storage
+        .save_scene(&make_scene_content(id, "v1"))
+        .await
+        .unwrap();
 
-    let snap = h.service
-        .create(SnapshotScope::Project, None, Some("baseline".into()), SnapshotTrigger::Manual)
+    let snap = h
+        .service
+        .create(
+            SnapshotScope::Project,
+            None,
+            Some("baseline".into()),
+            SnapshotTrigger::Manual,
+        )
         .await
         .expect("create");
 
-    h.storage.save_scene(&make_scene_content(id, "v2")).await.unwrap();
+    h.storage
+        .save_scene(&make_scene_content(id, "v2"))
+        .await
+        .unwrap();
 
     let before = h.storage.list_snapshots(None).await.unwrap().len();
     let report = h.service.restore(snap.id, None).await.expect("restore");
     let after = h.storage.list_snapshots(None).await.unwrap().len();
 
     // The safety snapshot must be a real, addressable record.
-    assert!(after > before, "restore must add a pre-restore snapshot to the manifest");
+    assert!(
+        after > before,
+        "restore must add a pre-restore snapshot to the manifest"
+    );
     let pre_id_str = report.pre_restore_snapshot_id.to_string();
-    let found = h.storage.list_snapshots(None).await.unwrap()
-        .into_iter().any(|s| s.id.to_string() == pre_id_str);
-    assert!(found, "the returned pre_restore_snapshot_id must exist in the snapshots table");
+    let found = h
+        .storage
+        .list_snapshots(None)
+        .await
+        .unwrap()
+        .into_iter()
+        .any(|s| s.id.to_string() == pre_id_str);
+    assert!(
+        found,
+        "the returned pre_restore_snapshot_id must exist in the snapshots table"
+    );
 }
 
 #[tokio::test]
@@ -244,13 +332,25 @@ async fn restore_failure_after_safety_carries_safety_id() {
     // the safety snapshot still gets written, then `load_tree` fails.
     let h = setup_harness().await;
     let unknown = Ulid::new();
-    let err = h.service.restore(unknown, None).await.expect_err("must fail");
+    let err = h
+        .service
+        .restore(unknown, None)
+        .await
+        .expect_err("must fail");
     match err {
         SnapshotError::RestoreFailedAfterSafety { safety_id, source } => {
             // The safety snapshot must exist in the manifest.
-            let exists = h.storage.list_snapshots(None).await.unwrap()
-                .into_iter().any(|s| s.id == safety_id);
-            assert!(exists, "safety snapshot {safety_id} must persist on failure");
+            let exists = h
+                .storage
+                .list_snapshots(None)
+                .await
+                .unwrap()
+                .into_iter()
+                .any(|s| s.id == safety_id);
+            assert!(
+                exists,
+                "safety snapshot {safety_id} must persist on failure"
+            );
             // And the wrapped error tells us why.
             assert!(matches!(*source, SnapshotError::NotFound(_)));
         }

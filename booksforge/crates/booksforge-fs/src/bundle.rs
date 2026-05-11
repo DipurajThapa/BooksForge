@@ -16,22 +16,48 @@ pub struct BundlePath {
 
 impl BundlePath {
     pub fn new(root: impl AsRef<Path>) -> Self {
-        Self { root: root.as_ref().to_path_buf() }
+        Self {
+            root: root.as_ref().to_path_buf(),
+        }
     }
 
-    pub fn root(&self) -> &Path { &self.root }
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
 
-    pub fn manifest(&self)  -> PathBuf { self.root.join("manifest.toml") }
-    pub fn db(&self)        -> PathBuf { self.root.join("project.db") }
-    pub fn version_file(&self) -> PathBuf { self.root.join(".booksforge-version") }
-    pub fn lock_file(&self) -> PathBuf { self.root.join(".booksforge.lock") }
-    pub fn manuscript(&self)  -> PathBuf { self.root.join("manuscript") }
-    pub fn assets(&self)      -> PathBuf { self.root.join("assets") }
-    pub fn snapshots(&self)   -> PathBuf { self.root.join("snapshots") }
-    pub fn snapshots_objects(&self) -> PathBuf { self.snapshots().join("objects") }
-    pub fn exports(&self)     -> PathBuf { self.root.join("exports") }
-    pub fn agent_runs(&self)  -> PathBuf { self.root.join("agent_runs") }
-    pub fn plugins(&self)     -> PathBuf { self.root.join("plugins") }
+    pub fn manifest(&self) -> PathBuf {
+        self.root.join("manifest.toml")
+    }
+    pub fn db(&self) -> PathBuf {
+        self.root.join("project.db")
+    }
+    pub fn version_file(&self) -> PathBuf {
+        self.root.join(".booksforge-version")
+    }
+    pub fn lock_file(&self) -> PathBuf {
+        self.root.join(".booksforge.lock")
+    }
+    pub fn manuscript(&self) -> PathBuf {
+        self.root.join("manuscript")
+    }
+    pub fn assets(&self) -> PathBuf {
+        self.root.join("assets")
+    }
+    pub fn snapshots(&self) -> PathBuf {
+        self.root.join("snapshots")
+    }
+    pub fn snapshots_objects(&self) -> PathBuf {
+        self.snapshots().join("objects")
+    }
+    pub fn exports(&self) -> PathBuf {
+        self.root.join("exports")
+    }
+    pub fn agent_runs(&self) -> PathBuf {
+        self.root.join("agent_runs")
+    }
+    pub fn plugins(&self) -> PathBuf {
+        self.root.join("plugins")
+    }
 
     pub fn chapter_file(&self, node_ulid: &str) -> PathBuf {
         self.manuscript().join(format!("{node_ulid}.md"))
@@ -92,10 +118,12 @@ where
     let temp_name = format!("booksforge-create-{}", Ulid::new());
     let temp_path = std::env::temp_dir().join(&temp_name);
 
-    tokio::fs::create_dir_all(&temp_path).await.map_err(|e| FsError::Io {
-        path: temp_path.display().to_string(),
-        source: e,
-    })?;
+    tokio::fs::create_dir_all(&temp_path)
+        .await
+        .map_err(|e| FsError::Io {
+            path: temp_path.display().to_string(),
+            source: e,
+        })?;
 
     let cleanup = || {
         let _ = std::fs::remove_dir_all(&temp_path);
@@ -107,10 +135,12 @@ where
     // Owned-content closure — taking `&str` triggers an async-closure
     // lifetime issue under newer Rust, so we copy into a String per write.
     let write_str = |path: PathBuf, content: String| async move {
-        tokio::fs::write(&path, content).await.map_err(|e| FsError::Io {
-            path: path.display().to_string(),
-            source: e,
-        })
+        tokio::fs::write(&path, content)
+            .await
+            .map_err(|e| FsError::Io {
+                path: path.display().to_string(),
+                source: e,
+            })
     };
 
     if let Err(e) = write_str(bp.manifest(), manifest_toml.to_owned()).await {
@@ -127,7 +157,10 @@ where
     let gitignore_path = temp_path.join(".gitignore");
     if let Err(e) = tokio::fs::write(&gitignore_path, BUNDLE_GITIGNORE).await {
         cleanup();
-        return Err(FsError::Io { path: gitignore_path.display().to_string(), source: e });
+        return Err(FsError::Io {
+            path: gitignore_path.display().to_string(),
+            source: e,
+        });
     }
 
     // Subdirectories
@@ -141,7 +174,10 @@ where
     ] {
         if let Err(e) = tokio::fs::create_dir_all(sub).await {
             cleanup();
-            return Err(FsError::Io { path: sub.display().to_string(), source: e });
+            return Err(FsError::Io {
+                path: sub.display().to_string(),
+                source: e,
+            });
         }
     }
 
@@ -181,11 +217,15 @@ pub async fn cleanup_orphan_temp_dirs() {
     let temp = std::env::temp_dir();
     let cutoff = std::time::Duration::from_secs(5 * 60);
 
-    let Ok(mut entries) = tokio::fs::read_dir(&temp).await else { return };
+    let Ok(mut entries) = tokio::fs::read_dir(&temp).await else {
+        return;
+    };
     while let Ok(Some(entry)) = entries.next_entry().await {
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
-        if !name_str.starts_with("booksforge-create-") { continue; }
+        if !name_str.starts_with("booksforge-create-") {
+            continue;
+        }
         if let Ok(meta) = entry.metadata().await {
             if let Ok(modified) = meta.modified() {
                 if modified.elapsed().unwrap_or_default() > cutoff {
@@ -203,9 +243,15 @@ mod tests {
     #[test]
     fn bundle_paths_are_deterministic() {
         let bp = BundlePath::new("/tmp/test.booksforge");
-        assert_eq!(bp.manifest(),  PathBuf::from("/tmp/test.booksforge/manifest.toml"));
-        assert_eq!(bp.db(),        PathBuf::from("/tmp/test.booksforge/project.db"));
-        assert_eq!(bp.lock_file(), PathBuf::from("/tmp/test.booksforge/.booksforge.lock"));
+        assert_eq!(
+            bp.manifest(),
+            PathBuf::from("/tmp/test.booksforge/manifest.toml")
+        );
+        assert_eq!(bp.db(), PathBuf::from("/tmp/test.booksforge/project.db"));
+        assert_eq!(
+            bp.lock_file(),
+            PathBuf::from("/tmp/test.booksforge/.booksforge.lock")
+        );
         assert_eq!(
             bp.chapter_file("01ABC"),
             PathBuf::from("/tmp/test.booksforge/manuscript/01ABC.md")

@@ -37,9 +37,13 @@ fn arb_scene() -> impl Strategy<Value = ScenePlan> {
         prop::option::of("[A-Z][a-z]{1,10}".prop_map(String::from)),
         prop::option::of("[a-z]{3,15}".prop_map(String::from)),
         prop::option::of(500u32..5_000u32),
-    ).prop_map(|(synopsis, pov, beat, target_word_count)| ScenePlan {
-        synopsis, pov, beat, target_word_count,
-    })
+    )
+        .prop_map(|(synopsis, pov, beat, target_word_count)| ScenePlan {
+            synopsis,
+            pov,
+            beat,
+            target_word_count,
+        })
 }
 
 fn arb_chapter() -> impl Strategy<Value = ChapterPlan> {
@@ -47,7 +51,12 @@ fn arb_chapter() -> impl Strategy<Value = ChapterPlan> {
         "[A-Za-z][A-Za-z0-9 ]{1,30}".prop_map(String::from),
         "[A-Za-z][A-Za-z0-9 ]{1,40}".prop_map(String::from),
         prop::collection::vec(arb_scene(), 0..5),
-    ).prop_map(|(title, purpose, scenes)| ChapterPlan { title, purpose, scenes })
+    )
+        .prop_map(|(title, purpose, scenes)| ChapterPlan {
+            title,
+            purpose,
+            scenes,
+        })
 }
 
 fn arb_part() -> impl Strategy<Value = PartPlan> {
@@ -55,7 +64,12 @@ fn arb_part() -> impl Strategy<Value = PartPlan> {
         "[A-Za-z][A-Za-z0-9 ]{1,30}".prop_map(String::from),
         "[A-Za-z][A-Za-z0-9 ]{1,40}".prop_map(String::from),
         prop::collection::vec(arb_chapter(), 0..4),
-    ).prop_map(|(title, purpose, chapters)| PartPlan { title, purpose, chapters })
+    )
+        .prop_map(|(title, purpose, chapters)| PartPlan {
+            title,
+            purpose,
+            chapters,
+        })
 }
 
 fn arb_proposal() -> impl Strategy<Value = OutlineProposal> {
@@ -63,9 +77,12 @@ fn arb_proposal() -> impl Strategy<Value = OutlineProposal> {
         prop::collection::vec(arb_part(), 0..4),
         "[A-Za-z0-9 ,.]{0,80}".prop_map(String::from),
         prop::collection::vec("[A-Za-z0-9 ]{1,30}".prop_map(String::from), 0..3),
-    ).prop_map(|(parts, rationale, notes_to_user)| OutlineProposal {
-        parts, rationale, notes_to_user,
-    })
+    )
+        .prop_map(|(parts, rationale, notes_to_user)| OutlineProposal {
+            parts,
+            rationale,
+            notes_to_user,
+        })
 }
 
 // ── Invariant check (used in the Ok branch) ───────────────────────────────────
@@ -73,15 +90,25 @@ fn arb_proposal() -> impl Strategy<Value = OutlineProposal> {
 fn assert_delta_is_valid(proposal: &OutlineProposal, delta: &NodeTreeDelta) {
     let expected = 1
         + proposal.parts.len()
-        + proposal.parts.iter().map(|p| p.chapters.len()).sum::<usize>()
-        + proposal.parts.iter()
+        + proposal
+            .parts
+            .iter()
+            .map(|p| p.chapters.len())
+            .sum::<usize>()
+        + proposal
+            .parts
+            .iter()
             .flat_map(|p| p.chapters.iter())
             .map(|c| c.scenes.len())
             .sum::<usize>();
     assert_eq!(delta.creates.len(), expected, "node count mismatch");
 
     // Exactly one project root.
-    let projects: Vec<_> = delta.creates.iter().filter(|n| n.kind == NodeKind::Project).collect();
+    let projects: Vec<_> = delta
+        .creates
+        .iter()
+        .filter(|n| n.kind == NodeKind::Project)
+        .collect();
     assert_eq!(projects.len(), 1, "expected exactly one project node");
     assert!(projects[0].parent_id.is_none(), "project root has parent");
 
@@ -92,7 +119,12 @@ fn assert_delta_is_valid(proposal: &OutlineProposal, delta: &NodeTreeDelta) {
     // Parent chain valid: every non-project node's parent is in the delta.
     for node in &delta.creates {
         if let Some(parent) = node.parent_id {
-            assert!(ids.contains(&parent), "node {} references missing parent {}", node.id, parent);
+            assert!(
+                ids.contains(&parent),
+                "node {} references missing parent {}",
+                node.id,
+                parent
+            );
         }
     }
 
@@ -105,7 +137,10 @@ fn assert_delta_is_valid(proposal: &OutlineProposal, delta: &NodeTreeDelta) {
         let mut iter = positions.iter();
         if let Some(mut prev) = iter.next() {
             for cur in iter {
-                assert!(prev < cur, "non-monotonic sibling positions: {prev} >= {cur}");
+                assert!(
+                    prev < cur,
+                    "non-monotonic sibling positions: {prev} >= {cur}"
+                );
                 prev = cur;
             }
         }
@@ -132,7 +167,7 @@ proptest! {
     #[test]
     fn outline_to_tree_total_with_no_partial_output(proposal in arb_proposal()) {
         let mut factory = deterministic_factory();
-        let result = outline_to_tree(&proposal, "Test Book", &mut factory, Utc::now());
+        let result = outline_to_tree(&proposal, "Test Book", &mut factory, Utc::now(), None);
 
         match result {
             Ok(delta) => assert_delta_is_valid(&proposal, &delta),

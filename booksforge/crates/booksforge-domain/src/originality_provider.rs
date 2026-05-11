@@ -33,8 +33,8 @@ impl OriginalityProviderId {
         match self {
             Self::LocalOnly => "local_only",
             Self::Copyleaks => "copyleaks",
-            Self::Plagscan  => "plagscan",
-            Self::Turnitin  => "turnitin",
+            Self::Plagscan => "plagscan",
+            Self::Turnitin => "turnitin",
         }
     }
 
@@ -42,10 +42,10 @@ impl OriginalityProviderId {
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "local_only" => Some(Self::LocalOnly),
-            "copyleaks"  => Some(Self::Copyleaks),
-            "plagscan"   => Some(Self::Plagscan),
-            "turnitin"   => Some(Self::Turnitin),
-            _            => None,
+            "copyleaks" => Some(Self::Copyleaks),
+            "plagscan" => Some(Self::Plagscan),
+            "turnitin" => Some(Self::Turnitin),
+            _ => None,
         }
     }
 
@@ -66,20 +66,20 @@ impl OriginalityProviderId {
 /// privacy-invariant test asserts this contract.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OriginalityConsent {
-    pub provider:    OriginalityProviderId,
+    pub provider: OriginalityProviderId,
     /// ISO-8601 timestamp when the user accepted the consent dialog.
     pub accepted_at: String,
     /// Free-form note the user can add (e.g. "review window — Q4 only").
     /// Empty for the default LocalOnly record.
-    pub note:        String,
+    pub note: String,
 }
 
 impl Default for OriginalityConsent {
     fn default() -> Self {
         Self {
-            provider:    OriginalityProviderId::LocalOnly,
+            provider: OriginalityProviderId::LocalOnly,
             accepted_at: String::new(),
-            note:        String::new(),
+            note: String::new(),
         }
     }
 }
@@ -89,14 +89,14 @@ impl Default for OriginalityConsent {
 /// detector or any future remote service.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OriginalityCheckResult {
-    pub provider:  OriginalityProviderId,
+    pub provider: OriginalityProviderId,
     /// Total number of overlap hits.
     pub hit_count: u32,
     /// Longest verbatim run, in words.
     pub longest_run_words: u32,
     /// Provider-specific quote / metadata strings.  For LocalOnly these
     /// are the same `OverlapHit.quote`s the in-process detector returns.
-    pub samples:   Vec<String>,
+    pub samples: Vec<String>,
 }
 
 #[cfg(test)]

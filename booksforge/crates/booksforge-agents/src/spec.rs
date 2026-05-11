@@ -34,7 +34,7 @@ pub enum ModelSizeHint {
 /// Preferred model configuration for an agent.
 #[derive(Debug, Clone, Copy)]
 pub struct ModelPreference {
-    pub family:   ModelFamily,
+    pub family: ModelFamily,
     pub min_size: ModelSizeHint,
 }
 
@@ -42,27 +42,63 @@ pub struct ModelPreference {
 #[derive(Debug, Clone, Copy)]
 pub struct ContextBudget {
     pub max_context_tokens: u32,
-    pub max_output_tokens:  u32,
+    pub max_output_tokens: u32,
 }
 
 impl ContextBudget {
-    pub fn total(&self) -> u32 { self.max_context_tokens + self.max_output_tokens }
+    pub fn total(&self) -> u32 {
+        self.max_context_tokens + self.max_output_tokens
+    }
 }
 
 /// Whether the agent runs automatically or requires user action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WhenToRun { Automatic, OnDemand, Scheduled }
+pub enum WhenToRun {
+    Automatic,
+    OnDemand,
+    Scheduled,
+}
+
+/// Reasoning-mode default for an agent on thinking-capable model families
+/// (Qwen 3.x, DeepSeek R-class, etc.).
+///
+/// The orchestrator translates this into the `think: Option<bool>` field on
+/// the wire request when invoking the model. Decoupled from `booksforge-ollama`
+/// to keep the layering invariant (`agents` = L3 pure logic, `ollama` = L4
+/// infrastructure).
+///
+/// Picking the right mode:
+///   - `Disabled` for prose generators and editorial passes where the model
+///     should produce its answer directly (intake, outline-architect,
+///     chapter-drafter, chapter-drafter-nf, copyeditor, final-polish,
+///     final-polish-merge, humanization, vocab-dictionary, memory-curator).
+///   - `Enabled` for agents where structural reasoning earns its tokens
+///     (proposal-validator, dev-editor).
+///   - `ModelDefault` for agents that should defer to whatever the model
+///     is configured to do — used for legacy or family-agnostic flows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DefaultThinking {
+    /// Force `think: false` on the wire payload.
+    Disabled,
+    /// Force `think: true` on the wire payload.
+    Enabled,
+    /// Omit the `think` field — let the model use its configured default.
+    ModelDefault,
+}
 
 /// Whether the user must confirm before output is applied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UserGate { Required, NotRequired }
+pub enum UserGate {
+    Required,
+    NotRequired,
+}
 
 /// A documented failure mode for the agent.  Surfaced in telemetry,
 /// help tooltips, and the test matrix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FailureMode {
     /// Stable, kebab-case identifier (e.g. `"empty-idea"`, `"range-mismatch"`).
-    pub id:          &'static str,
+    pub id: &'static str,
     /// One-line description shown in the UI when this mode is hit.
     pub description: &'static str,
     /// Whether this mode is recoverable via retry, or terminal.
@@ -100,23 +136,31 @@ pub enum CrossCuttingValidator {
 /// resolved at orchestrator-binding time).
 #[derive(Debug, Clone)]
 pub struct AgentSpec {
-    pub id:                &'static str,
-    pub name:              &'static str,
-    pub purpose:           &'static str,
+    pub id: &'static str,
+    pub name: &'static str,
+    pub purpose: &'static str,
     /// Documentation-grade name of the input type.  Lives in
     /// `booksforge-domain` and round-trips through `serde` parse-validation.
-    pub input_schema_id:   &'static str,
+    pub input_schema_id: &'static str,
     /// Documentation-grade name of the output type.
-    pub output_schema_id:  &'static str,
-    pub prompt_template:   PromptTemplateId,
-    pub model_preference:  ModelPreference,
+    pub output_schema_id: &'static str,
+    pub prompt_template: PromptTemplateId,
+    pub model_preference: ModelPreference,
     /// Project addition — exact-tag pin for high-end agents.
-    pub pinned_model:      Option<&'static str>,
-    pub context_budget:    ContextBudget,
-    pub validators:        &'static [CrossCuttingValidator],
-    pub failure_modes:     &'static [FailureMode],
-    pub when_to_run:       WhenToRun,
-    pub user_gate:         UserGate,
+    pub pinned_model: Option<&'static str>,
+    pub context_budget: ContextBudget,
+    pub validators: &'static [CrossCuttingValidator],
+    pub failure_modes: &'static [FailureMode],
+    pub when_to_run: WhenToRun,
+    pub user_gate: UserGate,
+    /// Reasoning-mode default for thinking-capable model families. The
+    /// orchestrator translates this into the wire `think` field at binding
+    /// time. Default for any agent that does not explicitly set a value is
+    /// [`DefaultThinking::Disabled`] — the safe choice for prose-emitting
+    /// agents (most of them), which would otherwise have output silently
+    /// swallowed into a `message.thinking` field on Qwen 3.x and other
+    /// reasoning families.
+    pub default_thinking: DefaultThinking,
 }
 
 /// Helper: standard "always-on" cross-cutting validators every agent must run.
@@ -137,7 +181,10 @@ mod tests {
 
     #[test]
     fn context_budget_totals_correctly() {
-        let b = ContextBudget { max_context_tokens: 4_000, max_output_tokens: 2_000 };
+        let b = ContextBudget {
+            max_context_tokens: 4_000,
+            max_output_tokens: 2_000,
+        };
         assert_eq!(b.total(), 6_000);
     }
 }

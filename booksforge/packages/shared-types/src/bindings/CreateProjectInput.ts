@@ -11,4 +11,12 @@ bundle_path: string, title: string, author: string,
 /**
  * Optional `genre` string (free-form tag for UI grouping).
  */
-genre: string | null, };
+genre: string | null, 
+/**
+ * Project classification — drives the workflow router (per-genre
+ * prompts, polish-stack ordering, rubric weights). Set by the
+ * NewProjectWizard's first step (Phase 5 of PRODUCT_ROADMAP_E2E.md).
+ * Optional for backwards compatibility with the prior wizard;
+ * `None` triggers the post-create onboarding overlay.
+ */
+book_kind: string | null, };

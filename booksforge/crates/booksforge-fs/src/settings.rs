@@ -30,9 +30,8 @@ pub async fn load_settings() -> Result<UserSettings, FsError> {
         path: path.display().to_string(),
         source: e,
     })?;
-    let text = std::str::from_utf8(&bytes).map_err(|_| {
-        FsError::Serialization("settings.toml is not valid UTF-8".to_owned())
-    })?;
+    let text = std::str::from_utf8(&bytes)
+        .map_err(|_| FsError::Serialization("settings.toml is not valid UTF-8".to_owned()))?;
     toml::from_str(text)
         .map_err(|e| FsError::Serialization(format!("settings.toml parse error: {e}")))
 }
@@ -41,10 +40,12 @@ pub async fn load_settings() -> Result<UserSettings, FsError> {
 pub async fn save_settings(settings: &UserSettings) -> Result<(), FsError> {
     let path = settings_path();
     if let Some(parent) = path.parent() {
-        tokio::fs::create_dir_all(parent).await.map_err(|e| FsError::Io {
-            path: parent.display().to_string(),
-            source: e,
-        })?;
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| FsError::Io {
+                path: parent.display().to_string(),
+                source: e,
+            })?;
     }
     let text = toml::to_string_pretty(settings)
         .map_err(|e| FsError::Serialization(format!("settings serialize error: {e}")))?;

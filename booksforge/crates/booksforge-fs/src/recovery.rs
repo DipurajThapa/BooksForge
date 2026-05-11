@@ -26,11 +26,7 @@ pub enum RecoveryEntry {
 }
 
 /// Append a `pending` entry to the recovery log.
-pub async fn write_pending(
-    bundle: &BundlePath,
-    node_id: &str,
-    ts: &str,
-) -> Result<(), FsError> {
+pub async fn write_pending(bundle: &BundlePath, node_id: &str, ts: &str) -> Result<(), FsError> {
     let entry = RecoveryEntry::Pending {
         node_id: node_id.to_owned(),
         ts: ts.to_owned(),
@@ -97,10 +93,12 @@ pub async fn check(bundle: &BundlePath) -> Result<Option<(String, String)>, FsEr
 pub async fn clear(bundle: &BundlePath) -> Result<(), FsError> {
     let path = bundle.root().join(LOG_FILENAME);
     if path.exists() {
-        tokio::fs::remove_file(&path).await.map_err(|e| FsError::Io {
-            path: path.display().to_string(),
-            source: e,
-        })?;
+        tokio::fs::remove_file(&path)
+            .await
+            .map_err(|e| FsError::Io {
+                path: path.display().to_string(),
+                source: e,
+            })?;
     }
     Ok(())
 }
@@ -125,9 +123,11 @@ async fn append_entry(bundle: &BundlePath, entry: &RecoveryEntry) -> Result<(), 
             source: e,
         })?;
 
-    file.write_all(line.as_bytes()).await.map_err(|e| FsError::Io {
-        path: path.display().to_string(),
-        source: e,
-    })?;
+    file.write_all(line.as_bytes())
+        .await
+        .map_err(|e| FsError::Io {
+            path: path.display().to_string(),
+            source: e,
+        })?;
     Ok(())
 }

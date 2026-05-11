@@ -16,8 +16,8 @@ pub struct SaveDiagnosticBundleInput {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct SaveDiagnosticBundleResult {
-    pub output_path:       String,
-    pub bytes:             u64,
+    pub output_path: String,
+    pub bytes: u64,
     pub log_files_included: u32,
-    pub redaction_applied:  bool,
+    pub redaction_applied: bool,
 }

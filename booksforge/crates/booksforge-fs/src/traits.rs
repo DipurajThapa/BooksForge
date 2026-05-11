@@ -19,7 +19,13 @@ pub trait BundleFilesystem: Send + Sync {
         &self,
         final_path: &Path,
         manifest_toml: &str,
-        db_path_callback: Box<dyn FnOnce(std::path::PathBuf) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), FsError>> + Send>> + Send>,
+        db_path_callback: Box<
+            dyn FnOnce(
+                    std::path::PathBuf,
+                ) -> std::pin::Pin<
+                    Box<dyn std::future::Future<Output = Result<(), FsError>> + Send>,
+                > + Send,
+        >,
     ) -> Result<BundlePath, FsError>;
 
     /// Open an existing bundle, validating its structure.
@@ -67,7 +73,13 @@ impl BundleFilesystem for OsFilesystem {
         &self,
         final_path: &Path,
         manifest_toml: &str,
-        db_path_callback: Box<dyn FnOnce(std::path::PathBuf) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), FsError>> + Send>> + Send>,
+        db_path_callback: Box<
+            dyn FnOnce(
+                    std::path::PathBuf,
+                ) -> std::pin::Pin<
+                    Box<dyn std::future::Future<Output = Result<(), FsError>> + Send>,
+                > + Send,
+        >,
     ) -> Result<BundlePath, FsError> {
         crate::bundle::create_bundle(final_path, manifest_toml, |db_path| {
             db_path_callback(db_path)
@@ -93,10 +105,12 @@ impl BundleFilesystem for OsFilesystem {
         markdown: &str,
     ) -> Result<(), FsError> {
         let path = bundle.chapter_file(node_ulid);
-        tokio::fs::write(&path, markdown).await.map_err(|e| FsError::Io {
-            path: path.display().to_string(),
-            source: e,
-        })
+        tokio::fs::write(&path, markdown)
+            .await
+            .map_err(|e| FsError::Io {
+                path: path.display().to_string(),
+                source: e,
+            })
     }
 
     async fn write_snapshot_object(
@@ -107,10 +121,12 @@ impl BundleFilesystem for OsFilesystem {
         let hash = blake3::hash(content).to_hex().to_string();
         let dest = bundle.snapshot_object(&hash);
         if let Some(parent) = dest.parent() {
-            tokio::fs::create_dir_all(parent).await.map_err(|e| FsError::Io {
-                path: parent.display().to_string(),
-                source: e,
-            })?;
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(|e| FsError::Io {
+                    path: parent.display().to_string(),
+                    source: e,
+                })?;
         }
         // Only write if not already present (content-addressed dedup).
         // Atomic: write to a sibling tmp file, then rename — readers never
@@ -124,10 +140,12 @@ impl BundleFilesystem for OsFilesystem {
                 ulid::Ulid::new(),
             );
             let tmp = dest.with_file_name(tmp_name);
-            tokio::fs::write(&tmp, content).await.map_err(|e| FsError::Io {
-                path: tmp.display().to_string(),
-                source: e,
-            })?;
+            tokio::fs::write(&tmp, content)
+                .await
+                .map_err(|e| FsError::Io {
+                    path: tmp.display().to_string(),
+                    source: e,
+                })?;
             // If a concurrent writer beat us to it, the rename is still safe —
             // both objects have the same content (same hash).
             if let Err(e) = std::fs::rename(&tmp, &dest) {

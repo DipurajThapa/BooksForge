@@ -8,7 +8,9 @@ brief                = { kind = "json",    schema = "ProjectBrief" }
 target_chapter_count = { kind = "int",     min = 6, max = 60 }
 
 [input.optional]
-genre_overlay = { kind = "string", default = "" }
+genre_overlay    = { kind = "string", default = "" }
+prompt_guard     = { kind = "string", default = "" }
+creative_profile = { kind = "string", default = "" }
 
 [render.system]
 text = """
@@ -18,6 +20,10 @@ each chapter has a one-sentence purpose and 2–4 scenes with one-sentence
 synopses. Do not write prose. Do not invent facts. Use the language of the
 brief. Output strictly valid JSON matching the schema provided. Do not include
 any text outside the JSON object.
+
+{{ creative_profile }}
+
+{{ prompt_guard }}
 """
 
 [render.user]

@@ -3,7 +3,10 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum DomainError {
     #[error("invalid node operation: node kind {kind:?} cannot {operation}")]
-    InvalidNodeOperation { kind: crate::NodeKind, operation: &'static str },
+    InvalidNodeOperation {
+        kind: crate::NodeKind,
+        operation: &'static str,
+    },
 
     #[error("circular parent reference: node {id} cannot be its own ancestor")]
     CircularReference { id: String },

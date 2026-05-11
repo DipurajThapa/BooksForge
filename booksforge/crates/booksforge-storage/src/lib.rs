@@ -12,11 +12,15 @@
 // fixtures; the workspace-level clippy lints fire only on shipped code.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
+pub mod agent_exemplars;
 pub mod migrations;
 pub mod pool;
 pub mod repository;
 pub mod sqlite;
 
+pub use agent_exemplars::{
+    fetch_top_exemplars, insert_exemplar, render_exemplars_block, AgentExemplar,
+};
 pub use migrations::run_migrations;
 pub use pool::{open_pool, DbPool};
 pub use repository::StorageRepository;

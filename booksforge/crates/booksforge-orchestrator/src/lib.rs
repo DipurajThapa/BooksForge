@@ -13,28 +13,39 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub mod apply;
+pub mod apply_chapter_drafter;
+pub mod apply_character_bible;
 pub mod apply_continuity;
 pub mod apply_copyedit;
+pub mod apply_polish;
+pub mod apply_scene_drafter_fic;
+pub mod apply_world_bible;
 pub mod config;
 pub mod context_builder;
 pub mod council;
+pub mod creative_profile;
 pub mod cross_cutting;
+pub mod event;
 pub mod originality_provider;
-pub mod proposal_validator;
 pub mod prompt_guard;
+pub mod proposal_validator;
 pub mod quick_action;
 pub mod run;
 pub mod runner;
 pub mod voice_pipeline;
-pub mod event;
 
 pub use apply::ApplyOutlineResult;
+pub use apply_chapter_drafter::ApplyChapterDrafterResult;
+pub use apply_character_bible::ApplyCharacterBibleResult;
 pub use apply_continuity::ApplyContinuityResult;
 pub use apply_copyedit::ApplyCopyeditResult;
+pub use apply_polish::ApplyPolishResult;
+pub use apply_scene_drafter_fic::ApplySceneDrafterFicResult;
+pub use apply_world_bible::ApplyWorldBibleResult;
 pub use config::OrchestratorConfig;
+pub use event::RunEvent;
 pub use quick_action::{ApplyOp, ApplyQuickActionResult, QuickActionOptions, QuickActionOutcome};
 pub use run::{Orchestrator, OutlineRunResult, RunHandle, WorkflowTrigger};
-pub use event::RunEvent;
 
 #[derive(Debug, thiserror::Error)]
 pub enum OrchestratorError {
@@ -48,7 +59,11 @@ pub enum OrchestratorError {
     TokenBudgetExceeded { limit: u32 },
 
     #[error("agent '{agent_id}' failed after {retries} retries: {reason}")]
-    AgentFailed { agent_id: String, retries: u32, reason: String },
+    AgentFailed {
+        agent_id: String,
+        retries: u32,
+        reason: String,
+    },
 
     #[error("workflow cancelled by user")]
     Cancelled,

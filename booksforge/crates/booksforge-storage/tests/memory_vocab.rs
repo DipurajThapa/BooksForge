@@ -4,9 +4,7 @@
 
 use std::sync::Arc;
 
-use booksforge_domain::{
-    EntryKind, EntrySource, MemoryEntry, MemoryScope, VocabEntry,
-};
+use booksforge_domain::{EntryKind, EntrySource, MemoryEntry, MemoryScope, VocabEntry};
 use booksforge_storage::{open_pool, run_migrations, SqliteStorage, StorageRepository};
 use chrono::Utc;
 use ulid::Ulid;
@@ -25,17 +23,21 @@ async fn memory_upsert_then_get_returns_same_value() {
     let (storage, _dir) = fresh().await;
     let now = Utc::now();
     let entry = MemoryEntry {
-        id:         Ulid::new(),
-        scope:      MemoryScope::Book,
-        key:        "premise".into(),
+        id: Ulid::new(),
+        scope: MemoryScope::Book,
+        key: "premise".into(),
         value_json: serde_json::json!({ "text": "Alice opens the locked archive." }),
-        agent_id:   "memory-curator".into(),
+        agent_id: "memory-curator".into(),
         created_at: now,
         updated_at: now,
     };
     storage.memory_upsert(&entry).await.unwrap();
 
-    let got = storage.memory_get(MemoryScope::Book, "premise").await.unwrap().unwrap();
+    let got = storage
+        .memory_get(MemoryScope::Book, "premise")
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(got.key, "premise");
     assert_eq!(got.scope, MemoryScope::Book);
     assert_eq!(got.value_json["text"], "Alice opens the locked archive.");
@@ -45,11 +47,11 @@ async fn memory_upsert_then_get_returns_same_value() {
 async fn memory_upsert_replaces_value_on_conflict() {
     let (storage, _dir) = fresh().await;
     let mut entry = MemoryEntry {
-        id:         Ulid::new(),
-        scope:      MemoryScope::Style,
-        key:        "em_dash".into(),
+        id: Ulid::new(),
+        scope: MemoryScope::Style,
+        key: "em_dash".into(),
         value_json: serde_json::json!("em"),
-        agent_id:   "copyeditor".into(),
+        agent_id: "copyeditor".into(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
@@ -59,7 +61,11 @@ async fn memory_upsert_replaces_value_on_conflict() {
     entry.updated_at = Utc::now();
     storage.memory_upsert(&entry).await.unwrap();
 
-    let got = storage.memory_get(MemoryScope::Style, "em_dash").await.unwrap().unwrap();
+    let got = storage
+        .memory_get(MemoryScope::Style, "em_dash")
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(got.value_json, serde_json::json!("en"));
 }
 
@@ -67,19 +73,25 @@ async fn memory_upsert_replaces_value_on_conflict() {
 async fn memory_delete_returns_one_then_zero() {
     let (storage, _dir) = fresh().await;
     let entry = MemoryEntry {
-        id:         Ulid::new(),
-        scope:      MemoryScope::Entity,
-        key:        "alice".into(),
+        id: Ulid::new(),
+        scope: MemoryScope::Entity,
+        key: "alice".into(),
         value_json: serde_json::json!({ "role": "protagonist" }),
-        agent_id:   "memory-curator".into(),
+        agent_id: "memory-curator".into(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
     storage.memory_upsert(&entry).await.unwrap();
 
-    let first = storage.memory_delete(MemoryScope::Entity, "alice").await.unwrap();
+    let first = storage
+        .memory_delete(MemoryScope::Entity, "alice")
+        .await
+        .unwrap();
     assert_eq!(first, 1);
-    let second = storage.memory_delete(MemoryScope::Entity, "alice").await.unwrap();
+    let second = storage
+        .memory_delete(MemoryScope::Entity, "alice")
+        .await
+        .unwrap();
     assert_eq!(second, 0);
 }
 
@@ -92,16 +104,27 @@ async fn vocab_seed_starters_writes_known_layers() {
     storage.vocab_seed_starters(&starters).await.unwrap();
 
     let ai_tells = storage.vocab_count_by_layer("ai_tells").await.unwrap();
-    let fantasy  = storage.vocab_count_by_layer("genre:fantasy").await.unwrap();
-    assert!(ai_tells >= 12, "ai_tells must have ≥12 starter entries, got {ai_tells}");
-    assert!(fantasy  >= 6,  "genre:fantasy must have ≥6 starter entries, got {fantasy}");
+    let fantasy = storage.vocab_count_by_layer("genre:fantasy").await.unwrap();
+    assert!(
+        ai_tells >= 12,
+        "ai_tells must have ≥12 starter entries, got {ai_tells}"
+    );
+    assert!(
+        fantasy >= 6,
+        "genre:fantasy must have ≥6 starter entries, got {fantasy}"
+    );
 }
 
 #[tokio::test]
 async fn vocab_resolve_with_active_layers_picks_most_specific() {
     let (storage, _dir) = fresh().await;
 
-    let mut e_ai = VocabEntry::new("ai_tells", "Tapestry", EntryKind::Replace, EntrySource::Starter);
+    let mut e_ai = VocabEntry::new(
+        "ai_tells",
+        "Tapestry",
+        EntryKind::Replace,
+        EntrySource::Starter,
+    );
     e_ai = e_ai.with_replacement("pattern");
     let mut e_proj = VocabEntry::new("project", "Tapestry", EntryKind::Replace, EntrySource::User);
     e_proj = e_proj.with_replacement("weave");
@@ -116,7 +139,10 @@ async fn vocab_resolve_with_active_layers_picks_most_specific() {
 
     let merged = booksforge_domain::resolve_vocab(&entries, &["project", "ai_tells"]);
     let tapestry = merged.iter().find(|e| e.term == "tapestry").unwrap();
-    assert_eq!(tapestry.layer, "project", "project layer must beat ai_tells");
+    assert_eq!(
+        tapestry.layer, "project",
+        "project layer must beat ai_tells"
+    );
     assert_eq!(tapestry.replacement.as_deref(), Some("weave"));
 }
 
@@ -129,7 +155,10 @@ async fn vocab_starters_are_not_overwritten_by_user_rows_when_reseeded() {
     storage.vocab_seed_starters(&starters).await.unwrap();
 
     let mut user_row = VocabEntry::new(
-        "project", "lighthouse", EntryKind::Prefer, EntrySource::User,
+        "project",
+        "lighthouse",
+        EntryKind::Prefer,
+        EntrySource::User,
     );
     user_row = user_row.with_rationale("Recurring symbol in the manuscript.");
     storage.vocab_upsert(&user_row).await.unwrap();

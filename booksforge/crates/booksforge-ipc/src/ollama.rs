@@ -38,24 +38,24 @@ pub struct OllamaStatusResponse {
 #[ts(export, export_to = "../../packages/shared-types/src/bindings/")]
 pub struct ModelListEntry {
     /// Ollama pull tag.
-    pub id:               String,
-    pub display_name:     String,
-    pub family:           String,
+    pub id: String,
+    pub display_name: String,
+    pub family: String,
     /// Approximate download size in bytes.
-    pub size_bytes:       u64,
+    pub size_bytes: u64,
     /// Minimum RAM (GB) required.
-    pub ram_min_gb:       u32,
-    pub context_window:   u32,
-    pub recommended_for:  Vec<String>,
-    pub strengths:        Vec<String>,
-    pub notes:            String,
+    pub ram_min_gb: u32,
+    pub context_window: u32,
+    pub recommended_for: Vec<String>,
+    pub strengths: Vec<String>,
+    pub notes: String,
     pub default_for_modes: Vec<String>,
     /// Whether this model appears in the picker (`false` = internal/smoke only).
-    pub official:         bool,
+    pub official: bool,
     /// Whether the model is already installed locally.
-    pub is_installed:     bool,
+    pub is_installed: bool,
     /// Local digest hash (sha256:…), present when installed.
-    pub digest:           Option<String>,
+    pub digest: Option<String>,
 }
 
 /// Progress payload emitted as a Tauri event during `ollama_pull`.
@@ -63,20 +63,20 @@ pub struct ModelListEntry {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../packages/shared-types/src/bindings/")]
 pub struct PullProgressPayload {
-    pub model:     String,
-    pub status:    String,
+    pub model: String,
+    pub status: String,
     pub completed: Option<u64>,
-    pub total:     Option<u64>,
+    pub total: Option<u64>,
 }
 
 /// Result of `ollama_smoke_test`.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../packages/shared-types/src/bindings/")]
 pub struct SmokeTestResult {
-    pub success:     bool,
+    pub success: bool,
     /// A short excerpt of the model's response (for the UI to display).
-    pub response:    Option<String>,
+    pub response: Option<String>,
     pub duration_ms: u64,
     /// Error message if the test failed.
-    pub error:       Option<String>,
+    pub error: Option<String>,
 }

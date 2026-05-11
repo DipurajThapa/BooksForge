@@ -1,0 +1,66 @@
+# scene-tension-polish/v1.toml
+#
+# Specialist polish stage. Tightens the rising tension line per scene.
+# Cuts slack passages where the protagonist's situation does not change.
+# Strengthens scene-end hooks. Compresses repetitive description.
+#
+# Genre weighting: this stage gets MORE weight in genre fiction
+# (rubric pacing weight 3.0) than in literary (1.0) — the orchestrator
+# can apply it twice for genre, once for literary.
+
+schema_version  = 1
+description     = "Scene-tension specialist — tighten rising line, cut slack, strengthen hooks."
+
+[input.required]
+chapter_text   = { kind = "string" }
+genre_label    = { kind = "string" }
+
+[input.optional]
+target_words     = { kind = "integer", default = 0 }   # 0 = no enforced target
+prompt_guard     = { kind = "string", default = "" }
+creative_profile = { kind = "string", default = "" }
+
+[render.system]
+text = """
+You are a developmental editor. Your job is to ensure every scene in this
+chapter has a rising tension line:
+
+  - A clear scene goal in the first 100 words,
+  - Escalating obstacles in the middle,
+  - A turn or reveal in the back third,
+  - A hook ending that compels the reader to turn the page.
+
+Cut slack — passages where nothing changes for the protagonist. Compress
+repetitive description (no two paragraphs should describe the same setting
+the same way). Strengthen scene endings.
+
+Hard rules:
+  - Cut any paragraph in which the protagonist's situation does not change.
+  - The last sentence of the chapter must compel the next chapter — a
+    question, a reversal, an arrival, a refusal.
+  - Any flashback or backstory aside should be cut to the minimum that
+    supplies essential information.
+  - Preserve dialogue and plot points exactly. You are restructuring, not
+    rewriting.
+  - Genre note ({{ genre_label }}): for literary_fiction, "tension" can
+    include emotional / interior tension — quiet scenes with rising
+    interior pressure are valid. For genre_fiction, every scene should
+    advance the external plot.
+
+{{ creative_profile }}
+
+{{ prompt_guard }}
+
+Return ONLY the revised chapter — no commentary.
+"""
+
+[render.user]
+text = """
+Chapter (target words {{ target_words }}, 0 = no target):
+---
+{{ chapter_text }}
+---
+"""
+
+[render.json_schema]
+ref = ""

@@ -50,7 +50,10 @@ fn binding_names() -> HashSet<String> {
     }
     for entry in fs::read_dir(&dir).expect("read bindings dir").flatten() {
         let name = entry.file_name();
-        let name = match name.to_str() { Some(s) => s, None => continue };
+        let name = match name.to_str() {
+            Some(s) => s,
+            None => continue,
+        };
         if let Some(stem) = name.strip_suffix(".ts") {
             out.insert(stem.to_owned());
         }
@@ -61,8 +64,7 @@ fn binding_names() -> HashSet<String> {
 /// Scan `index.ts` for `export type { Name } from ...` re-exports and
 /// extract the `Name` token.
 fn index_exports() -> HashSet<String> {
-    let content = fs::read_to_string(index_ts())
-        .expect("read packages/shared-types/src/index.ts");
+    let content = fs::read_to_string(index_ts()).expect("read packages/shared-types/src/index.ts");
     let mut out = HashSet::new();
     for line in content.lines() {
         let trimmed = line.trim();
@@ -72,7 +74,9 @@ fn index_exports() -> HashSet<String> {
                 let names = &rest[..end];
                 for name in names.split(',') {
                     let n = name.trim();
-                    if !n.is_empty() { out.insert(n.to_owned()); }
+                    if !n.is_empty() {
+                        out.insert(n.to_owned());
+                    }
                 }
             }
         }
@@ -92,10 +96,11 @@ const INTERNAL_ONLY: &[&str] = &[
 #[test]
 fn every_binding_file_is_exported_from_index() {
     let bindings = binding_names();
-    let exports  = index_exports();
+    let exports = index_exports();
     let internal: HashSet<String> = INTERNAL_ONLY.iter().map(|s| (*s).to_string()).collect();
 
-    let mut missing: Vec<String> = bindings.difference(&exports)
+    let mut missing: Vec<String> = bindings
+        .difference(&exports)
         .filter(|n| !internal.contains(*n))
         .cloned()
         .collect();
@@ -113,11 +118,9 @@ fn every_binding_file_is_exported_from_index() {
 #[test]
 fn every_index_export_has_a_binding_file() {
     let bindings = binding_names();
-    let exports  = index_exports();
+    let exports = index_exports();
 
-    let mut missing: Vec<String> = exports.difference(&bindings)
-        .cloned()
-        .collect();
+    let mut missing: Vec<String> = exports.difference(&bindings).cloned().collect();
     missing.sort();
     assert!(
         missing.is_empty(),

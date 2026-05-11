@@ -19,6 +19,7 @@
 pub mod agent_events;
 pub mod agent_runs;
 pub mod agents;
+pub mod cover_boilerplate;
 pub mod diagnostics;
 pub mod editor;
 pub mod error;
@@ -26,11 +27,16 @@ pub mod export;
 pub mod memory_vocab;
 pub mod ollama;
 pub mod project;
+pub mod publishing;
+pub mod quality;
 pub mod quick_action;
 pub mod snapshot;
 pub mod system;
 pub mod validator;
 
+pub use agent_events::{
+    AgentCancelInput, AgentRunCompletedEvent, AgentRunProgressEvent, AgentRunStartedEvent,
+};
 pub use agent_runs::{
     AgentRunResultDto, PeerReviewConcernDto, PeerReviewResultDto, ProposalValidationDto,
     RunChapterDrafterInput, RunContinuityInput, RunCopyeditInput, RunDevEditorInput,
@@ -38,20 +44,47 @@ pub use agent_runs::{
     RunVocabDictionaryInput, ValidationCheckDto, VerificationReportDto,
 };
 pub use agents::{
-    ApplyContinuityInput, ApplyContinuityResultDto, ApplyCopyeditInput, ApplyCopyeditResult,
-    ApplyHumanizationInput, ApplyOutlineInput, ApplyOutlineResult, ContinuityScenePassDto,
-    EntityBibleApplyInput, EntityBibleApplyResult, OriginalityScanInput, OriginalityScanResult,
-    OutlineRunResult, OverlapHitDto, RunDevelopmentalReviewInput, RunDevelopmentalReviewResult,
-    RunIntakeAndOutlineInput, RunIntakeAndOutlineResult, RunOutlineInput, VocabApplyInput,
-    VocabApplyResult,
+    ApplyChapterDrafterInput, ApplyChapterDrafterResultDto, ApplyCharacterBibleInput,
+    ApplyCharacterBibleResultDto, ApplyContinuityInput, ApplyContinuityResultDto,
+    ApplyCopyeditInput, ApplyCopyeditResult, ApplyHumanizationInput, ApplyOutlineInput,
+    ApplyOutlineResult, ApplyPolishInput, ApplyPolishResultDto, ApplySceneDrafterFicInput,
+    ApplySceneDrafterFicResultDto, ApplyWorldBibleInput, ApplyWorldBibleResultDto,
+    ContinuityScenePassDto, EntityBibleApplyInput, EntityBibleApplyResult, OriginalityScanInput,
+    OriginalityScanResult, OutlineRunResult, OverlapHitDto, RunCharacterBibleInput,
+    RunDevelopmentalReviewInput, RunDevelopmentalReviewResult, RunIntakeAndOutlineInput,
+    RunIntakeAndOutlineResult, RunOutlineInput, RunPolishStageInput, RunSceneCriticInput,
+    RunSceneDrafterFicInput, RunWorldBibleInput, VocabApplyInput, VocabApplyResult,
 };
-pub use agent_events::{
-    AgentCancelInput, AgentRunCompletedEvent, AgentRunProgressEvent, AgentRunStartedEvent,
+pub use cover_boilerplate::{
+    BoilerplatePageDto, BoilerplateSaveInput, BoilerplateSaveResult, CoverAssetDto,
+    CoverImportInput, CoverRemoveInput, CoverSetDto,
 };
 pub use diagnostics::{SaveDiagnosticBundleInput, SaveDiagnosticBundleResult};
+pub use editor::{
+    NodeCreateInput, NodeInfo, NodeUpdateInput, RecoveryStatus, SceneLoadResult, SceneSaveInput,
+};
+pub use error::BooksForgeError;
 pub use export::{
     ExportDependencyReport, ExportDependencyStatus, ExportHistoryEntry, ExportMarkdownInput,
     ExportMarkdownResult, ExportRunInput, ExportRunResult,
+};
+pub use memory_vocab::{
+    MemoryDeleteInput, MemoryEntryDto, MemoryListInput, MemoryUpsertInput, VocabEntryDto,
+    VocabListInput, VocabUpsertInput,
+};
+pub use ollama::{ModelListEntry, OllamaProbeResult, PullProgressPayload, SmokeTestResult};
+pub use project::{
+    CreateProjectInput, OpenProjectInput, OpenProjectResult, ProjectBriefDto,
+    ProjectBriefSaveInput, ProjectKindSetInput, ProjectKindSetResult, RecentProjectEntry,
+};
+pub use publishing::{
+    PlatformReadiness, PrepareForPublishingInput, PrepareForPublishingResult, PublishingMetadata,
+    ReadinessItem,
+};
+pub use quality::{
+    GenrePackInput, StylometricDistanceInput, StylometricDistanceResult, TellsScanInput,
+    TellsScanResult, VoiceAnchorGetResult, VoiceAnchorSetInput, VoiceAnchorSetResult,
+    VoiceFingerprintInput, VoiceFingerprintResult,
 };
 pub use quick_action::{
     AiApplyInput, AiApplyResult, AiCancelInput, AiSuggestDoneEvent, AiSuggestInput,
@@ -61,20 +94,10 @@ pub use snapshot::{
     NodeDiffDto, SnapshotCreateInput, SnapshotDiffInput, SnapshotDto, SnapshotListInput,
     SnapshotRestoreInput, SnapshotRestoreResult,
 };
+pub use system::AppVersion;
 pub use validator::{
     ApplyFixInput, ApplyFixResult, ExportGateDto, ValidatorIssueDto, ValidatorReportDto,
 };
-pub use memory_vocab::{
-    MemoryDeleteInput, MemoryEntryDto, MemoryListInput, MemoryUpsertInput, VocabEntryDto,
-    VocabListInput, VocabUpsertInput,
-};
-pub use editor::{
-    NodeCreateInput, NodeInfo, NodeUpdateInput, RecoveryStatus, SceneLoadResult, SceneSaveInput,
-};
-pub use error::BooksForgeError;
-pub use ollama::{ModelListEntry, OllamaProbeResult, PullProgressPayload, SmokeTestResult};
-pub use project::{CreateProjectInput, OpenProjectInput, OpenProjectResult, RecentProjectEntry};
-pub use system::AppVersion;
 
 // ── ts-rs export test ────────────────────────────────────────────────────────
 // Running `cargo test -p booksforge-ipc` regenerates all TypeScript bindings.
@@ -82,8 +105,10 @@ pub use system::AppVersion;
 mod ts_bindings {
     use ts_rs::TS as _;
 
-    const BINDINGS_DIR: &str =
-        concat!(env!("CARGO_MANIFEST_DIR"), "/../../packages/shared-types/src/bindings");
+    const BINDINGS_DIR: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../packages/shared-types/src/bindings"
+    );
 
     #[test]
     fn export_system_bindings() {
@@ -113,12 +138,36 @@ mod ts_bindings {
         use crate::project::*;
         CreateProjectInput::export_all_to(BINDINGS_DIR)
             .expect("failed to export CreateProjectInput");
-        OpenProjectInput::export_all_to(BINDINGS_DIR)
-            .expect("failed to export OpenProjectInput");
-        OpenProjectResult::export_all_to(BINDINGS_DIR)
-            .expect("failed to export OpenProjectResult");
+        OpenProjectInput::export_all_to(BINDINGS_DIR).expect("failed to export OpenProjectInput");
+        OpenProjectResult::export_all_to(BINDINGS_DIR).expect("failed to export OpenProjectResult");
         RecentProjectEntry::export_all_to(BINDINGS_DIR)
             .expect("failed to export RecentProjectEntry");
+        // Recent-projects management — Remove action in the picker.
+        RecentRemoveInput::export_all_to(BINDINGS_DIR).expect("failed to export RecentRemoveInput");
+        // Phase 4 — book-kind editing post-creation.
+        ProjectKindSetInput::export_all_to(BINDINGS_DIR)
+            .expect("failed to export ProjectKindSetInput");
+        ProjectKindSetResult::export_all_to(BINDINGS_DIR)
+            .expect("failed to export ProjectKindSetResult");
+        // Round 5 — manually-edited ProjectBrief save/load round-trip.
+        crate::ProjectBriefSaveInput::export_all_to(BINDINGS_DIR)
+            .expect("failed to export ProjectBriefSaveInput");
+        crate::ProjectBriefDto::export_all_to(BINDINGS_DIR)
+            .expect("failed to export ProjectBriefDto");
+        // Phase 4 — domain BookKind enum (re-exported by ipc + emitted here
+        // so the index.ts re-export driven by codegen-drift picks it up).
+        booksforge_domain::BookKind::export_all_to(BINDINGS_DIR)
+            .expect("failed to export BookKind");
+        // Phase 7 — Prepare-for-Publishing single-action types.
+        crate::PrepareForPublishingInput::export_all_to(BINDINGS_DIR)
+            .expect("failed to export PrepareForPublishingInput");
+        crate::PrepareForPublishingResult::export_all_to(BINDINGS_DIR)
+            .expect("failed to export PrepareForPublishingResult");
+        crate::PublishingMetadata::export_all_to(BINDINGS_DIR)
+            .expect("failed to export PublishingMetadata");
+        crate::PlatformReadiness::export_all_to(BINDINGS_DIR)
+            .expect("failed to export PlatformReadiness");
+        crate::ReadinessItem::export_all_to(BINDINGS_DIR).expect("failed to export ReadinessItem");
     }
 
     #[test]
@@ -139,6 +188,56 @@ mod ts_bindings {
         ApplyOutlineResult::export_all_to(BINDINGS_DIR).expect("ApplyOutlineResult");
         ApplyCopyeditInput::export_all_to(BINDINGS_DIR).expect("ApplyCopyeditInput");
         ApplyCopyeditResult::export_all_to(BINDINGS_DIR).expect("ApplyCopyeditResult");
+        ApplyChapterDrafterInput::export_all_to(BINDINGS_DIR).expect("ApplyChapterDrafterInput");
+        ApplyChapterDrafterResultDto::export_all_to(BINDINGS_DIR)
+            .expect("ApplyChapterDrafterResultDto");
+        // Fiction agents (BACKLOG §A13 / Phase 1).
+        RunCharacterBibleInput::export_all_to(BINDINGS_DIR).expect("RunCharacterBibleInput");
+        ApplyCharacterBibleInput::export_all_to(BINDINGS_DIR).expect("ApplyCharacterBibleInput");
+        ApplyCharacterBibleResultDto::export_all_to(BINDINGS_DIR)
+            .expect("ApplyCharacterBibleResultDto");
+        RunWorldBibleInput::export_all_to(BINDINGS_DIR).expect("RunWorldBibleInput");
+        ApplyWorldBibleInput::export_all_to(BINDINGS_DIR).expect("ApplyWorldBibleInput");
+        ApplyWorldBibleResultDto::export_all_to(BINDINGS_DIR).expect("ApplyWorldBibleResultDto");
+        RunSceneDrafterFicInput::export_all_to(BINDINGS_DIR).expect("RunSceneDrafterFicInput");
+        ApplySceneDrafterFicInput::export_all_to(BINDINGS_DIR).expect("ApplySceneDrafterFicInput");
+        ApplySceneDrafterFicResultDto::export_all_to(BINDINGS_DIR)
+            .expect("ApplySceneDrafterFicResultDto");
+        // Specialist polish stack (BACKLOG §A15 / Phase 2).
+        RunPolishStageInput::export_all_to(BINDINGS_DIR).expect("RunPolishStageInput");
+        ApplyPolishInput::export_all_to(BINDINGS_DIR).expect("ApplyPolishInput");
+        ApplyPolishResultDto::export_all_to(BINDINGS_DIR).expect("ApplyPolishResultDto");
+        RunSceneCriticInput::export_all_to(BINDINGS_DIR).expect("RunSceneCriticInput");
+        // Phase C quality gates.
+        RunConceptScorerInput::export_all_to(BINDINGS_DIR).expect("RunConceptScorerInput");
+        RunAudienceMapperInput::export_all_to(BINDINGS_DIR).expect("RunAudienceMapperInput");
+        RunCharacterCriticInput::export_all_to(BINDINGS_DIR).expect("RunCharacterCriticInput");
+        RunStructureCriticInput::export_all_to(BINDINGS_DIR).expect("RunStructureCriticInput");
+        // Quality stack types from sister crates (BACKLOG §A16 / Phase 3).
+        booksforge_voice::VoiceProfile::export_all_to(BINDINGS_DIR).expect("VoiceProfile");
+        booksforge_voice::StylometricDistance::export_all_to(BINDINGS_DIR)
+            .expect("StylometricDistance");
+        booksforge_voice::StylometricComponent::export_all_to(BINDINGS_DIR)
+            .expect("StylometricComponent");
+        booksforge_anti_ai_tells::TellsReport::export_all_to(BINDINGS_DIR).expect("TellsReport");
+        booksforge_anti_ai_tells::TellHit::export_all_to(BINDINGS_DIR).expect("TellHit");
+        // BookKind is exported above from `booksforge_domain` (Phase 4
+        // moved it). The `booksforge_genre_packs::BookKind` re-export
+        // produces the same TS file, so this line is no longer needed.
+        booksforge_genre_packs::GenrePack::export_all_to(BINDINGS_DIR).expect("GenrePack");
+        // Quality-stack IPC wrapper types (live in this crate's quality.rs).
+        crate::VoiceFingerprintInput::export_all_to(BINDINGS_DIR).expect("VoiceFingerprintInput");
+        crate::VoiceFingerprintResult::export_all_to(BINDINGS_DIR).expect("VoiceFingerprintResult");
+        crate::VoiceAnchorSetInput::export_all_to(BINDINGS_DIR).expect("VoiceAnchorSetInput");
+        crate::VoiceAnchorSetResult::export_all_to(BINDINGS_DIR).expect("VoiceAnchorSetResult");
+        crate::VoiceAnchorGetResult::export_all_to(BINDINGS_DIR).expect("VoiceAnchorGetResult");
+        crate::StylometricDistanceInput::export_all_to(BINDINGS_DIR)
+            .expect("StylometricDistanceInput");
+        crate::StylometricDistanceResult::export_all_to(BINDINGS_DIR)
+            .expect("StylometricDistanceResult");
+        crate::TellsScanInput::export_all_to(BINDINGS_DIR).expect("TellsScanInput");
+        crate::TellsScanResult::export_all_to(BINDINGS_DIR).expect("TellsScanResult");
+        crate::GenrePackInput::export_all_to(BINDINGS_DIR).expect("GenrePackInput");
         ApplyHumanizationInput::export_all_to(BINDINGS_DIR).expect("ApplyHumanizationInput");
         ApplyContinuityInput::export_all_to(BINDINGS_DIR).expect("ApplyContinuityInput");
         ApplyContinuityResultDto::export_all_to(BINDINGS_DIR).expect("ApplyContinuityResultDto");
@@ -146,8 +245,10 @@ mod ts_bindings {
         VocabApplyResult::export_all_to(BINDINGS_DIR).expect("VocabApplyResult");
         RunIntakeAndOutlineInput::export_all_to(BINDINGS_DIR).expect("RunIntakeAndOutlineInput");
         RunIntakeAndOutlineResult::export_all_to(BINDINGS_DIR).expect("RunIntakeAndOutlineResult");
-        RunDevelopmentalReviewInput::export_all_to(BINDINGS_DIR).expect("RunDevelopmentalReviewInput");
-        RunDevelopmentalReviewResult::export_all_to(BINDINGS_DIR).expect("RunDevelopmentalReviewResult");
+        RunDevelopmentalReviewInput::export_all_to(BINDINGS_DIR)
+            .expect("RunDevelopmentalReviewInput");
+        RunDevelopmentalReviewResult::export_all_to(BINDINGS_DIR)
+            .expect("RunDevelopmentalReviewResult");
         ContinuityScenePassDto::export_all_to(BINDINGS_DIR).expect("ContinuityScenePassDto");
         EntityBibleApplyInput::export_all_to(BINDINGS_DIR).expect("EntityBibleApplyInput");
         EntityBibleApplyResult::export_all_to(BINDINGS_DIR).expect("EntityBibleApplyResult");
@@ -208,10 +309,23 @@ mod ts_bindings {
     }
 
     #[test]
+    fn export_cover_boilerplate_bindings() {
+        use crate::cover_boilerplate::*;
+        CoverImportInput::export_all_to(BINDINGS_DIR).expect("CoverImportInput");
+        CoverRemoveInput::export_all_to(BINDINGS_DIR).expect("CoverRemoveInput");
+        CoverAssetDto::export_all_to(BINDINGS_DIR).expect("CoverAssetDto");
+        CoverSetDto::export_all_to(BINDINGS_DIR).expect("CoverSetDto");
+        BoilerplatePageDto::export_all_to(BINDINGS_DIR).expect("BoilerplatePageDto");
+        BoilerplateSaveInput::export_all_to(BINDINGS_DIR).expect("BoilerplateSaveInput");
+        BoilerplateSaveResult::export_all_to(BINDINGS_DIR).expect("BoilerplateSaveResult");
+    }
+
+    #[test]
     fn export_diagnostics_bindings() {
         use crate::diagnostics::*;
         SaveDiagnosticBundleInput::export_all_to(BINDINGS_DIR).expect("SaveDiagnosticBundleInput");
-        SaveDiagnosticBundleResult::export_all_to(BINDINGS_DIR).expect("SaveDiagnosticBundleResult");
+        SaveDiagnosticBundleResult::export_all_to(BINDINGS_DIR)
+            .expect("SaveDiagnosticBundleResult");
     }
 
     #[test]

@@ -79,10 +79,14 @@ fn which(binary: &str) -> Option<String> {
     let path_var = std::env::var_os("PATH")?;
     for dir in std::env::split_paths(&path_var) {
         let candidate = dir.join(binary);
-        if candidate.is_file() { return Some(candidate.to_string_lossy().into_owned()); }
+        if candidate.is_file() {
+            return Some(candidate.to_string_lossy().into_owned());
+        }
         // Windows .exe fallback
         let exe = candidate.with_extension("exe");
-        if exe.is_file() { return Some(exe.to_string_lossy().into_owned()); }
+        if exe.is_file() {
+            return Some(exe.to_string_lossy().into_owned());
+        }
     }
     None
 }
@@ -92,7 +96,9 @@ fn which(binary: &str) -> Option<String> {
 /// string on success so callers can log it / show it in settings.
 pub async fn probe_pandoc(binary: &str) -> Result<String, ExportError> {
     if !Path::new(binary).is_file() {
-        return Err(ExportError::SidecarMissing { binary: binary.to_owned() });
+        return Err(ExportError::SidecarMissing {
+            binary: binary.to_owned(),
+        });
     }
     let out = Command::new(binary)
         .arg("--version")
@@ -113,8 +119,17 @@ pub async fn probe_pandoc(binary: &str) -> Result<String, ExportError> {
 
 /// Build the argv for a given profile.  Pure logic (no I/O); split out
 /// for unit testability of the profile → CLI mapping.
-pub fn args_for_profile(profile: ExportProfile, output_path: &str, docx_template: Option<&str>) -> Vec<String> {
-    args_for_profile_with_format(profile, output_path, docx_template, FormatProfile::default())
+pub fn args_for_profile(
+    profile: ExportProfile,
+    output_path: &str,
+    docx_template: Option<&str>,
+) -> Vec<String> {
+    args_for_profile_with_format(
+        profile,
+        output_path,
+        docx_template,
+        FormatProfile::default(),
+    )
 }
 
 /// Build argv for an export profile, with full genre awareness via
@@ -123,9 +138,9 @@ pub fn args_for_profile(profile: ExportProfile, output_path: &str, docx_template
 /// class options, and TOC policy.  DOCX output ignores the format
 /// profile (the reference template handles styling).
 pub fn args_for_profile_with_format(
-    profile:        ExportProfile,
-    output_path:    &str,
-    docx_template:  Option<&str>,
+    profile: ExportProfile,
+    output_path: &str,
+    docx_template: Option<&str>,
     format_profile: FormatProfile,
 ) -> Vec<String> {
     args_for_profile_full(profile, output_path, docx_template, format_profile, None)
@@ -135,26 +150,30 @@ pub fn args_for_profile_with_format(
 /// in the bundled-font directory so PDF runs use bundled Google Fonts
 /// (BACKLOG §H8.2 follow-up).
 pub fn args_for_profile_full(
-    profile:        ExportProfile,
-    output_path:    &str,
-    docx_template:  Option<&str>,
+    profile: ExportProfile,
+    output_path: &str,
+    docx_template: Option<&str>,
     format_profile: FormatProfile,
     font_bundle_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args: Vec<String> = vec![
-        "-f".into(), "markdown".into(),
+        "-f".into(),
+        "markdown".into(),
         "--standalone".into(),
-        "-o".into(), output_path.to_owned(),
+        "-o".into(),
+        output_path.to_owned(),
     ];
     match profile {
         ExportProfile::Docx => {
-            args.push("-t".into()); args.push("docx".into());
+            args.push("-t".into());
+            args.push("docx".into());
             if let Some(tmpl) = docx_template {
                 args.push(format!("--reference-doc={tmpl}"));
             }
         }
         ExportProfile::TradePdf5x8 | ExportProfile::TradePdf6x9 => {
-            args.push("-t".into()); args.push("pdf".into());
+            args.push("-t".into());
+            args.push("pdf".into());
             push_pdf_geometry_for_format_with_fonts(&mut args, format_profile, font_bundle_dir);
         }
         _ => { /* caller already gated; produce a permissive default */ }
@@ -170,17 +189,17 @@ fn header_includes_for_format(fp: FormatProfile) -> String {
     let para_indent = match fp {
         // Practical non-fiction uses block paragraphs (no indent).
         NonFictionPractical => "0pt",
-        Academic            => "1.5em",
-        _                   => "1.2em",
+        Academic => "1.5em",
+        _ => "1.2em",
     };
     let extra = match fp {
         // Literary fiction gets fancy chapter headings via memoir's
         // chapterstyle.  YA gets bigger heading air.  Academic adds
         // section numbering.
-        FictionLiterary  => r"\chapterstyle{veelo}",
+        FictionLiterary => r"\chapterstyle{veelo}",
         FictionYoungAdult => r"\linespread{1.1}",
-        Academic         => r"\setcounter{secnumdepth}{3}",
-        _                => "",
+        Academic => r"\setcounter{secnumdepth}{3}",
+        _ => "",
     };
     format!(
         r"\usepackage{{microtype}}\usepackage{{ragged2e}}\setlength{{\parindent}}{{{para_indent}}}\widowpenalty=10000\clubpenalty=10000{extra}",
@@ -204,28 +223,38 @@ fn push_pdf_geometry_for_format(args: &mut Vec<String>, fp: FormatProfile) {
 /// app bundle rather than the writer's system install.
 fn push_pdf_geometry_for_format_with_fonts(
     args: &mut Vec<String>,
-    fp:   FormatProfile,
+    fp: FormatProfile,
     bundle: Option<&str>,
 ) {
     let (w, h) = fp.trim_inches();
-    args.push("-V".into()); args.push(format!("geometry:paperwidth={w}"));
-    args.push("-V".into()); args.push(format!("geometry:paperheight={h}"));
+    args.push("-V".into());
+    args.push(format!("geometry:paperwidth={w}"));
+    args.push("-V".into());
+    args.push(format!("geometry:paperheight={h}"));
 
     // Asymmetric gutter for chapters-on-recto layouts (KDP minimums
     // for novel-length books).  Academic / YA use simpler symmetric
     // margins to save paper.
     if fp.chapter_starts_recto() {
-        args.push("-V".into()); args.push("geometry:inner=0.75in".into());
-        args.push("-V".into()); args.push("geometry:outer=0.5in".into());
+        args.push("-V".into());
+        args.push("geometry:inner=0.75in".into());
+        args.push("-V".into());
+        args.push("geometry:outer=0.5in".into());
     } else {
-        args.push("-V".into()); args.push("geometry:inner=0.7in".into());
-        args.push("-V".into()); args.push("geometry:outer=0.5in".into());
+        args.push("-V".into());
+        args.push("geometry:inner=0.7in".into());
+        args.push("-V".into());
+        args.push("geometry:outer=0.5in".into());
     }
-    args.push("-V".into()); args.push("geometry:top=0.75in".into());
-    args.push("-V".into()); args.push("geometry:bottom=0.75in".into());
+    args.push("-V".into());
+    args.push("geometry:top=0.75in".into());
+    args.push("-V".into());
+    args.push("geometry:bottom=0.75in".into());
 
-    args.push("-V".into()); args.push(format!("documentclass={}", fp.pandoc_documentclass()));
-    args.push("-V".into()); args.push(format!("classoption={}", fp.pandoc_classoption()));
+    args.push("-V".into());
+    args.push(format!("documentclass={}", fp.pandoc_documentclass()));
+    args.push("-V".into());
+    args.push(format!("classoption={}", fp.pandoc_classoption()));
 
     // Body + heading fonts come straight from the Google Font bundle
     // (BACKLOG §H8.2).  xelatex resolves these by family name from
@@ -235,9 +264,10 @@ fn push_pdf_geometry_for_format_with_fonts(
     // `<resources>/fonts/<family>.ttf`).  When fonts aren't installed,
     // xelatex prints a clear "font not found" error rather than
     // silently substituting.
-    let body_font_name    = fp.google_body_family();
+    let body_font_name = fp.google_body_family();
     let heading_font_name = fp.google_heading_family();
-    args.push("-V".into()); args.push(format!("mainfont={body_font_name}"));
+    args.push("-V".into());
+    args.push(format!("mainfont={body_font_name}"));
     // When the bundled font directory is supplied, also emit the
     // fontspec `Path=` / `UprightFont=` / `ItalicFont=` options so
     // xelatex resolves the font from our bundle rather than the
@@ -252,18 +282,24 @@ fn push_pdf_geometry_for_format_with_fonts(
         // (xelatex will use mainfont for the heading style too).
         let is_sans = matches!(heading_font_name, "Inter" | "Source Sans 3");
         if is_sans {
-            args.push("-V".into()); args.push(format!("sansfont={heading_font_name}"));
+            args.push("-V".into());
+            args.push(format!("sansfont={heading_font_name}"));
             if let Some(dir) = bundle {
                 push_fontspec_options(args, "sansfontoptions", dir, heading_font_name);
             }
         }
     }
 
-    args.push("-V".into()); args.push(format!("fontsize={}", fp.body_size_pt()));
-    args.push("-V".into()); args.push(format!("linestretch={}", fp.line_height()));
+    args.push("-V".into());
+    args.push(format!("fontsize={}", fp.body_size_pt()));
+    args.push("-V".into());
+    args.push(format!("linestretch={}", fp.line_height()));
 
     args.push("-V".into());
-    args.push(format!("header-includes={}", header_includes_for_format(fp)));
+    args.push(format!(
+        "header-includes={}",
+        header_includes_for_format(fp)
+    ));
 
     args.push("--top-level-division=chapter".into());
     if fp.pdf_toc() {
@@ -289,10 +325,12 @@ fn push_pdf_geometry_for_format_with_fonts(
 /// build that ships in google/fonts (also `<Family>[wght].ttf`).
 fn push_fontspec_options(args: &mut Vec<String>, key: &str, bundle_dir: &str, family: &str) {
     let dir_name = family.replace(' ', "_");
-    let stem     = family.replace(' ', "");
+    let stem = family.replace(' ', "");
     let dir_path = format!("{bundle_dir}/{dir_name}/");
-    args.push("-V".into()); args.push(format!("{key}:Path={dir_path}"));
-    args.push("-V".into()); args.push(format!("{key}:Extension=.ttf"));
+    args.push("-V".into());
+    args.push(format!("{key}:Path={dir_path}"));
+    args.push("-V".into());
+    args.push(format!("{key}:Extension=.ttf"));
 
     // Variable-weight `[wght]` files come first; some families also
     // expose `[opsz,wght]`.  fontspec tries the literal name on disk,
@@ -301,9 +339,15 @@ fn push_fontspec_options(args: &mut Vec<String>, key: &str, bundle_dir: &str, fa
     // `collect_bundled_fonts` lookup.
     let has_opsz = matches!(family, "Source Serif 4" | "Inter");
     let upright_suffix = if has_opsz { "[opsz,wght]" } else { "[wght]" };
-    let italic_suffix  = if has_opsz { "-Italic[opsz,wght]" } else { "-Italic[wght]" };
-    args.push("-V".into()); args.push(format!("{key}:UprightFont={stem}{upright_suffix}"));
-    args.push("-V".into()); args.push(format!("{key}:ItalicFont={stem}{italic_suffix}"));
+    let italic_suffix = if has_opsz {
+        "-Italic[opsz,wght]"
+    } else {
+        "-Italic[wght]"
+    };
+    args.push("-V".into());
+    args.push(format!("{key}:UprightFont={stem}{upright_suffix}"));
+    args.push("-V".into());
+    args.push(format!("{key}:ItalicFont={stem}{italic_suffix}"));
 }
 
 /// Pull the first font name out of a CSS-style font stack.
@@ -345,17 +389,28 @@ fn push_pdf_geometry(args: &mut Vec<String>, w: &str, h: &str) {
     //   - `--toc` adds a table of contents from the chapter headings.
     //   - `--top-level-division=chapter` makes H1 headings start on a
     //     fresh recto page (the trade-book convention).
-    args.push("-V".into()); args.push(format!("geometry:paperwidth={w}"));
-    args.push("-V".into()); args.push(format!("geometry:paperheight={h}"));
-    args.push("-V".into()); args.push("geometry:inner=0.75in".into());
-    args.push("-V".into()); args.push("geometry:outer=0.5in".into());
-    args.push("-V".into()); args.push("geometry:top=0.75in".into());
-    args.push("-V".into()); args.push("geometry:bottom=0.75in".into());
-    args.push("-V".into()); args.push("documentclass=memoir".into());
-    args.push("-V".into()); args.push("classoption=twoside,openright".into());
-    args.push("-V".into()); args.push("mainfont=Georgia".into());
-    args.push("-V".into()); args.push("fontsize=11pt".into());
-    args.push("-V".into()); args.push("linestretch=1.15".into());
+    args.push("-V".into());
+    args.push(format!("geometry:paperwidth={w}"));
+    args.push("-V".into());
+    args.push(format!("geometry:paperheight={h}"));
+    args.push("-V".into());
+    args.push("geometry:inner=0.75in".into());
+    args.push("-V".into());
+    args.push("geometry:outer=0.5in".into());
+    args.push("-V".into());
+    args.push("geometry:top=0.75in".into());
+    args.push("-V".into());
+    args.push("geometry:bottom=0.75in".into());
+    args.push("-V".into());
+    args.push("documentclass=memoir".into());
+    args.push("-V".into());
+    args.push("classoption=twoside,openright".into());
+    args.push("-V".into());
+    args.push("mainfont=Georgia".into());
+    args.push("-V".into());
+    args.push("fontsize=11pt".into());
+    args.push("-V".into());
+    args.push("linestretch=1.15".into());
 
     // Header includes for typography niceties — paragraph indent +
     // suppress orphans/widows where the renderer supports it.
@@ -390,7 +445,8 @@ pub async fn run_pandoc(input: PandocInput) -> Result<ExportOutcome, ExportError
     // Make sure the output directory exists.
     if let Some(parent) = Path::new(&input.output_path).parent() {
         if !parent.as_os_str().is_empty() && !parent.exists() {
-            tokio::fs::create_dir_all(parent).await
+            tokio::fs::create_dir_all(parent)
+                .await
                 .map_err(|e| ExportError::Failed {
                     message: format!("could not create output dir: {e}"),
                 })?;
@@ -423,16 +479,21 @@ pub async fn run_pandoc(input: PandocInput) -> Result<ExportOutcome, ExportError
         })?;
 
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(input.markdown_source.as_bytes()).await
+        stdin
+            .write_all(input.markdown_source.as_bytes())
+            .await
             .map_err(|e| ExportError::Failed {
                 message: format!("failed to pipe markdown to Pandoc stdin: {e}"),
             })?;
         // Drop closes the pipe.
     }
 
-    let out = child.wait_with_output().await.map_err(|e| ExportError::Failed {
-        message: format!("Pandoc child failed: {e}"),
-    })?;
+    let out = child
+        .wait_with_output()
+        .await
+        .map_err(|e| ExportError::Failed {
+            message: format!("Pandoc child failed: {e}"),
+        })?;
 
     if !out.status.success() {
         let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
@@ -445,9 +506,11 @@ pub async fn run_pandoc(input: PandocInput) -> Result<ExportOutcome, ExportError
         });
     }
 
-    let bytes = tokio::fs::read(&input.output_path).await.map_err(|e| ExportError::Failed {
-        message: format!("Pandoc reported success but output file is missing: {e}"),
-    })?;
+    let bytes = tokio::fs::read(&input.output_path)
+        .await
+        .map_err(|e| ExportError::Failed {
+            message: format!("Pandoc reported success but output file is missing: {e}"),
+        })?;
     if bytes.is_empty() {
         return Err(ExportError::Failed {
             message: "Pandoc produced an empty file".to_owned(),
@@ -456,7 +519,7 @@ pub async fn run_pandoc(input: PandocInput) -> Result<ExportOutcome, ExportError
     let hash = blake3::hash(&bytes).to_hex().to_string();
 
     Ok(ExportOutcome {
-        profile:     input.profile,
+        profile: input.profile,
         output_path: input.output_path,
         hash,
     })
@@ -464,7 +527,11 @@ pub async fn run_pandoc(input: PandocInput) -> Result<ExportOutcome, ExportError
 
 /// Resolve the path to the bundled Pandoc sidecar binary.
 pub fn sidecar_binary_name() -> &'static str {
-    if cfg!(target_os = "windows") { "pandoc-3.5.exe" } else { "pandoc-3.5" }
+    if cfg!(target_os = "windows") {
+        "pandoc-3.5.exe"
+    } else {
+        "pandoc-3.5"
+    }
 }
 
 #[cfg(test)]
@@ -490,7 +557,9 @@ mod tests {
     fn args_for_pdf_5x8_includes_geometry() {
         // FormatProfile drives trim — pass the mass-market profile explicitly.
         let a = args_for_profile_with_format(
-            ExportProfile::TradePdf5x8, "/tmp/o.pdf", None,
+            ExportProfile::TradePdf5x8,
+            "/tmp/o.pdf",
+            None,
             FormatProfile::FictionTradeMass,
         );
         let joined = a.join(" ");
@@ -511,28 +580,30 @@ mod tests {
     #[tokio::test]
     async fn run_pandoc_rejects_missing_binary() {
         let r = run_pandoc(PandocInput {
-            pandoc_binary:   "/nonexistent/path/to/pandoc".into(),
+            pandoc_binary: "/nonexistent/path/to/pandoc".into(),
             markdown_source: "# hi".into(),
-            docx_template:   None,
-            profile:         ExportProfile::Docx,
-            output_path:     "/tmp/should_not_exist.docx".into(),
-            format_profile:  FormatProfile::default(),
+            docx_template: None,
+            profile: ExportProfile::Docx,
+            output_path: "/tmp/should_not_exist.docx".into(),
+            format_profile: FormatProfile::default(),
             font_bundle_dir: None,
-        }).await;
+        })
+        .await;
         assert!(matches!(r, Err(ExportError::SidecarMissing { .. })));
     }
 
     #[tokio::test]
     async fn run_pandoc_rejects_unsupported_profile() {
         let r = run_pandoc(PandocInput {
-            pandoc_binary:   "/usr/bin/true".into(), // exists, just not pandoc
+            pandoc_binary: "/usr/bin/true".into(), // exists, just not pandoc
             markdown_source: "# hi".into(),
-            docx_template:   None,
-            profile:         ExportProfile::Markdown, // unsupported here
-            output_path:     "/tmp/.x".into(),
-            format_profile:  FormatProfile::default(),
+            docx_template: None,
+            profile: ExportProfile::Markdown, // unsupported here
+            output_path: "/tmp/.x".into(),
+            format_profile: FormatProfile::default(),
             font_bundle_dir: None,
-        }).await;
+        })
+        .await;
         assert!(matches!(r, Err(ExportError::Failed { .. })));
     }
 
@@ -540,7 +611,9 @@ mod tests {
     fn pdf_args_pick_trim_from_format_profile() {
         // YA profile uses 5.5×8.5; literary fiction uses 6×9.
         let ya = args_for_profile_with_format(
-            ExportProfile::TradePdf6x9, "/tmp/o.pdf", None,
+            ExportProfile::TradePdf6x9,
+            "/tmp/o.pdf",
+            None,
             FormatProfile::FictionYoungAdult,
         );
         let joined = ya.join(" ");
@@ -555,11 +628,15 @@ mod tests {
     #[test]
     fn pdf_args_emit_toc_for_non_fiction_only() {
         let fiction = args_for_profile_with_format(
-            ExportProfile::TradePdf6x9, "/tmp/o.pdf", None,
+            ExportProfile::TradePdf6x9,
+            "/tmp/o.pdf",
+            None,
             FormatProfile::FictionTradeStandard,
         );
         let academic = args_for_profile_with_format(
-            ExportProfile::TradePdf6x9, "/tmp/o.pdf", None,
+            ExportProfile::TradePdf6x9,
+            "/tmp/o.pdf",
+            None,
             FormatProfile::Academic,
         );
         assert!(!fiction.iter().any(|a| a == "--toc"));
@@ -568,8 +645,10 @@ mod tests {
 
     #[test]
     fn first_font_in_stack_strips_quotes() {
-        assert_eq!(first_font_in_stack(r#""Adobe Garamond Pro", Garamond, serif"#),
-                   "Adobe Garamond Pro");
+        assert_eq!(
+            first_font_in_stack(r#""Adobe Garamond Pro", Garamond, serif"#),
+            "Adobe Garamond Pro"
+        );
         assert_eq!(first_font_in_stack("Georgia, serif"), "Georgia");
     }
 
@@ -577,43 +656,61 @@ mod tests {
     fn pdf_args_emit_fontspec_path_when_bundle_supplied() {
         // RomanceHistorical → Cormorant Garamond body+heading.
         let a = args_for_profile_full(
-            ExportProfile::TradePdf6x9, "/tmp/o.pdf", None,
+            ExportProfile::TradePdf6x9,
+            "/tmp/o.pdf",
+            None,
             FormatProfile::RomanceHistorical,
             Some("/abs/font/bundle"),
         );
         let joined = a.join(" ");
-        assert!(joined.contains("mainfontoptions:Path=/abs/font/bundle/Cormorant_Garamond/"),
-                "expected mainfontoptions Path; got: {joined}");
-        assert!(joined.contains("mainfontoptions:UprightFont=CormorantGaramond[wght]"),
-                "expected UprightFont; got: {joined}");
-        assert!(joined.contains("mainfontoptions:ItalicFont=CormorantGaramond-Italic[wght]"),
-                "expected ItalicFont; got: {joined}");
+        assert!(
+            joined.contains("mainfontoptions:Path=/abs/font/bundle/Cormorant_Garamond/"),
+            "expected mainfontoptions Path; got: {joined}"
+        );
+        assert!(
+            joined.contains("mainfontoptions:UprightFont=CormorantGaramond[wght]"),
+            "expected UprightFont; got: {joined}"
+        );
+        assert!(
+            joined.contains("mainfontoptions:ItalicFont=CormorantGaramond-Italic[wght]"),
+            "expected ItalicFont; got: {joined}"
+        );
     }
 
     #[test]
     fn pdf_args_use_opsz_axis_for_inter_and_source_serif() {
         let a = args_for_profile_full(
-            ExportProfile::TradePdf6x9, "/tmp/o.pdf", None,
+            ExportProfile::TradePdf6x9,
+            "/tmp/o.pdf",
+            None,
             FormatProfile::NonFictionPractical, // Source Serif 4 + Inter
             Some("/x/y"),
         );
         let joined = a.join(" ");
-        assert!(joined.contains("UprightFont=SourceSerif4[opsz,wght]"),
-                "expected opsz,wght for Source Serif 4: {joined}");
+        assert!(
+            joined.contains("UprightFont=SourceSerif4[opsz,wght]"),
+            "expected opsz,wght for Source Serif 4: {joined}"
+        );
         // Non-fiction practical sets sansfont = Inter.
-        assert!(joined.contains("sansfontoptions:UprightFont=Inter[opsz,wght]"),
-                "expected opsz,wght for Inter: {joined}");
+        assert!(
+            joined.contains("sansfontoptions:UprightFont=Inter[opsz,wght]"),
+            "expected opsz,wght for Inter: {joined}"
+        );
     }
 
     #[test]
     fn pdf_args_omit_fontspec_when_no_bundle() {
         let a = args_for_profile_with_format(
-            ExportProfile::TradePdf6x9, "/tmp/o.pdf", None,
+            ExportProfile::TradePdf6x9,
+            "/tmp/o.pdf",
+            None,
             FormatProfile::FictionTradeStandard,
         );
         let joined = a.join(" ");
-        assert!(!joined.contains("mainfontoptions:Path="),
-                "fontspec opts should be omitted without bundle: {joined}");
+        assert!(
+            !joined.contains("mainfontoptions:Path="),
+            "fontspec opts should be omitted without bundle: {joined}"
+        );
     }
 
     #[test]
