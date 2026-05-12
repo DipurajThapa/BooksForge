@@ -30,8 +30,14 @@ expect.extend(matchers);
 // Augment vitest's matcher type so TypeScript knows about
 // `toHaveNoViolations` without each test having to import the type
 // helper.
+//
+// `Assertion<T = any>` must match @vitest/expect's own declaration
+// exactly — TS2428 fires if the default type parameter diverges
+// (vitest uses `any`, not `unknown`). See
+// @vitest/expect/dist/index.d.ts:`interface Assertion<T = any>`.
 declare module "vitest" {
-  interface Assertion<T = unknown> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  interface Assertion<T = any> {
     toHaveNoViolations(): T;
   }
   interface AsymmetricMatchersContaining {
