@@ -34,6 +34,7 @@ import {
   COMPOSITE_THRESHOLD,
   type AxisLike,
 } from "../components/AxisBar";
+import { ScoreSummary, FindingsList, EditsList } from "../components/ScorePanel";
 import { ipc } from "../lib/ipc";
 import { errorMessage } from "../lib/errorMessage";
 
@@ -624,32 +625,24 @@ function StructureCriticPanel({
         </span>
         <button style={s.smallBtn} onClick={onClear}>Clear</button>
       </header>
-      <div style={s.critSummaryRow}>
-        <div style={s.scoreSummary}>
-          <div style={{
-            ...s.scoreBig,
-            color: passes
-              ? "var(--color-green-700, #15803d)"
-              : "var(--color-amber-700, #b45309)",
-          }}>
-            {composite.toFixed(1)}
-            <span style={s.scoreBigDenom}>/10</span>
-          </div>
-          <div style={s.scoreBigLabel}>composite</div>
-        </div>
-        <div style={s.critSummaryStats}>
-          <div>
-            <b>{axes.filter(([_, a]) => a.score >= AXIS_FLOOR).length}</b>{" "}
-            / 4 axes ≥ {AXIS_FLOOR}
-          </div>
-          <div>
-            <b>{errors.length}</b> blocking finding{errors.length === 1 ? "" : "s"}
-          </div>
-          <div>
-            <b>{p.edits.length}</b> suggested edit{p.edits.length === 1 ? "" : "s"}
-          </div>
-        </div>
-      </div>
+      <ScoreSummary
+        composite={composite}
+        passing={passes}
+        stats={(
+          <>
+            <div>
+              <b>{axes.filter(([_, a]) => a.score >= AXIS_FLOOR).length}</b>{" "}
+              / 4 axes ≥ {AXIS_FLOOR}
+            </div>
+            <div>
+              <b>{errors.length}</b> blocking finding{errors.length === 1 ? "" : "s"}
+            </div>
+            <div>
+              <b>{p.edits.length}</b> suggested edit{p.edits.length === 1 ? "" : "s"}
+            </div>
+          </>
+        )}
+      />
 
       <div style={s.axisGrid}>
         {axes.map(([label, axis]) => (
@@ -661,51 +654,24 @@ function StructureCriticPanel({
         <div style={s.overallSummary}>{p.overall_summary}</div>
       )}
 
-      {p.findings.length > 0 && (
-        <div style={s.findingsBlock}>
-          <h4 style={s.findingsH}>
-            Structural findings ({p.findings.length})
-          </h4>
-          <ul style={s.findingsList}>
-            {p.findings.map((f, i) => (
-              <li key={i} style={{
-                ...s.findingRow,
-                ...(f.severity === "error" ? s.findingErr : s.findingWarn),
-              }}>
-                <span style={s.findingKind}>{f.kind}</span>
-                <span>{f.message}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <FindingsList
+        title="Structural findings"
+        findings={p.findings.map((f) => ({
+          kind:     f.kind,
+          message:  f.message,
+          severity: f.severity,
+        }))}
+      />
 
-      {p.edits.length > 0 && (
-        <div style={s.editsBlock}>
-          <h4 style={s.editsH}>Suggested edits ({p.edits.length})</h4>
-          <ul style={s.editsList}>
-            {p.edits.map((edit, i) => (
-              <li key={i} style={s.editRow}>
-                <div style={s.editLeft}>
-                  <span style={s.editField}>
-                    {edit.target}{edit.locator ? ` · ${edit.locator}` : ""}
-                  </span>
-                  <span style={s.editSuggestion}>{edit.suggestion}</span>
-                  {edit.replacement && (
-                    <span style={s.editReplacement}>
-                      ↳ <em>{edit.replacement}</em>
-                    </span>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-          <p style={s.editsHint}>
-            Edits are advisory — apply them by re-running the outline with a
-            tightened brief, or by hand-editing scenes after Accept &amp; apply.
-          </p>
-        </div>
-      )}
+      <EditsList
+        title="Suggested edits"
+        edits={p.edits.map((edit) => ({
+          field:       edit.target + (edit.locator ? ` · ${edit.locator}` : ""),
+          suggestion:  edit.suggestion,
+          replacement: edit.replacement,
+        }))}
+        footerHint="Edits are advisory — apply them by re-running the outline with a tightened brief, or by hand-editing scenes after Accept & apply."
+      />
     </section>
   );
 }
