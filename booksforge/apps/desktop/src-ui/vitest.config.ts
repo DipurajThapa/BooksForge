@@ -16,9 +16,16 @@ export default defineConfig({
         url: "http://localhost/",
       },
     },
-    setupFiles: ["./vitest.setup.ts"],
     globals: false,
-    setupFiles: ["./src/test-setup.ts"],
+    // Both setup files load — the second `setupFiles:` key on this
+    // object used to silently overwrite the first (object-literal
+    // duplicate-key semantics), which dropped the Storage polyfill
+    // in vitest.setup.ts and caused every `localStorage.clear()` in
+    // theme.test.ts to fail with "Cannot read properties of
+    // undefined (reading 'clear')". Order matters: the Storage
+    // polyfill must run first so subsequent setup can import modules
+    // that touch localStorage at load time.
+    setupFiles: ["./vitest.setup.ts", "./src/test-setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
     coverage: {
       reporter: ["text", "html"],

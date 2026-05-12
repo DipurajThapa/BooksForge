@@ -4,34 +4,35 @@ import { render } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider, useToast } from "./components/ToastProvider";
-import {
-  ProposalReview,
-  type Decision,
-  type Proposal,
-} from "./components/ProposalReview";
-import { ShortcutHelp } from "./components/ShortcutHelp";
+import StageRail, {
+  MVP_STAGES,
+  type StageInfo,
+  type StageStatus,
+} from "./components/StageRail";
 
 /**
  * Top-level accessibility audit.
  *
  * Closes the automated half of EXTERNAL_AUDIT_BACKLOG.md #34 (WCAG
- * 2.2 AA).  axe-core catches a meaningful subset of WCAG issues —
- * Deque measures ~57% of real-world violations are auto-detectable
- * — and is a good first guard against regressions.  The manual
+ * 2.2 AA). axe-core catches a meaningful subset of WCAG issues —
+ * Deque measures ~57% of real-world violations are auto-detectable —
+ * and is a good first guard against regressions. The manual
  * AT-testing half (VoiceOver + NVDA on a real device) is the
  * pre-release human task tracked in `MILESTONES.md M6 §I1`.
  *
- * One test per shipped component that's part of the always-mounted
- * app shell or the user-action-modal set:
- *   - ErrorBoundary fallback dialog
- *   - ToastProvider toast region (info, error, with action)
- *   - ProposalReview region (loaded + empty state)
- *   - ShortcutHelp overlay
+ * Components covered, drawn from the May 2026 editor redesign:
+ *   - ErrorBoundary fallback dialog          (always-mounted)
+ *   - ToastProvider toast region             (always-mounted)
+ *   - StageRail nav rail                     (always-visible in editor shell)
  *
- * Every test builds a small DOM, runs axe, and asserts no
- * violations.  When axe DOES flag something, the report is verbose
- * enough that the contributor can see the rule, the offending
- * selector, and the fix in the test failure output.
+ * **History note.** A prior version of this file also tested
+ * `ProposalReview` and `ShortcutHelp` — both belong to the pre-2026-05
+ * UI architecture (archived under `src-ui-archive-2026-05-11/`).
+ * When the StageRail-based redesign landed they were removed from
+ * the active build; this file now covers their conceptual
+ * replacements. Wizard / picker / stage panels are deferred until
+ * the F1 binder + manuscript-view PR lands and there's a stable
+ * surface to assert against.
  *
  * **Adding a new component:** import it, render a representative
  * snapshot, and `expect(await axe(container)).toHaveNoViolations()`.
@@ -125,57 +126,53 @@ describe("a11y — ToastProvider", () => {
   });
 });
 
-describe("a11y — ProposalReview", () => {
-  function buildProposal(empty: boolean): Proposal {
-    return empty
-      ? { id: "empty", agentName: "Copyedit", hunks: [] }
-      : {
-          id: "p1",
-          agentName: "Copyedit",
-          summary: "3 small wording fixes.",
-          hunks: [
-            { id: "h1", before: "old1", after: "new1", rationale: "shorter" },
-            { id: "h2", before: "old2", after: "new2" },
-          ],
-        };
+describe("a11y — StageRail", () => {
+  // Render the rail in three representative states the writer
+  // actually encounters: fresh project (everything available), mid
+  // journey (one passed, one in-progress, rest available), and a
+  // gated state (later stages locked behind prereqs). axe should
+  // pass on all three.
+  function railWithStatuses(statuses: Partial<Record<StageInfo["id"], StageStatus>>): StageInfo[] {
+    return MVP_STAGES.map((s) => ({
+      ...s,
+      status: statuses[s.id] ?? "available",
+    }));
   }
-  const decisions = (p: Proposal): Decision[] =>
-    p.hunks.map((h) => ({ hunkId: h.id, status: "pending" }));
 
-  it("loaded proposal review has no axe violations", async () => {
-    const p = buildProposal(false);
+  it("fresh project (all available) has no axe violations", async () => {
+    const stages = railWithStatuses({ setup: "in_progress" });
     const { container } = render(
-      <ProposalReview
-        proposal={p}
-        decisions={decisions(p)}
-        onChange={() => undefined}
-        onApply={() => undefined}
-        onCancel={() => undefined}
-      />,
+      <StageRail stages={stages} active="setup" onSelect={() => undefined} />,
     );
     const result = await axe(container);
     expect(result).toHaveNoViolations();
   });
 
-  it("empty proposal review has no axe violations", async () => {
-    const p = buildProposal(true);
+  it("mid-journey state has no axe violations", async () => {
+    const stages = railWithStatuses({
+      setup:      "passed",
+      audience:   "passed",
+      characters: "in_progress",
+    });
     const { container } = render(
-      <ProposalReview
-        proposal={p}
-        decisions={[]}
-        onChange={() => undefined}
-        onApply={() => undefined}
-        onCancel={() => undefined}
-      />,
+      <StageRail stages={stages} active="characters" onSelect={() => undefined} />,
     );
     const result = await axe(container);
     expect(result).toHaveNoViolations();
   });
-});
 
-describe("a11y — ShortcutHelp overlay", () => {
-  it("modal dialog has no axe violations", async () => {
-    const { container } = render(<ShortcutHelp onClose={() => undefined} />);
+  it("gated state (later stages locked) has no axe violations", async () => {
+    const stages = railWithStatuses({
+      setup:      "in_progress",
+      audience:   "locked",
+      characters: "locked",
+      outline:    "locked",
+      drafting:   "locked",
+      export:     "locked",
+    });
+    const { container } = render(
+      <StageRail stages={stages} active="setup" onSelect={() => undefined} />,
+    );
     const result = await axe(container);
     expect(result).toHaveNoViolations();
   });
