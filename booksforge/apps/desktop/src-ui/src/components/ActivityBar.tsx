@@ -57,6 +57,12 @@ interface PipelineState {
   /** Wall-clock the bar locked when the first event for this run
    *  arrived — used for a smooth 1-Hz tick between progress events. */
   firstSeen: number;
+  /** Pipeline-level run id captured from the `agent-run-started`
+   *  event emitted at the top of `agent_run_book_pipeline`. Lets
+   *  the Cancel button target the pipeline via `agent_cancel`. Null
+   *  until the started-event arrives (typical: 1-2 frames after
+   *  the first progress event). */
+  runId?:    string | null;
 }
 
 interface AgentRunState {
@@ -114,7 +120,12 @@ export default function ActivityBar() {
     };
   }, []);
 
-  // Standalone-agent runs (outline-architect, concept-scorer, etc.).
+  // Standalone-agent runs (outline-architect, concept-scorer, etc.)
+  // AND the pipeline-level run_id (agent_id === "book-pipeline").
+  // We branch on agent_id so the pipeline's started/completed events
+  // bind the run_id to the pipeline state — letting the Cancel
+  // button in `PipelineRow` target the right job — while standalone
+  // agents go to their own panel like before.
   useEffect(() => {
     let cancelled = false;
     let unStart:    (() => void) | undefined;
@@ -123,6 +134,21 @@ export default function ActivityBar() {
     (async () => {
       unStart = await ipc.onAgentRunStarted((e: AgentRunStartedEvent) => {
         if (cancelled) return;
+        if (e.agent_id === "book-pipeline") {
+          setPipeline((prev) => prev
+            ? { ...prev, runId: e.run_id }
+            : {
+                stage:     "book-pipeline",
+                status:    "running",
+                summary:   "Starting…",
+                current:   0,
+                total:     0,
+                elapsedS:  0,
+                firstSeen: Date.now(),
+                runId:     e.run_id,
+              });
+          return;
+        }
         setAgentRun({
           runId:     e.run_id,
           agentId:   e.agent_id,
@@ -141,6 +167,14 @@ export default function ActivityBar() {
       });
       unComplete = await ipc.onAgentRunCompleted((e: AgentRunCompletedEvent) => {
         if (cancelled) return;
+        if (e.agent_id === "book-pipeline") {
+          // Pipeline finished — clear the bar so the writer sees idle.
+          // The book-pipeline:progress handler already debounces
+          // success with a 4s delay; this handler covers the
+          // cancelled / error paths.
+          setPipeline(null);
+          return;
+        }
         setAgentRun((prev) => prev && prev.runId === e.run_id ? null : prev);
       });
     })();
@@ -177,6 +211,12 @@ function PipelineRow({ state }: { state: PipelineState }) {
   const sceneCtr    = state.stage === "scene-drafter-fic" && state.total > 0
     ? ` · scene ${state.current} / ${state.total}`
     : "";
+  const [cancelling, setCancelling] = useState(false);
+  async function handleCancel() {
+    if (!state.runId || cancelling) return;
+    setCancelling(true);
+    try { await ipc.agentCancel({ run_id: state.runId }); } catch { /* idempotent */ }
+  }
   return (
     <footer
       style={{ ...s.bar, ...statusBg(state.status) }}
@@ -188,6 +228,17 @@ function PipelineRow({ state }: { state: PipelineState }) {
         <b>{label}</b>{sceneCtr} — {state.summary}
       </span>
       <span style={s.elapsed}>{formatElapsed(wallElapsed)}</span>
+      {state.runId && state.status !== "completed" && state.status !== "failed" && (
+        <button
+          type="button"
+          onClick={handleCancel}
+          disabled={cancelling}
+          style={s.cancelBtn}
+          title="Stop the pipeline after the current scene rolls back. Already-drafted scenes are preserved."
+        >
+          {cancelling ? "Cancelling…" : "Cancel"}
+        </button>
+      )}
     </footer>
   );
 }
@@ -273,5 +324,15 @@ const s: Record<string, React.CSSProperties> = {
     fontVariantNumeric: "tabular-nums",
     minWidth: 70,
     textAlign: "right",
+  },
+  cancelBtn: {
+    background: "transparent",
+    border: "1px solid currentColor",
+    borderRadius: 4,
+    padding: "2px 10px",
+    fontSize: 11, fontWeight: 600,
+    color: "inherit",
+    cursor: "pointer",
+    fontFamily: "var(--font-ui)",
   },
 };

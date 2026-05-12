@@ -14,7 +14,12 @@
  * panel can show "will skip" badges and accurate ETA.
  */
 import { useEffect, useRef, useState } from "react";
-import type { NodeInfo, OpenProjectResult } from "@booksforge/shared-types";
+import type {
+  AgentRunCompletedEvent,
+  AgentRunStartedEvent,
+  NodeInfo,
+  OpenProjectResult,
+} from "@booksforge/shared-types";
 import {
   ipc,
   type BookPipelineProgressEvent,
@@ -65,6 +70,10 @@ export default function Stage8_Drafting({ project, onChanged, onSwitchToManuscri
   const [bibleStages,     setBibleStages]     = useState<Record<string, StageState>>({});
   const [currentScene,    setCurrentScene]    = useState<StageState | null>(null);
   const [completedEvents, setCompletedEvents] = useState<BookSceneStageResult[]>([]);
+  // Pipeline-level run_id captured from `agent-run-started` so the
+  // Cancel button can call `agent_cancel`. Reset on each new run.
+  const [pipelineRunId,   setPipelineRunId]   = useState<string | null>(null);
+  const [cancelling,      setCancelling]      = useState<boolean>(false);
 
   // Wall-clock
   const startedAtRef = useRef<number | null>(null);
@@ -95,13 +104,18 @@ export default function Stage8_Drafting({ project, onChanged, onSwitchToManuscri
     return () => { cancelled = true; };
   }, []);
 
-  // Subscribe to pipeline progress while running.
+  // Subscribe to pipeline progress + the pipeline-level run_id while
+  // running. The run_id is emitted in `agent-run-started` with
+  // `agent_id === "book-pipeline"` and lets the Cancel button target
+  // the pipeline through the existing `agent_cancel` IPC.
   useEffect(() => {
     if (!running) return;
     let cancelled = false;
-    let unlisten: (() => void) | undefined;
+    let unProgress: (() => void) | undefined;
+    let unStart:    (() => void) | undefined;
+    let unComplete: (() => void) | undefined;
     (async () => {
-      unlisten = await ipc.onBookPipelineProgress((e: BookPipelineProgressEvent) => {
+      unProgress = await ipc.onBookPipelineProgress((e: BookPipelineProgressEvent) => {
         if (cancelled) return;
         if (e.stage === "scene-drafter-fic") {
           setCurrentScene({
@@ -131,9 +145,31 @@ export default function Stage8_Drafting({ project, onChanged, onSwitchToManuscri
           }));
         }
       });
+      unStart = await ipc.onAgentRunStarted((e: AgentRunStartedEvent) => {
+        if (cancelled) return;
+        if (e.agent_id === "book-pipeline") setPipelineRunId(e.run_id);
+      });
+      unComplete = await ipc.onAgentRunCompleted((e: AgentRunCompletedEvent) => {
+        if (cancelled) return;
+        if (e.agent_id === "book-pipeline") {
+          setPipelineRunId(null);
+          setCancelling(false);
+        }
+      });
     })();
-    return () => { cancelled = true; unlisten?.(); };
+    return () => {
+      cancelled = true;
+      unProgress?.();
+      unStart?.();
+      unComplete?.();
+    };
   }, [running]);
+
+  async function cancelPipeline() {
+    if (!pipelineRunId || cancelling) return;
+    setCancelling(true);
+    try { await ipc.agentCancel({ run_id: pipelineRunId }); } catch { /* idempotent */ }
+  }
 
   async function startPipeline() {
     setRunning(true); setResult(null); setError(null);
@@ -329,14 +365,23 @@ export default function Stage8_Drafting({ project, onChanged, onSwitchToManuscri
             <div style={s.sectionBody}>
               <div style={s.runStatus} role="status" aria-live="polite">
                 <span style={s.spinner} aria-hidden="true" />
-                <p style={s.muted}>
-                  Pipeline cancellation isn't wired through yet — the
-                  pipeline doesn't emit a run_id the frontend can target.
-                  If you need to stop mid-flight, quit the app; everything
-                  already written to the bundle is preserved, and the next
-                  run resumes from the last completed scene
-                  (Skip already drafted = on by default).
-                </p>
+                <div style={{ flex: 1 }}>
+                  <p style={s.muted}>
+                    Cancel stops the pipeline after the current scene
+                    rolls back. Already-applied bibles + scenes stay;
+                    the next run resumes from the last completed scene
+                    (Skip already drafted = on by default).
+                  </p>
+                </div>
+                {pipelineRunId && (
+                  <button
+                    style={s.ghostBtn}
+                    onClick={cancelPipeline}
+                    disabled={cancelling}
+                  >
+                    {cancelling ? "Cancelling…" : "Cancel"}
+                  </button>
+                )}
               </div>
               <ul style={s.stageList}>
                 <StageRow label="Character bible" state={bibleStages["character-bible"]} />
