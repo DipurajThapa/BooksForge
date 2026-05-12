@@ -36,6 +36,7 @@ import Stage7_Outline     from "../stages/Stage7_Outline";
 import Stage8_Drafting    from "../stages/Stage8_Drafting";
 import Stage13_14_Export  from "../stages/Stage13_14_Export";
 import Manuscript         from "./Manuscript";
+import ActivityBar        from "../components/ActivityBar";
 
 interface Props {
   project: OpenProjectResult;
@@ -148,6 +149,12 @@ export default function EditorShell({ project, onClose }: Props) {
           />
         )}
       </div>
+
+      {/* F4 — Persistent activity footer. Survives view switches so
+       *  a writer who starts Drafting then jumps to Manuscript still
+       *  sees scene N / total + elapsed. Hidden when nothing is
+       *  running. */}
+      <ActivityBar />
     </div>
   );
 }
