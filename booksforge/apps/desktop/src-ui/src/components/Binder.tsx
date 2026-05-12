@@ -47,6 +47,10 @@ interface Props {
    *  IPC promise so the binder can show a transient state. If
    *  omitted, rename UI is hidden. */
   onRenameNode?:    (id: string, newTitle: string) => Promise<void>;
+  /** Right-click handler. Receives the targeted node + viewport
+   *  cursor coords so the parent can mount a context menu near
+   *  the cursor. Omit to disable right-click affordances. */
+  onContextMenu?:   (info: { node: NodeInfo; x: number; y: number }) => void;
 }
 
 interface TreeNode {
@@ -85,7 +89,7 @@ function sumWords(node: TreeNode): number {
 }
 
 const Binder = forwardRef<BinderHandle, Props>(function Binder(
-  { nodes, selectedSceneId, onSelectScene, onRenameNode },
+  { nodes, selectedSceneId, onSelectScene, onRenameNode, onContextMenu },
   ref,
 ) {
   const tree = useMemo(() => buildTree(nodes), [nodes]);
@@ -145,6 +149,7 @@ const Binder = forwardRef<BinderHandle, Props>(function Binder(
               onStartRename={onRenameNode ? setRenamingId : undefined}
               onCommitRename={onRenameNode}
               onCancelRename={() => setRenamingId(null)}
+              onContextMenu={onContextMenu}
             />
           ))
         )}
@@ -167,12 +172,15 @@ interface BinderRowProps {
   onStartRename?:   (id: string) => void;
   onCommitRename?:  (id: string, newTitle: string) => Promise<void>;
   onCancelRename?:  () => void;
+  // Context-menu plumbing (parent owns the menu; we just forward the event).
+  onContextMenu?:   (info: { node: NodeInfo; x: number; y: number }) => void;
 }
 
 function BinderRow(props: BinderRowProps) {
   const {
     node, depth, selectedSceneId, collapsed, onToggle, onSelect,
     renamingId, onStartRename, onCommitRename, onCancelRename,
+    onContextMenu,
   } = props;
   const { info, children } = node;
   const isScene    = info.kind === "scene";
@@ -200,6 +208,13 @@ function BinderRow(props: BinderRowProps) {
     onStartRename(info.id);
   }
 
+  function handleContextMenu(e: ReactMouseEvent) {
+    if (!onContextMenu) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onContextMenu({ node: info, x: e.clientX, y: e.clientY });
+  }
+
   return (
     <li>
       {isRenaming && onCommitRename && onCancelRename ? (
@@ -219,6 +234,7 @@ function BinderRow(props: BinderRowProps) {
           }}
           onClick={handleClick}
           onDoubleClick={handleDoubleClick}
+          onContextMenu={handleContextMenu}
           aria-expanded={hasChildren ? isExpanded : undefined}
           aria-current={isSelected ? "page" : undefined}
           title={
@@ -254,6 +270,7 @@ function BinderRow(props: BinderRowProps) {
               onStartRename={onStartRename}
               onCommitRename={onCommitRename}
               onCancelRename={onCancelRename}
+              onContextMenu={onContextMenu}
             />
           ))}
         </ol>

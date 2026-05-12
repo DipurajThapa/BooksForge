@@ -32,10 +32,12 @@ import type {
   SceneLoadResult,
 } from "@booksforge/shared-types";
 import Binder, { type BinderHandle } from "../components/Binder";
+import BinderContextMenu, { type BinderContextMenuAnchor } from "../components/BinderContextMenu";
 import { ipc } from "../lib/ipc";
 import { errorMessage } from "../lib/errorMessage";
 import { useToast } from "../components/ToastProvider";
 import { useShortcut } from "../lib/keymap";
+import { positionAtEnd } from "../lib/lexorank";
 
 interface Props {
   project:          OpenProjectResult;
@@ -207,6 +209,171 @@ export default function Manuscript({ project, initialSceneId, onSwitchToJourney 
   const binderRef = useRef<BinderHandle>(null);
   useShortcut("binder.focus", () => binderRef.current?.focusFirstRow());
 
+  // Right-click context menu state. The anchor carries the targeted
+  // node + viewport cursor coords; `null` means the menu is closed.
+  const [ctxMenu, setCtxMenu] = useState<BinderContextMenuAnchor | null>(null);
+
+  // ── Binder mutations ────────────────────────────────────────────────
+
+  /**
+   * Find the chapter that should own a new scene given the writer's
+   * right-click target. If they right-clicked a scene, hoist to the
+   * scene's parent (a chapter). If they right-clicked the chapter
+   * itself, return it directly.
+   */
+  function findChapterAncestor(node: NodeInfo): NodeInfo | null {
+    if (node.kind === "chapter") return node;
+    if (node.kind === "scene" && node.parent_id) {
+      return nodes.find((n) => n.id === node.parent_id) ?? null;
+    }
+    return null;
+  }
+
+  /** Find the project-root node (kind === "project"). */
+  function findProjectRoot(): NodeInfo | null {
+    return nodes.find((n) => n.kind === "project") ?? null;
+  }
+
+  async function createScene(parentChapter: NodeInfo) {
+    const siblings = nodes.filter((n) => n.parent_id === parentChapter.id && n.kind === "scene");
+    try {
+      const created = await ipc.nodeCreate({
+        parent_id:    parentChapter.id,
+        kind:         "scene",
+        title:        "Untitled scene",
+        position:     positionAtEnd(siblings),
+        status:       "planned",
+        target_words: null,
+      });
+      setNodes((prev) => [...prev, created]);
+      setSelectedSceneId(created.id);
+      toast.push({
+        severity: "success",
+        body:     `Added scene to "${parentChapter.title || "this chapter"}".`,
+      });
+    } catch (e) {
+      toast.push({
+        severity: "error",
+        title:    "Could not add scene",
+        body:     errorMessage(e),
+      });
+    }
+  }
+
+  async function createChapter() {
+    const root = findProjectRoot();
+    if (!root) {
+      toast.push({
+        severity: "warning",
+        body:     "No project root found. Generate an outline (Stage 4) first, then chapters can be appended here.",
+      });
+      return;
+    }
+    const siblings = nodes.filter((n) => n.parent_id === root.id && n.kind === "chapter");
+    try {
+      const created = await ipc.nodeCreate({
+        parent_id:    root.id,
+        kind:         "chapter",
+        title:        "Untitled chapter",
+        position:     positionAtEnd(siblings),
+        status:       "planned",
+        target_words: null,
+      });
+      setNodes((prev) => [...prev, created]);
+      toast.push({
+        severity: "success",
+        body:     `Added chapter "${created.title}". Right-click it to add scenes.`,
+      });
+    } catch (e) {
+      toast.push({
+        severity: "error",
+        title:    "Could not add chapter",
+        body:     errorMessage(e),
+      });
+    }
+  }
+
+  /**
+   * Delete with a snapshot-backed undo. We take a project-scope
+   * snapshot before deleting so the writer can restore via a toast
+   * action without losing surrounding edits. If the snapshot fails,
+   * we abort the delete — the writer keeps everything.
+   */
+  async function deleteWithUndo(target: NodeInfo) {
+    const label = target.title || target.kind;
+    if (!window.confirm(`Delete ${target.kind} "${label}"?\n\nA snapshot will be taken first so you can undo from the toast.`)) {
+      return;
+    }
+    let snapshotId: string | null = null;
+    try {
+      const snap = await ipc.snapshotCreate({
+        scope:    "project",
+        scope_id: null,
+        label:    `Pre-delete: ${label}`,
+        trigger:  "manual",
+      });
+      snapshotId = snap.id;
+    } catch (e) {
+      toast.push({
+        severity: "error",
+        title:    "Snapshot failed — delete aborted",
+        body:     errorMessage(e),
+      });
+      return;
+    }
+    try {
+      await ipc.nodeDelete(target.id);
+      // Refetch the tree — delete is cascading, optimistic removal
+      // of just the target is wrong if it had children.
+      const fresh = await ipc.nodeList();
+      setNodes(fresh);
+      // If the deleted node was selected, fall back to the first
+      // remaining scene so the editor stays meaningful.
+      if (selectedSceneId === target.id) {
+        const scenes = fresh.filter((n) => n.kind === "scene")
+          .sort((a, b) => a.position.localeCompare(b.position));
+        setSelectedSceneId(scenes[0]?.id ?? null);
+      }
+      toast.push({
+        severity: "warning",
+        title:    `Deleted ${target.kind}`,
+        body:     `"${label}" removed. Undo restores from the snapshot.`,
+        durationMs: 12_000,
+        action: {
+          label: "Undo",
+          onClick: () => { void undeleteFromSnapshot(snapshotId!); },
+        },
+      });
+    } catch (e) {
+      toast.push({
+        severity: "error",
+        title:    "Delete failed",
+        body:     errorMessage(e),
+      });
+    }
+  }
+
+  async function undeleteFromSnapshot(snapshotId: string) {
+    try {
+      await ipc.snapshotRestore({
+        snapshot_id: snapshotId,
+        selective:   null,  // whole-tree
+      });
+      const fresh = await ipc.nodeList();
+      setNodes(fresh);
+      toast.push({
+        severity: "success",
+        body:     "Restored from snapshot.",
+      });
+    } catch (e) {
+      toast.push({
+        severity: "error",
+        title:    "Restore failed",
+        body:     errorMessage(e),
+      });
+    }
+  }
+
   return (
     <div style={s.shell}>
       <Binder
@@ -215,6 +382,7 @@ export default function Manuscript({ project, initialSceneId, onSwitchToJourney 
         selectedSceneId={selectedSceneId}
         onSelectScene={setSelectedSceneId}
         onRenameNode={handleRename}
+        onContextMenu={setCtxMenu}
       />
 
       <main style={s.editorPane}>
@@ -262,6 +430,35 @@ export default function Manuscript({ project, initialSceneId, onSwitchToJourney 
         project={project}
         onRefreshTree={() => setRefreshKey((k) => k + 1)}
       />
+
+      {ctxMenu && (
+        <BinderContextMenu
+          anchor={ctxMenu}
+          onClose={() => setCtxMenu(null)}
+          onNewScene={(target) => {
+            const chapter = findChapterAncestor(target);
+            if (!chapter) {
+              toast.push({
+                severity: "warning",
+                body: "Pick a chapter or a scene inside a chapter to add a sibling scene.",
+              });
+              return;
+            }
+            void createScene(chapter);
+          }}
+          onNewChapter={() => { void createChapter(); }}
+          onRename={(target) => {
+            // Re-use the inline rename flow: select the row + the
+            // Binder's renamingId state will pick it up once we wire
+            // a way to enter it from outside. For now, surface a hint.
+            toast.push({
+              severity: "info",
+              body: `Double-click "${target.title || target.kind}" in the binder to rename inline.`,
+            });
+          }}
+          onDelete={(target) => { void deleteWithUndo(target); }}
+        />
+      )}
     </div>
   );
 }
