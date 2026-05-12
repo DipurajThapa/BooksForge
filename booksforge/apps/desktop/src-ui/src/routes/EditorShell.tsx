@@ -1,13 +1,19 @@
 /**
- * EditorShell — minimal foundation for the writer's editor (2026-05 redesign).
+ * EditorShell — foundation for the writer's editor.
  *
- * Three regions:
+ * Two views, switched by the header segmented control:
+ *
+ *   Journey view (the original rail-driven AI pipeline):
  *   ┌─────────────┬───────────────────────────────────────────────────┐
  *   │ StageRail   │ Stage panel (Setup / Audience / … / Export)       │
  *   │   (220px)   │   — content depends on the active stage           │
- *   ├─────────────┴───────────────────────────────────────────────────┤
- *   │ (footer / status — currently empty)                             │
- *   └────────────────────────────────────────────────────────────────┘
+ *   └─────────────┴───────────────────────────────────────────────────┘
+ *
+ *   Manuscript view (F1 — added 2026-05-12):
+ *   ┌──────────┬──────────────────────────────┬─────────────────┐
+ *   │ Binder   │ TipTap SceneEditor           │ Scene meta      │
+ *   │ (tree)   │ (current scene's pm_doc)     │  (read-only)    │
+ *   └──────────┴──────────────────────────────┴─────────────────┘
  *
  * Stage status:
  *   The rail's coloured dots are derived live from project data via
@@ -15,8 +21,8 @@
  *     1. On mount (initial render).
  *     2. Whenever the user switches to a new stage in the rail —
  *        re-fetching catches changes the previous stage just made.
- *   That covers the common writer-flow patterns ("edit Stage 1, click
- *   Stage 4 to see it unlocked") without per-panel refresh hooks.
+ *     3. Whenever the writer toggles back from Manuscript view, in
+ *        case AI runs from elsewhere changed structure / word counts.
  */
 import { useCallback, useState } from "react";
 import type { OpenProjectResult } from "@booksforge/shared-types";
@@ -29,13 +35,17 @@ import Stage5_Characters  from "../stages/Stage5_Characters";
 import Stage7_Outline     from "../stages/Stage7_Outline";
 import Stage8_Drafting    from "../stages/Stage8_Drafting";
 import Stage13_14_Export  from "../stages/Stage13_14_Export";
+import Manuscript         from "./Manuscript";
 
 interface Props {
   project: OpenProjectResult;
   onClose: () => void;
 }
 
+type View = "journey" | "manuscript";
+
 export default function EditorShell({ project, onClose }: Props) {
+  const [view,       setView]       = useState<View>("journey");
   const [active,     setActive]     = useState<StageId>("setup");
   // refreshKey is bumped on stage switch so useStageStatuses re-fetches
   // and the rail's dots reflect any cross-stage change.
@@ -70,6 +80,21 @@ export default function EditorShell({ project, onClose }: Props) {
     setRefreshKey((k) => k + 1);
   }, []);
 
+  // F1 — Switch to the manuscript view. Drafting (Stage 5) calls
+  // this from its "Done" panel so the writer lands in the editor
+  // immediately after a pipeline run finishes.
+  const handleSwitchToManuscript = useCallback(() => {
+    setView("manuscript");
+  }, []);
+
+  // F1 — Switch back to the journey view; refresh statuses so any
+  // changes made via the manuscript view (e.g. word counts)
+  // propagate to the rail's dots.
+  const handleSwitchToJourney = useCallback(() => {
+    setView("journey");
+    setRefreshKey((k) => k + 1);
+  }, []);
+
   // The rail merges the static stage definition with the live status.
   // Active stage always shows "in_progress" if it isn't already "passed"
   // — that's the dot the writer sees beside the stage they're typing in.
@@ -87,6 +112,7 @@ export default function EditorShell({ project, onClose }: Props) {
       <header style={s.header}>
         <span style={s.wordmark}>BooksForge</span>
         <span style={s.projectTitle}>{project.title}</span>
+        <ViewToggle view={view} onChange={setView} />
         <div style={s.headerRight}>
           <span style={s.refreshHint} title="Statuses refresh on every stage switch">
             ↻ live
@@ -96,23 +122,73 @@ export default function EditorShell({ project, onClose }: Props) {
       </header>
 
       <div style={s.body}>
-        <StageRail stages={stages} active={active} onSelect={handleSelect} />
-        <main style={s.main}>
-          {active === "setup"      && <Stage1_Setup      project={project} onChanged={handleStageProgress} onAdvance={handleStageAdvance} />}
-          {active === "audience"   && <Stage2_Audience   project={project} onChanged={handleStageProgress} onAdvance={handleStageAdvance} />}
-          {active === "characters" && <Stage5_Characters project={project} onChanged={handleStageProgress} />}
-          {active === "outline"    && <Stage7_Outline    project={project} onChanged={handleStageProgress} />}
-          {active === "drafting"   && <Stage8_Drafting   project={project} onChanged={handleStageProgress} />}
-          {active === "export"     && <Stage13_14_Export project={project} onChanged={handleStageProgress} />}
-        </main>
+        {view === "journey" && (
+          <>
+            <StageRail stages={stages} active={active} onSelect={handleSelect} />
+            <main style={s.main}>
+              {active === "setup"      && <Stage1_Setup      project={project} onChanged={handleStageProgress} onAdvance={handleStageAdvance} />}
+              {active === "audience"   && <Stage2_Audience   project={project} onChanged={handleStageProgress} onAdvance={handleStageAdvance} />}
+              {active === "characters" && <Stage5_Characters project={project} onChanged={handleStageProgress} />}
+              {active === "outline"    && <Stage7_Outline    project={project} onChanged={handleStageProgress} />}
+              {active === "drafting"   && (
+                <Stage8_Drafting
+                  project={project}
+                  onChanged={handleStageProgress}
+                  onSwitchToManuscript={handleSwitchToManuscript}
+                />
+              )}
+              {active === "export"     && <Stage13_14_Export project={project} onChanged={handleStageProgress} />}
+            </main>
+          </>
+        )}
+        {view === "manuscript" && (
+          <Manuscript
+            project={project}
+            onSwitchToJourney={handleSwitchToJourney}
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => void }) {
+  return (
+    <div style={s.toggle} role="tablist" aria-label="Editor view">
+      <ToggleBtn active={view === "journey"}    onClick={() => onChange("journey")}>
+        Journey
+      </ToggleBtn>
+      <ToggleBtn active={view === "manuscript"} onClick={() => onChange("manuscript")}>
+        Manuscript
+      </ToggleBtn>
+    </div>
+  );
+}
+
+function ToggleBtn({
+  active, onClick, children,
+}: {
+  active: boolean; onClick: () => void; children: React.ReactNode;
+}) {
+  return (
+    <button
+      role="tab"
+      aria-selected={active}
+      style={{
+        ...s.toggleBtn,
+        ...(active ? s.toggleBtnActive : {}),
+      }}
+      onClick={onClick}
+    >
+      {children}
+    </button>
   );
 }
 
 const s: Record<string, React.CSSProperties> = {
   shell: {
     minHeight: "100vh",
+    height: "100vh",
     display: "flex", flexDirection: "column",
     background: "var(--color-neutral-50)",
     fontFamily: "var(--font-ui)",
@@ -134,6 +210,31 @@ const s: Record<string, React.CSSProperties> = {
     color: "var(--color-neutral-900)",
     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
   },
+  toggle: {
+    display: "flex",
+    background: "var(--color-neutral-100)",
+    border: "1px solid var(--color-neutral-300)",
+    borderRadius: 6,
+    padding: 2,
+    gap: 2,
+  },
+  toggleBtn: {
+    background: "transparent",
+    border: "none",
+    borderRadius: 4,
+    padding: "4px 12px",
+    fontSize: 12,
+    fontWeight: 500,
+    fontFamily: "var(--font-ui)",
+    color: "var(--color-neutral-700)",
+    cursor: "pointer",
+  },
+  toggleBtnActive: {
+    background: "#fff",
+    color: "var(--color-amber-700, #b45309)",
+    fontWeight: 600,
+    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+  },
   headerRight: { display: "flex", gap: 8, alignItems: "center" },
   refreshHint: {
     fontSize: 11,
@@ -146,7 +247,7 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 4, padding: "4px 12px", fontSize: 12,
     color: "var(--color-neutral-700)", cursor: "pointer",
   },
-  body: { flex: 1, display: "flex", overflow: "hidden" },
+  body: { flex: 1, display: "flex", overflow: "hidden", minHeight: 0 },
   main: {
     flex: 1, overflow: "auto",
     background: "#fff",
