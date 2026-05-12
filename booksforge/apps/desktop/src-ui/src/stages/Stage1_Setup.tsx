@@ -711,14 +711,17 @@ const s: Record<string, React.CSSProperties> = {
     borderBottom: "1px solid var(--color-neutral-200)",
   },
   sectionTitle: {
+    // F9 — Section titles are 15px 600 mixed-case (matching Stage 4
+    // and downstream). Previous 11px uppercase collided visually
+    // with the 11px uppercase field labels below, leaving the form
+    // with no hierarchy. Title now reads as a real heading.
     margin: 0,
-    fontSize: 11, fontWeight: 600,
-    textTransform: "uppercase", letterSpacing: "0.08em",
-    color: "var(--color-neutral-700)",
+    fontSize: 15, fontWeight: 600,
+    color: "var(--color-neutral-900)",
   },
   sectionHint: {
     margin: "4px 0 0",
-    fontSize: 11, color: "var(--color-neutral-500)", lineHeight: 1.5,
+    fontSize: 12, color: "var(--color-neutral-600)", lineHeight: 1.5,
   },
   sectionBody: {
     padding: 16,
