@@ -7,7 +7,8 @@ use booksforge_domain::{Node, NodeKind, NodeStatus, SceneContent};
 use booksforge_fs::{markdown_mirror, recovery};
 use booksforge_ipc::{
     editor::{
-        NodeCreateInput, NodeInfo, NodeUpdateInput, RecoveryStatus, SceneLoadResult, SceneSaveInput,
+        NodeCreateInput, NodeInfo, NodeMoveInput, NodeUpdateInput, RecoveryStatus, SceneLoadResult,
+        SceneSaveInput,
     },
     BooksForgeError,
 };
@@ -250,6 +251,106 @@ pub async fn node_update(
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
 
     Ok(node_to_info(node))
+}
+
+// ── node_move ─────────────────────────────────────────────────────────────────
+
+/// Re-parent a node + update its position in one transaction.
+///
+/// Used by the binder's drag-into-different-chapter affordance.
+/// Validates:
+///   - target node exists and isn't the project root
+///   - new parent exists and isn't itself (or any descendant of the
+///     target — would create a cycle in the tree)
+///   - kind compatibility: scenes can only move under chapters;
+///     chapters can only move under parts or the project root;
+///     parts can only move under the project root.
+///
+/// Returns the updated `NodeInfo` so callers can refresh state in
+/// one round-trip.
+#[tauri::command]
+pub async fn node_move(
+    input: NodeMoveInput,
+    state: State<'_, AppState>,
+) -> Result<NodeInfo, BooksForgeError> {
+    let project = require_project(&state).await?;
+
+    let id = Ulid::from_string(&input.id)
+        .map_err(|e| BooksForgeError::validation(format!("invalid id: {e}")))?;
+    let new_parent_id = Ulid::from_string(&input.new_parent_id)
+        .map_err(|e| BooksForgeError::validation(format!("invalid new_parent_id: {e}")))?;
+
+    let nodes = project
+        .storage
+        .list_nodes()
+        .await
+        .map_err(|e| BooksForgeError::internal(e.to_string()))?;
+
+    let target = nodes
+        .iter()
+        .find(|n| n.id == id)
+        .cloned()
+        .ok_or_else(|| BooksForgeError::not_found(format!("node {}", input.id)))?;
+
+    if matches!(target.kind, NodeKind::Project) {
+        return Err(BooksForgeError::validation(
+            "the project root cannot be moved".to_string(),
+        ));
+    }
+
+    if id == new_parent_id {
+        return Err(BooksForgeError::validation(
+            "a node cannot be its own parent".to_string(),
+        ));
+    }
+
+    let new_parent = nodes
+        .iter()
+        .find(|n| n.id == new_parent_id)
+        .ok_or_else(|| BooksForgeError::not_found(format!("parent {}", input.new_parent_id)))?;
+
+    // Reject kind mismatches that would put the manuscript into a
+    // shape the rest of the app can't render.
+    match (target.kind, new_parent.kind) {
+        (NodeKind::Scene, NodeKind::Chapter) => {}
+        (NodeKind::Chapter, NodeKind::Part | NodeKind::Project) => {}
+        (NodeKind::Part, NodeKind::Project) => {}
+        (target_kind, parent_kind) => {
+            return Err(BooksForgeError::validation(format!(
+                "cannot move {:?} under {:?}",
+                target_kind, parent_kind
+            )));
+        }
+    }
+
+    // Cycle prevention: walk up from the proposed new_parent — if
+    // we encounter `id`, the move would create a cycle.
+    let mut cursor = Some(new_parent_id);
+    while let Some(cid) = cursor {
+        if cid == id {
+            return Err(BooksForgeError::validation(
+                "cannot move a node into one of its own descendants".to_string(),
+            ));
+        }
+        cursor = nodes
+            .iter()
+            .find(|n| n.id == cid)
+            .and_then(|n| n.parent_id);
+    }
+
+    let updated_at = Utc::now();
+    project
+        .storage
+        .move_node(id, new_parent_id, input.new_position.clone(), updated_at)
+        .await
+        .map_err(|e| BooksForgeError::internal(e.to_string()))?;
+
+    // Build the updated NodeInfo for the response.
+    let mut updated = target;
+    updated.parent_id = Some(new_parent_id);
+    updated.position = input.new_position;
+    updated.updated_at = updated_at;
+    Ok(node_to_info(updated))
 }
 
 // ── node_delete ───────────────────────────────────────────────────────────────

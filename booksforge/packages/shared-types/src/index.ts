@@ -10,6 +10,7 @@ export type { BooksForgeError } from "./bindings/BooksForgeError";
 export type { NodeInfo } from "./bindings/NodeInfo";
 export type { NodeCreateInput } from "./bindings/NodeCreateInput";
 export type { NodeUpdateInput } from "./bindings/NodeUpdateInput";
+export type { NodeMoveInput } from "./bindings/NodeMoveInput";
 export type { SceneSaveInput } from "./bindings/SceneSaveInput";
 export type { SceneLoadResult } from "./bindings/SceneLoadResult";
 export type { RecoveryStatus } from "./bindings/RecoveryStatus";

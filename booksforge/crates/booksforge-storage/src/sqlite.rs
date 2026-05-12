@@ -270,6 +270,32 @@ impl StorageRepository for SqliteStorage {
         Ok(())
     }
 
+    async fn move_node(
+        &self,
+        id: Ulid,
+        new_parent_id: Ulid,
+        new_position: String,
+        updated_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), StorageError> {
+        let id_str = ulid_to_str(id);
+        let parent_str = ulid_to_str(new_parent_id);
+        let updated_str = ts_to_str(updated_at);
+        sqlx::query!(
+            r#"
+            UPDATE nodes
+            SET parent_id = ?, position = ?, updated_at = ?
+            WHERE id = ?
+            "#,
+            parent_str,
+            new_position,
+            updated_str,
+            id_str,
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     async fn delete_node(&self, id: Ulid) -> Result<(), StorageError> {
         let now = ts_to_str(Utc::now());
         let id_str = ulid_to_str(id);

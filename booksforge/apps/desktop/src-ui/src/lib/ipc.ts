@@ -114,6 +114,7 @@ import type {
   NodeCreateInput,
   NodeDiffDto,
   NodeInfo,
+  NodeMoveInput,
   NodeUpdateInput,
   OllamaProbeResult,
   OpenProjectInput,
@@ -309,6 +310,16 @@ export const ipc = {
   },
   nodeCreate(input: NodeCreateInput): Promise<NodeInfo> {
     return invoke("node_create", { input });
+  },
+  /**
+   * Re-parent a node + update its position in one transaction.
+   * The Rust handler validates kind compatibility (scenes under
+   * chapters, etc.) and rejects cycles. Use this for the binder's
+   * drag-into-different-chapter affordance; same-parent reorder
+   * still goes through `nodeUpdate({ position })`.
+   */
+  nodeMove(input: NodeMoveInput): Promise<NodeInfo> {
+    return invoke("node_move", { input });
   },
   nodeUpdate(input: NodeUpdateInput): Promise<NodeInfo> {
     return invoke("node_update", { input });

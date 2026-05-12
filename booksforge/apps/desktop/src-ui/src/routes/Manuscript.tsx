@@ -170,6 +170,53 @@ export default function Manuscript({ project, initialSceneId, onSwitchToJourney 
     [nodes, selectedSceneId],
   );
 
+  /**
+   * Cross-parent move handler — invoked when the writer drags a
+   * scene into a different chapter (or a chapter into a different
+   * part). The Rust `node_move` IPC validates kind compatibility
+   * + cycles. Same-parent reorder still goes through
+   * `handleReorder` (when the drag-reorder PR lands).
+   *
+   * The caller is responsible for computing `newPosition` against
+   * the *destination* parent's existing children via
+   * `lib/lexorank.positionBetween`.
+   */
+  const handleMoveNode = useCallback(async (
+    id: string,
+    newParentId: string,
+    newPosition: string,
+  ) => {
+    setNodes((prev) => prev.map((n) => (
+      n.id === id
+        ? { ...n, parent_id: newParentId, position: newPosition }
+        : n
+    )));
+    try {
+      const updated = await ipc.nodeMove({
+        id,
+        new_parent_id: newParentId,
+        new_position:  newPosition,
+      });
+      // The IPC returns the canonical updated node; merge it in
+      // so any backend-side timestamp fix lands locally.
+      setNodes((prev) => prev.map((n) => (
+        n.id === id ? { ...n, ...updated } : n
+      )));
+      toast.push({ severity: "success", body: "Moved." });
+    } catch (e) {
+      try {
+        const fresh = await ipc.nodeList();
+        setNodes(fresh);
+      } catch { /* keep optimistic */ }
+      toast.push({
+        severity: "error",
+        title: "Move failed",
+        body: errorMessage(e),
+      });
+    }
+  }, [toast]);
+  void handleMoveNode; // Wired by the drag-reorder PR's cross-parent branch.
+
   // F8 — Inline rename handler. Backend uses `nodeUpdate`; we update
   // local state optimistically so the binder reflects the new title
   // even before the IPC settles. Errors surface via toast.

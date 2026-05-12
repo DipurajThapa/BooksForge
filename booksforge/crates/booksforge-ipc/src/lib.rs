@@ -61,7 +61,8 @@ pub use cover_boilerplate::{
 };
 pub use diagnostics::{SaveDiagnosticBundleInput, SaveDiagnosticBundleResult};
 pub use editor::{
-    NodeCreateInput, NodeInfo, NodeUpdateInput, RecoveryStatus, SceneLoadResult, SceneSaveInput,
+    NodeCreateInput, NodeInfo, NodeMoveInput, NodeUpdateInput, RecoveryStatus, SceneLoadResult,
+    SceneSaveInput,
 };
 pub use error::BooksForgeError;
 pub use export::{
@@ -128,6 +129,7 @@ mod ts_bindings {
         NodeInfo::export_all_to(BINDINGS_DIR).expect("NodeInfo");
         NodeCreateInput::export_all_to(BINDINGS_DIR).expect("NodeCreateInput");
         NodeUpdateInput::export_all_to(BINDINGS_DIR).expect("NodeUpdateInput");
+        NodeMoveInput::export_all_to(BINDINGS_DIR).expect("NodeMoveInput");
         SceneSaveInput::export_all_to(BINDINGS_DIR).expect("SceneSaveInput");
         SceneLoadResult::export_all_to(BINDINGS_DIR).expect("SceneLoadResult");
         RecoveryStatus::export_all_to(BINDINGS_DIR).expect("RecoveryStatus");

@@ -37,7 +37,28 @@ pub trait StorageRepository: Send + Sync {
     async fn upsert_node(&self, node: &Node) -> Result<(), StorageError>;
 
     /// Update mutable fields of an existing node.
+    ///
+    /// **Does not** mutate `parent_id`. The `update_node` contract
+    /// has always been "same-parent edits only" so existing callers
+    /// can rely on the parent staying put across `update_node` calls.
+    /// Use `move_node` for cross-parent moves.
     async fn update_node(&self, node: &Node) -> Result<(), StorageError>;
+
+    /// Re-parent a node + update its sibling-order `position` in one
+    /// transaction.
+    ///
+    /// Used by the binder's drag-to-different-chapter affordance.
+    /// Added as a separate method (rather than extending
+    /// `update_node`) so existing callers and downstream agents that
+    /// rely on `update_node` never accidentally re-parent a node by
+    /// mutating the `Node` they pass in.
+    async fn move_node(
+        &self,
+        id: Ulid,
+        new_parent_id: Ulid,
+        new_position: String,
+        updated_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), StorageError>;
 
     /// Soft-delete a node (sets `deleted_at = now`).
     async fn delete_node(&self, id: Ulid) -> Result<(), StorageError>;

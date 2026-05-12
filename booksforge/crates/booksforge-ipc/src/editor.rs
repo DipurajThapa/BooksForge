@@ -51,6 +51,30 @@ pub struct NodeUpdateInput {
     pub target_words: Option<u32>,
 }
 
+/// Input for `node_move` — change a node's parent and position
+/// in one transaction. Added so the binder can drag a scene from
+/// one chapter into another without exposing `parent_id` on the
+/// existing `node_update` (whose contract has never accepted it).
+///
+/// Same-parent reorder is also supported by passing the existing
+/// `parent_id` value — but for that case the frontend should still
+/// prefer `node_update` since it's the established pattern; this
+/// command is specifically for the cross-parent move.
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct NodeMoveInput {
+    pub id: String,
+    /// New parent node id. `None` is rejected — moves to the
+    /// project root are not allowed because the project root is a
+    /// singleton (`kind = "project"`) and only the project itself
+    /// sits there.
+    pub new_parent_id: String,
+    /// New LexoRank position string. The frontend computes this
+    /// via `lib/lexorank.positionBetween` against the destination
+    /// parent's existing children.
+    pub new_position: String,
+}
+
 // ── Scene content types ───────────────────────────────────────────────────────
 
 /// Input for `scene_save`.

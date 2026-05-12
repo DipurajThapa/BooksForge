@@ -55,6 +55,7 @@ pub fn run() {
             commands::editor::node_list,
             commands::editor::node_create,
             commands::editor::node_update,
+            commands::editor::node_move,
             commands::editor::node_delete,
             commands::editor::scene_save,
             commands::editor::scene_load,
