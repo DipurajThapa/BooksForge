@@ -17,9 +17,12 @@
  *   - Accept (insert into the TipTap editor at the selection) /
  *     Reject (close) / Regenerate (re-run the same preset).
  *
- * Diff view (per spec) is deferred to a follow-up PR — accepting
- * replaces the selection directly. The audit trail is preserved
- * server-side regardless (`ai_calls.id` returned in the done event).
+ * Diff view: the done-state body has a Diff / Final toggle. Diff
+ * mode word-diffs the original scope against the AI output (red
+ * strike-throughs + green underlines via `lib/wordDiff`). Final mode
+ * is the plain new prose — what the writer actually inserts on
+ * Accept. The Continue preset is append-only, so its Diff toggle is
+ * disabled and the view defaults to Final.
  *
  * Backend boundary: this component uses only the existing
  * `ai_suggest` + `ai_cancel` IPC. No new commands. The locked
@@ -32,6 +35,7 @@ import { ipc } from "../lib/ipc";
 import { useDialogA11y } from "../lib/useDialogA11y";
 import { useToast } from "./ToastProvider";
 import { errorMessage } from "../lib/errorMessage";
+import DiffView from "./DiffView";
 
 type Preset = "sharpen" | "continue" | "rephrase" | "shorten" | "expand";
 
@@ -246,19 +250,13 @@ export default function QuickActionBar({ sceneNodeId, initialScope, editor, onCl
           )}
 
           {state.kind === "done" && (
-            <div style={s.runningWrap}>
-              <header style={s.runningHeader}>
-                <span style={s.runningLabel}>
-                  <b>{PRESET_LABEL[state.preset]}</b> · ~{Math.round(state.durationMs / 100) / 10}s
-                </span>
-              </header>
-              <pre style={s.output}>{state.output}</pre>
-              <div style={s.actions}>
-                <button style={s.ghostBtn} onClick={onClose}>Reject</button>
-                <button style={s.ghostBtn} onClick={regenerate}>Regenerate</button>
-                <button style={s.primaryBtn} onClick={accept}>Accept &amp; insert</button>
-              </div>
-            </div>
+            <DoneState
+              state={state}
+              initialScope={initialScope}
+              onReject={onClose}
+              onRegenerate={regenerate}
+              onAccept={accept}
+            />
           )}
 
           {state.kind === "error" && (
@@ -276,6 +274,83 @@ export default function QuickActionBar({ sceneNodeId, initialScope, editor, onCl
         <footer style={s.footer}>
           <span>Heavy-tier model. Streamed locally; the call lands in <code style={s.code}>ai_calls</code>.</span>
         </footer>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * `DoneState` — renders the completed suggestion with a Diff / Final
+ * toggle. Diff mode word-diffs the original scope against the AI
+ * output (only useful for replacement-style presets). Final mode
+ * shows just the new prose as plain text, which is what the writer
+ * actually inserts on Accept.
+ *
+ * The `continue` preset is append-only — the AI's output starts a
+ * new paragraph rather than rewriting the source — so for that
+ * preset we default to Final and grey out the Diff toggle.
+ */
+function DoneState({
+  state, initialScope, onReject, onRegenerate, onAccept,
+}: {
+  state: { preset: Preset; output: string; durationMs: number };
+  initialScope: string;
+  onReject:    () => void;
+  onRegenerate: () => void;
+  onAccept:    () => void;
+}) {
+  const isReplacement = state.preset !== "continue";
+  const [viewMode, setViewMode] = useState<"diff" | "final">(
+    isReplacement ? "diff" : "final"
+  );
+  return (
+    <div style={s.runningWrap}>
+      <header style={s.runningHeader}>
+        <span style={s.runningLabel}>
+          <b>{PRESET_LABEL[state.preset]}</b> · ~{Math.round(state.durationMs / 100) / 10}s
+        </span>
+        <div style={s.viewToggle} role="tablist" aria-label="Suggestion view">
+          <button
+            role="tab"
+            aria-selected={viewMode === "diff"}
+            disabled={!isReplacement}
+            onClick={() => setViewMode("diff")}
+            style={{
+              ...s.viewToggleBtn,
+              ...(viewMode === "diff" ? s.viewToggleBtnActive : {}),
+              ...(isReplacement ? {} : s.viewToggleBtnDisabled),
+            }}
+            title={isReplacement
+              ? "Show word-level diff against the original"
+              : "Diff is unavailable for Continue (output is appended, not replaced)"}
+          >
+            Diff
+          </button>
+          <button
+            role="tab"
+            aria-selected={viewMode === "final"}
+            onClick={() => setViewMode("final")}
+            style={{
+              ...s.viewToggleBtn,
+              ...(viewMode === "final" ? s.viewToggleBtnActive : {}),
+            }}
+            title="Show the new prose as it will land on Accept"
+          >
+            Final
+          </button>
+        </div>
+      </header>
+      {viewMode === "diff" && isReplacement ? (
+        <div style={s.output}>
+          <DiffView before={initialScope} after={state.output} />
+        </div>
+      ) : (
+        <pre style={s.output}>{state.output}</pre>
+      )}
+      <div style={s.actions}>
+        <button style={s.ghostBtn} onClick={onReject}>Reject</button>
+        <button style={s.ghostBtn} onClick={onRegenerate}>Regenerate</button>
+        <button style={s.primaryBtn} onClick={onAccept}>Accept &amp; insert</button>
       </div>
     </div>
   );
@@ -366,6 +441,35 @@ const s: Record<string, CSSProperties> = {
   runningLabel: {
     fontFamily: "var(--font-mono)",
     fontSize: 12,
+  },
+  // Diff / Final view toggle in the done-state header.
+  viewToggle: {
+    display: "flex",
+    gap: 2,
+    background: "var(--color-neutral-100)",
+    border: "1px solid var(--color-neutral-300)",
+    borderRadius: 6,
+    padding: 2,
+  },
+  viewToggleBtn: {
+    padding: "3px 10px",
+    background: "transparent",
+    border: "none",
+    borderRadius: 4,
+    fontSize: 11, fontWeight: 500,
+    fontFamily: "var(--font-ui)",
+    color: "var(--color-neutral-700)",
+    cursor: "pointer",
+  },
+  viewToggleBtnActive: {
+    background: "#fff",
+    color: "var(--color-amber-700, #b45309)",
+    fontWeight: 600,
+    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+  },
+  viewToggleBtnDisabled: {
+    opacity: 0.4,
+    cursor: "not-allowed",
   },
   output: {
     margin: 0,
