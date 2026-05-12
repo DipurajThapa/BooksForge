@@ -16,7 +16,10 @@ use ts_rs::TS;
 pub struct AiSuggestInput {
     /// The scene node the call runs against.
     pub node_id: String,
-    /// One of: "sharpen" | "continue" | "rephrase".
+    /// One of: "sharpen" | "continue" | "rephrase" | "shorten" |
+    /// "expand". The orchestrator side has supported `shorten` and
+    /// `expand` since the `quick_action.shorten_expand` migration;
+    /// the frontend now exposes them as separate buttons.
     pub preset: String,
     /// The selected passage (or current paragraph when no selection).
     pub scope_text: String,

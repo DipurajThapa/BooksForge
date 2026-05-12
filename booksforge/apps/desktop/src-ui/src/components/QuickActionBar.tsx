@@ -8,12 +8,11 @@
  * view; user accepts/rejects/regenerates."
  *
  * Scope of this PR:
- *   - Three presets the Rust backend already supports natively:
- *     `sharpen` | `continue` | `rephrase` (see
- *     `crates/booksforge-ipc/bindings/AiSuggestInput.ts`). Shorten
- *     and Expand are documented in the spec but would require new
- *     prompt templates on the Rust side — deferred until the
- *     backend exposes them.
+ *   - Five presets, all natively supported by the Rust backend:
+ *     `sharpen` | `continue` | `rephrase` | `shorten` | `expand`
+ *     (see `crates/booksforge-domain/src/quick_action.rs`). All map
+ *     to versioned prompt templates under
+ *     `crates/booksforge-prompt/templates/<preset>/v1.toml`.
  *   - Streaming preview via `ai-suggest:<job_id>:token` events.
  *   - Accept (insert into the TipTap editor at the selection) /
  *     Reject (close) / Regenerate (re-run the same preset).
@@ -34,18 +33,22 @@ import { useDialogA11y } from "../lib/useDialogA11y";
 import { useToast } from "./ToastProvider";
 import { errorMessage } from "../lib/errorMessage";
 
-type Preset = "sharpen" | "continue" | "rephrase";
+type Preset = "sharpen" | "continue" | "rephrase" | "shorten" | "expand";
 
 const PRESET_LABEL: Record<Preset, string> = {
   sharpen:  "Sharpen",
   continue: "Continue",
   rephrase: "Rephrase",
+  shorten:  "Shorten",
+  expand:   "Expand",
 };
 
 const PRESET_HINT: Record<Preset, string> = {
   sharpen:  "Tighten the selected prose without changing meaning.",
   continue: "Continue from the cursor in the same voice.",
   rephrase: "Restate the selection in a different way.",
+  shorten:  "Cut the selection to roughly half its length, keeping the meaning.",
+  expand:   "Stretch the selection with concrete sensory + emotional detail.",
 };
 
 type RunState =
