@@ -2,13 +2,40 @@
 
 /**
  * One row in the recent-projects list (returned by `project_recent`).
+ *
+ * Fields below the `missing` flag are additive enhancements
+ * (F10 — 2026-05) so the picker can show real "alive" state per
+ * bundle: filesystem mtime, scene count, total word count. They
+ * default to sensible empty values when the bundle is missing or
+ * the underlying `project.db` can't be read.
  */
 export type RecentProjectEntry = { id: string, path: string, name: string, 
 /**
- * ISO-8601 timestamp string.
+ * ISO-8601 timestamp string of when the writer last opened
+ * this bundle inside BooksForge.
  */
 last_opened: string, 
 /**
  * `true` when the path no longer exists on disk.
  */
-missing: boolean, };
+missing: boolean, 
+/**
+ * ISO-8601 timestamp of the bundle directory's filesystem
+ * mtime. Empty string when the path is missing or unreadable.
+ * Used by the picker to show "edited 3 days ago"-style hints
+ * that survive across `BooksForge.last_opened` (which only
+ * updates on app launch).
+ */
+mtime: string, 
+/**
+ * Count of `scene`-kind nodes inside the project. Zero when
+ * the database can't be queried (missing bundle, locked file,
+ * schema mismatch). Best-effort — never blocks the recents
+ * list from loading.
+ */
+scene_count: number, 
+/**
+ * Total `word_count` summed across all scene nodes. Zero
+ * when the database read fails, same as `scene_count`.
+ */
+word_count: number, };

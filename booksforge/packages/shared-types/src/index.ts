@@ -18,6 +18,7 @@ export type { OpenProjectInput } from "./bindings/OpenProjectInput";
 export type { OpenProjectResult } from "./bindings/OpenProjectResult";
 export type { RecentProjectEntry } from "./bindings/RecentProjectEntry";
 export type { RecentRemoveInput } from "./bindings/RecentRemoveInput";
+export type { RevealInFinderInput } from "./bindings/RevealInFinderInput";
 export type { OllamaProbeResult } from "./bindings/OllamaProbeResult";
 export type { ModelListEntry } from "./bindings/ModelListEntry";
 export type { PullProgressPayload } from "./bindings/PullProgressPayload";

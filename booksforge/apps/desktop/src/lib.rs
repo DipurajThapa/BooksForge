@@ -52,6 +52,7 @@ pub fn run() {
             commands::project::project_close,
             commands::project::project_recent,
             commands::project::project_recent_remove,
+            commands::project::reveal_in_finder,
             commands::editor::node_list,
             commands::editor::node_create,
             commands::editor::node_update,

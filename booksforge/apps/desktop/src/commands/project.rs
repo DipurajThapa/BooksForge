@@ -12,7 +12,7 @@ use booksforge_ipc::{
     project::{
         CreateProjectInput, OpenProjectInput, OpenProjectResult, ProjectBriefDto,
         ProjectBriefSaveInput, ProjectKindSetInput, ProjectKindSetResult, RecentProjectEntry,
-        RecentRemoveInput,
+        RecentRemoveInput, RevealInFinderInput,
     },
     BooksForgeError,
 };
@@ -273,25 +273,100 @@ pub async fn project_close(state: State<'_, AppState>) -> Result<(), BooksForgeE
 
 // ── project_recent ────────────────────────────────────────────────────────────
 
-/// Return the recent-projects list with `missing` flags for stale paths.
+/// Build a `RecentProjectEntry` from a settings row, enriching it
+/// with filesystem mtime + scene/word counts from the bundle's
+/// `project.db` when readable. Best-effort on the enriched fields:
+/// missing or unreadable bundles still return a valid entry, just
+/// with empty/zero values in those slots.
+async fn enrich_recent_entry(e: RecentProject) -> RecentProjectEntry {
+    let path = Path::new(&e.path);
+    let missing = !path.exists();
+    let mtime = if !missing {
+        std::fs::metadata(path)
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339())
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let (scene_count, word_count) = if missing {
+        (0_u32, 0_u32)
+    } else {
+        read_project_stats(path).await.unwrap_or((0, 0))
+    };
+    RecentProjectEntry {
+        id: e.id,
+        name: e.name,
+        last_opened: e.last_opened.to_rfc3339(),
+        missing,
+        path: e.path,
+        mtime,
+        scene_count,
+        word_count,
+    }
+}
+
+/// Read scene_count + word_count from a bundle's `project.db`.
+///
+/// Read-only. Opens its own sqlx connection so it never contends
+/// with an in-app pool, closes on drop. Returns `None` for any
+/// failure (file missing, schema mismatch, locked) so the recents
+/// list never fails to load because a single bundle is broken.
+async fn read_project_stats(bundle_path: &Path) -> Option<(u32, u32)> {
+    let db_path = bundle_path.join("project.db");
+    if !db_path.exists() {
+        return None;
+    }
+    // Use `sqlx::sqlite::SqliteConnectOptions` so we can open
+    // read-only without creating the file if it's missing.
+    use sqlx::sqlite::SqlitePoolOptions;
+    use sqlx::ConnectOptions;
+    let opts = sqlx::sqlite::SqliteConnectOptions::new()
+        .filename(&db_path)
+        .read_only(true)
+        .create_if_missing(false)
+        .disable_statement_logging();
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .acquire_timeout(std::time::Duration::from_millis(500))
+        .connect_with(opts)
+        .await
+        .ok()?;
+    // Two compile-time-unchecked queries because the `nodes` table
+    // schema isn't in this crate's `sqlx` query cache. We rely on
+    // the schema being stable enough that the columns exist; if
+    // they don't, the query errors and we return None.
+    let scene_count: Option<i64> = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM nodes WHERE kind = 'scene'"
+    )
+    .fetch_one(&pool)
+    .await
+    .ok();
+    let word_count: Option<i64> = sqlx::query_scalar::<_, i64>(
+        "SELECT COALESCE(SUM(word_count), 0) FROM nodes WHERE kind = 'scene'"
+    )
+    .fetch_one(&pool)
+    .await
+    .ok();
+    pool.close().await;
+    Some((
+        scene_count.unwrap_or(0).max(0) as u32,
+        word_count.unwrap_or(0).max(0)  as u32,
+    ))
+}
+
+/// Return the recent-projects list with `missing` flags for stale
+/// paths, plus F10 enrichment (mtime + scene_count + word_count).
+/// Enrichment is best-effort per row; a broken bundle never blocks
+/// the rest of the list from loading.
 #[tauri::command]
 pub async fn project_recent() -> Result<Vec<RecentProjectEntry>, BooksForgeError> {
     let settings = settings::load_settings().await.unwrap_or_default();
-    let entries = settings
-        .recent_projects
-        .entries
-        .into_iter()
-        .map(|e| {
-            let missing = !Path::new(&e.path).exists();
-            RecentProjectEntry {
-                id: e.id,
-                name: e.name,
-                last_opened: e.last_opened.to_rfc3339(),
-                missing,
-                path: e.path,
-            }
-        })
-        .collect();
+    let mut entries = Vec::with_capacity(settings.recent_projects.entries.len());
+    for e in settings.recent_projects.entries {
+        entries.push(enrich_recent_entry(e).await);
+    }
     Ok(entries)
 }
 
@@ -311,22 +386,63 @@ pub async fn project_recent_remove(
         .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
 
-    let entries = settings
-        .recent_projects
-        .entries
-        .into_iter()
-        .map(|e| {
-            let missing = !Path::new(&e.path).exists();
-            RecentProjectEntry {
-                id: e.id,
-                name: e.name,
-                last_opened: e.last_opened.to_rfc3339(),
-                missing,
-                path: e.path,
-            }
-        })
-        .collect();
+    let mut entries = Vec::with_capacity(settings.recent_projects.entries.len());
+    for e in settings.recent_projects.entries {
+        entries.push(enrich_recent_entry(e).await);
+    }
     Ok(entries)
+}
+
+// ── reveal_in_finder ─────────────────────────────────────────────────────────
+
+/// Open the host OS file manager with the given path highlighted
+/// (macOS / Windows) or with the parent directory open (Linux, where
+/// the highlight protocol isn't standardised).
+///
+/// Fire-and-forget: we spawn the OS process and return immediately.
+/// We never log or transmit the path — it stays on the device.
+#[tauri::command]
+pub async fn reveal_in_finder(input: RevealInFinderInput) -> Result<(), BooksForgeError> {
+    let p = Path::new(&input.path);
+    if !p.exists() {
+        return Err(BooksForgeError::internal(format!(
+            "Path does not exist: {}",
+            input.path
+        )));
+    }
+    let result: std::io::Result<()> = {
+        #[cfg(target_os = "macos")]
+        {
+            std::process::Command::new("open")
+                .arg("-R")
+                .arg(&input.path)
+                .spawn()
+                .map(|_| ())
+        }
+        #[cfg(target_os = "windows")]
+        {
+            std::process::Command::new("explorer")
+                .arg(format!("/select,{}", input.path))
+                .spawn()
+                .map(|_| ())
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        {
+            // Linux + others: no portable "reveal with selection".
+            // Open the parent directory (or the path itself if it's
+            // already a directory) with xdg-open.
+            let target = if p.is_dir() {
+                p.to_path_buf()
+            } else {
+                p.parent().unwrap_or(p).to_path_buf()
+            };
+            std::process::Command::new("xdg-open")
+                .arg(target)
+                .spawn()
+                .map(|_| ())
+        }
+    };
+    result.map_err(|e| BooksForgeError::internal(format!("reveal failed: {e}")))
 }
 
 // ── project_brief_load / project_brief_save ───────────────────────────────────

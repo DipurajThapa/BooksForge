@@ -109,16 +109,40 @@ pub struct ProjectBriefDto {
 }
 
 /// One row in the recent-projects list (returned by `project_recent`).
+///
+/// Fields below the `missing` flag are additive enhancements
+/// (F10 — 2026-05) so the picker can show real "alive" state per
+/// bundle: filesystem mtime, scene count, total word count. They
+/// default to sensible empty values when the bundle is missing or
+/// the underlying `project.db` can't be read.
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct RecentProjectEntry {
     pub id: String,
     pub path: String,
     pub name: String,
-    /// ISO-8601 timestamp string.
+    /// ISO-8601 timestamp string of when the writer last opened
+    /// this bundle inside BooksForge.
     pub last_opened: String,
     /// `true` when the path no longer exists on disk.
     pub missing: bool,
+    /// ISO-8601 timestamp of the bundle directory's filesystem
+    /// mtime. Empty string when the path is missing or unreadable.
+    /// Used by the picker to show "edited 3 days ago"-style hints
+    /// that survive across `BooksForge.last_opened` (which only
+    /// updates on app launch).
+    #[serde(default)]
+    pub mtime: String,
+    /// Count of `scene`-kind nodes inside the project. Zero when
+    /// the database can't be queried (missing bundle, locked file,
+    /// schema mismatch). Best-effort — never blocks the recents
+    /// list from loading.
+    #[serde(default)]
+    pub scene_count: u32,
+    /// Total `word_count` summed across all scene nodes. Zero
+    /// when the database read fails, same as `scene_count`.
+    #[serde(default)]
+    pub word_count: u32,
 }
 
 /// Input for `project_recent_remove`.  Removes a single entry from
@@ -129,5 +153,17 @@ pub struct RecentProjectEntry {
 pub struct RecentRemoveInput {
     /// Absolute bundle path of the entry to remove (matches the
     /// `path` field returned by `project_recent`).
+    pub path: String,
+}
+
+/// Input for `reveal_in_finder` — opens the host OS's file manager
+/// with the given path highlighted (or its parent on Linux where
+/// the highlight protocol isn't standardised). Used by the recents
+/// list's "Reveal" affordance.
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct RevealInFinderInput {
+    /// Absolute path to reveal. Need not be a `.booksforge/` bundle
+    /// — any existing path works.
     pub path: String,
 }

@@ -76,6 +76,7 @@ pub use ollama::{ModelListEntry, OllamaProbeResult, PullProgressPayload, SmokeTe
 pub use project::{
     CreateProjectInput, OpenProjectInput, OpenProjectResult, ProjectBriefDto,
     ProjectBriefSaveInput, ProjectKindSetInput, ProjectKindSetResult, RecentProjectEntry,
+    RecentRemoveInput, RevealInFinderInput,
 };
 pub use publishing::{
     PlatformReadiness, PrepareForPublishingInput, PrepareForPublishingResult, PublishingMetadata,
@@ -144,6 +145,9 @@ mod ts_bindings {
             .expect("failed to export RecentProjectEntry");
         // Recent-projects management — Remove action in the picker.
         RecentRemoveInput::export_all_to(BINDINGS_DIR).expect("failed to export RecentRemoveInput");
+        // F10 — "Reveal in Finder/Explorer" affordance on the recents list.
+        RevealInFinderInput::export_all_to(BINDINGS_DIR)
+            .expect("failed to export RevealInFinderInput");
         // Phase 4 — book-kind editing post-creation.
         ProjectKindSetInput::export_all_to(BINDINGS_DIR)
             .expect("failed to export ProjectKindSetInput");

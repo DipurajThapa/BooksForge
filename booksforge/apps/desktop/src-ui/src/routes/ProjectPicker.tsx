@@ -87,6 +87,20 @@ export default function ProjectPicker({ onProjectOpened, onNewProject }: Props) 
     }
   }
 
+  async function revealRecent(entry: RecentProjectEntry, ev: React.MouseEvent) {
+    ev.stopPropagation();
+    if (busy || entry.missing) return;
+    try {
+      await ipc.revealInFinder({ path: entry.path });
+    } catch (e) {
+      toast.push({
+        severity: "error",
+        title: "Could not reveal in file manager",
+        body: errorMessage(e),
+      });
+    }
+  }
+
   async function removeRecent(entry: RecentProjectEntry, ev: React.MouseEvent) {
     ev.stopPropagation();
     if (busy) return;
@@ -163,9 +177,35 @@ export default function ProjectPicker({ onProjectOpened, onNewProject }: Props) 
                       <div style={s.recentLeft}>
                         <span style={s.recentName}>{entry.name}</span>
                         <span style={s.recentPath}>{entry.path}</span>
+                        {!entry.missing && (entry.scene_count > 0 || entry.word_count > 0 || entry.mtime) && (
+                          <span style={s.recentMeta}>
+                            {entry.scene_count > 0 && (
+                              <>{entry.scene_count} scene{entry.scene_count === 1 ? "" : "s"}</>
+                            )}
+                            {entry.word_count > 0 && (
+                              <> · {entry.word_count.toLocaleString()} word{entry.word_count === 1 ? "" : "s"}</>
+                            )}
+                            {entry.mtime && (
+                              <> · edited {formatRelative(entry.mtime)}</>
+                            )}
+                          </span>
+                        )}
                       </div>
                       <div style={s.recentRight}>
                         {entry.missing && <span style={s.missingBadge}>missing</span>}
+                        {!entry.missing && (
+                          <button
+                            style={{
+                              ...s.revealBtn,
+                              visibility: isHover ? "visible" : "hidden",
+                            }}
+                            onClick={(e) => revealRecent(entry, e)}
+                            disabled={isBusy}
+                            title="Show this project in your file manager"
+                          >
+                            Reveal
+                          </button>
+                        )}
                         <button
                           style={{
                             ...s.removeBtn,
@@ -187,6 +227,26 @@ export default function ProjectPicker({ onProjectOpened, onNewProject }: Props) 
       </div>
     </div>
   );
+}
+
+/**
+ * F10 — Format an ISO-8601 timestamp as a short relative phrase
+ * ("3 min ago", "2 d ago"). Falls back to the date for anything
+ * older than 30 days so the picker stays scannable across long
+ * gaps between sessions.
+ */
+function formatRelative(iso: string): string {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "";
+  const ms = Date.now() - t;
+  const min = Math.floor(ms / 60_000);
+  if (min < 1)  return "just now";
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24)  return `${hr} h ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day} d ago`;
+  return new Date(t).toLocaleDateString();
 }
 
 const s: Record<string, React.CSSProperties> = {
@@ -259,6 +319,12 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: "var(--font-mono)",
     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
   },
+  // F10 — Per-recent meta line: scene count, word count, edited.
+  recentMeta: {
+    fontSize: 11, color: "var(--color-neutral-600)",
+    fontVariantNumeric: "tabular-nums",
+    marginTop: 2,
+  },
   missingBadge: {
     fontSize: 10, color: "var(--color-red-600, #dc2626)",
     fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em",
@@ -268,6 +334,15 @@ const s: Record<string, React.CSSProperties> = {
   },
   removeBtn: {
     background: "transparent", color: "var(--color-neutral-500)",
+    border: "1px solid var(--color-neutral-300)", borderRadius: 4,
+    fontSize: 11, fontWeight: 500, padding: "4px 10px",
+    cursor: "pointer", fontFamily: "var(--font-ui)",
+  },
+  // F10 — "Reveal in Finder/Explorer" action, only shown for
+  // non-missing entries (so we don't tempt the writer to reveal a
+  // path that doesn't exist).
+  revealBtn: {
+    background: "transparent", color: "var(--color-neutral-700)",
     border: "1px solid var(--color-neutral-300)", borderRadius: 4,
     fontSize: 11, fontWeight: 500, padding: "4px 10px",
     cursor: "pointer", fontFamily: "var(--font-ui)",

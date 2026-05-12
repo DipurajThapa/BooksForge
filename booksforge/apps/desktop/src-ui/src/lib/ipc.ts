@@ -121,6 +121,7 @@ import type {
   OutlineRunResult,
   RecentProjectEntry,
   RecentRemoveInput,
+  RevealInFinderInput,
   RecoveryStatus,
   RunOutlineInput,
   SceneLoadResult,
@@ -301,6 +302,14 @@ export const ipc = {
    */
   projectRecentRemove(input: RecentRemoveInput): Promise<RecentProjectEntry[]> {
     return invoke("project_recent_remove", { input });
+  },
+  /**
+   * F10 — Open the host OS file manager with the given path
+   * highlighted (macOS Finder, Windows Explorer) or with its
+   * parent open (Linux). Fire-and-forget; resolves to void.
+   */
+  revealInFinder(input: RevealInFinderInput): Promise<void> {
+    return invoke("reveal_in_finder", { input });
   },
 
   // ── Document tree (nodes) ─────────────────────────────────────────────────
