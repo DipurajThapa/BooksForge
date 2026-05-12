@@ -232,11 +232,28 @@ export default function Stage8_Drafting({ project, onChanged, onSwitchToManuscri
                 </div>
               )}
 
-              {draftedScenes > 0 && (
+              {draftedScenes > 0 && draftedScenes < sceneCount && (
+                <div style={s.bannerResume}>
+                  <b>Resume drafting.</b> {draftedScenes} of {sceneCount} scenes
+                  are already drafted ({chapterCount} chapters total). With
+                  "Skip already drafted" on (default), this run will only
+                  touch the remaining <b>{sceneCount - draftedScenes}</b>.
+                </div>
+              )}
+              {draftedScenes === 0 && sceneCount > 0 && (
                 <div style={s.bannerNote}>
-                  This project has <b>{draftedScenes} of {sceneCount} scenes
-                  </b> already drafted ({chapterCount} chapters total).
-                  By default we skip those.
+                  Estimated time:{" "}
+                  <b>{formatEtaRange(sceneCount, hasCharBible, hasWorldBible)}</b>
+                  {" "}for {sceneCount} scenes
+                  {(!hasCharBible || !hasWorldBible) && " (includes bibles)"}.
+                  Use "Max scenes this run" to test on a chapter first.
+                </div>
+              )}
+              {draftedScenes > 0 && draftedScenes < sceneCount && skipAlreadyDrafted && (
+                <div style={s.bannerNote}>
+                  Estimated time to finish:{" "}
+                  <b>{formatEtaRange(sceneCount - draftedScenes, hasCharBible, hasWorldBible)}</b>
+                  {" "}for the {sceneCount - draftedScenes} remaining scenes.
                 </div>
               )}
 
@@ -274,7 +291,9 @@ export default function Stage8_Drafting({ project, onChanged, onSwitchToManuscri
 
               <div style={s.actionsRow}>
                 <button style={s.primaryBtn} onClick={startPipeline}>
-                  ✨ Run pipeline
+                  {draftedScenes > 0 && draftedScenes < sceneCount && skipAlreadyDrafted
+                    ? `✨ Resume drafting (${sceneCount - draftedScenes} scenes)`
+                    : "✨ Run pipeline"}
                 </button>
               </div>
             </div>
@@ -299,8 +318,12 @@ export default function Stage8_Drafting({ project, onChanged, onSwitchToManuscri
               <div style={s.runStatus} role="status" aria-live="polite">
                 <span style={s.spinner} aria-hidden="true" />
                 <p style={s.muted}>
-                  Cancel via the Live Run overlay (when wired). Already-applied
-                  bibles + scenes are preserved on cancel.
+                  Pipeline cancellation isn't wired through yet — the
+                  pipeline doesn't emit a run_id the frontend can target.
+                  If you need to stop mid-flight, quit the app; everything
+                  already written to the bundle is preserved, and the next
+                  run resumes from the last completed scene
+                  (Skip already drafted = on by default).
                 </p>
               </div>
               <ul style={s.stageList}>
@@ -444,6 +467,33 @@ function formatElapsed(ms: number): string {
   return `${m}m ${s_.toString().padStart(2, "0")}s`;
 }
 
+/**
+ * F6 — Up-front ETA estimate for the drafting pipeline.
+ *
+ * Wall-clock per scene on the Heavy tier (qwen3.6:latest) is
+ * roughly 5–15 min per the panel's own existing copy. Each missing
+ * bible adds ~2–4 min on the Medium tier. We surface a range
+ * rather than a point estimate because hardware + scene length
+ * dominate the variance.
+ */
+function formatEtaRange(sceneCount: number, hasCharBible: boolean, hasWorldBible: boolean): string {
+  const minPerScene = 5;   // optimistic floor
+  const maxPerScene = 15;  // pessimistic ceiling
+  let minMinutes = sceneCount * minPerScene;
+  let maxMinutes = sceneCount * maxPerScene;
+  if (!hasCharBible)  { minMinutes += 2; maxMinutes += 4; }
+  if (!hasWorldBible) { minMinutes += 2; maxMinutes += 3; }
+  return `${formatMinutes(minMinutes)} – ${formatMinutes(maxMinutes)}`;
+}
+
+function formatMinutes(total: number): string {
+  if (total < 60) return `${total}m`;
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
 // Inject spinner keyframes once (HMR-safe).
 if (typeof document !== "undefined" && !document.getElementById("bf-stage8-anim")) {
   const styleEl = document.createElement("style");
@@ -514,6 +564,15 @@ const s: Record<string, React.CSSProperties> = {
     border: "1px solid var(--color-neutral-200)",
     borderRadius: 4,
     fontSize: 12, color: "var(--color-neutral-700)", lineHeight: 1.6,
+  },
+  // F6 — Resume-mode banner: amber-tinted to signal the writer is
+  // mid-flight and the pipeline will pick up where it left off.
+  bannerResume: {
+    padding: "10px 14px",
+    background: "var(--color-amber-50, #fffbeb)",
+    border: "1px solid var(--color-amber-300, #fcd34d)",
+    borderRadius: 6,
+    fontSize: 13, color: "var(--color-amber-700, #b45309)", lineHeight: 1.6,
   },
   stagePreview: {
     margin: 0, paddingLeft: 24,
