@@ -18,14 +18,14 @@
     "@booksforge/shared-types": "workspace:*",
     "@tauri-apps/api": "^2.2.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
-    "react": "^18.3.1",
+    "react": "^19.2.6",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@axe-core/react": "^4.10.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.0.1",
-    "@types/react": "^18.3.1",
+    "@types/react": "^19.2.14",
     "@types/react-dom": "^18.3.1",
     "@tauri-apps/cli": "^2.2.0",
     "@vitejs/plugin-react": "^4.3.1",
