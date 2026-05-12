@@ -89,6 +89,7 @@ fn node_to_info(node: Node) -> NodeInfo {
         pov: node.pov,
         beat: node.beat,
         target_words: node.target_words,
+        synopsis: node.synopsis,
         word_count: 0,
         created_at: node.created_at.to_rfc3339(),
         updated_at: node.updated_at.to_rfc3339(),
@@ -184,6 +185,7 @@ pub async fn node_create(
         pov: None,
         beat: None,
         target_words: input.target_words,
+        synopsis: None,
         created_at: now,
         updated_at: now,
         deleted_at: None,
@@ -240,6 +242,12 @@ pub async fn node_update(
     }
     if let Some(tw) = input.target_words {
         node.target_words = Some(tw);
+    }
+    if let Some(syn) = input.synopsis {
+        // Treat an empty-string patch as "clear the synopsis" so
+        // the OutlineView's blur-to-save flow can wipe a value
+        // without needing a separate Option<Option<_>> payload.
+        node.synopsis = if syn.is_empty() { None } else { Some(syn) };
     }
     node.updated_at = Utc::now();
 

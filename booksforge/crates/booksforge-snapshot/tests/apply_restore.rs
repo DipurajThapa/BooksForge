@@ -59,6 +59,7 @@ fn make_scene(node_id: Ulid, title: &str) -> Node {
         pov: None,
         beat: None,
         target_words: None,
+        synopsis: None,
         created_at: now,
         updated_at: now,
         deleted_at: None,

@@ -3,4 +3,14 @@
 /**
  * Input for `node_update` (partial — only mutable fields).
  */
-export type NodeUpdateInput = { id: string, title: string | null, position: string | null, status: string | null, pov: string | null, beat: string | null, target_words: number | null, };
+export type NodeUpdateInput = { id: string, title: string | null, position: string | null, status: string | null, pov: string | null, beat: string | null, target_words: number | null, 
+/**
+ * Optional synopsis patch. `None` (or omitted) leaves the
+ * stored synopsis unchanged. `Some(s)` writes `s`. To clear
+ * the synopsis explicitly, send an empty string for now —
+ * the OutlineView treats `Some("")` as cleared so the writer
+ * can blank the field via the input. A full Option<Option<_>>
+ * "patch" payload can come later if anyone needs the
+ * distinction between "unchanged" and "cleared to NULL".
+ */
+synopsis: string | null, };

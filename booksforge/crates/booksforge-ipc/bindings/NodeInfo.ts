@@ -11,4 +11,10 @@ kind: string, title: string, position: string,
 /**
  * `"planned"` | `"drafting"` | `"revised"` | `"final"`
  */
-status: string, pov: string | null, beat: string | null, target_words: number | null, word_count: number, created_at: string, updated_at: string, };
+status: string, pov: string | null, beat: string | null, target_words: number | null, 
+/**
+ * Short writer-facing description (added 2026-05 for the
+ * OutlineView sidebar). Optional; null for never-set rows.
+ * Defaulted via serde so old clients still deserialise.
+ */
+synopsis: string | null, word_count: number, created_at: string, updated_at: string, };

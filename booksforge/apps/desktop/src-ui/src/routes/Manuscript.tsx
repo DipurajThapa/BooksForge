@@ -186,6 +186,7 @@ export default function Manuscript({ project, initialSceneId, onSwitchToJourney 
         pov:          null,
         beat:         null,
         target_words: null,
+        synopsis:     null,
       });
       toast.push({ severity: "success", body: `Renamed to "${newTitle}".` });
     } catch (e) {

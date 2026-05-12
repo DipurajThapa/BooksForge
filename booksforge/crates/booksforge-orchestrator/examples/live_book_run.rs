@@ -136,6 +136,7 @@ async fn main() {
             pov: Some(CHAPTER_POV.into()),
             beat: None,
             target_words: Some(TARGET_WORDS),
+            synopsis: None,
             created_at: now,
             updated_at: now,
             deleted_at: None,

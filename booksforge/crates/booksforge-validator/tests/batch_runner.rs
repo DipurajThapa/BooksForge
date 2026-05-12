@@ -29,6 +29,7 @@ fn node(id: Ulid, parent: Option<Ulid>, kind: NodeKind, title: &str) -> Node {
         pov: None,
         beat: None,
         target_words: None,
+        synopsis: None,
         created_at: now,
         updated_at: now,
         deleted_at: None,

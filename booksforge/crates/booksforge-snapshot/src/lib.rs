@@ -434,6 +434,7 @@ fn entry_to_node(entry: &TreeEntry) -> Result<Node, SnapshotError> {
         pov: entry.pov.clone(),
         beat: entry.beat.clone(),
         target_words: entry.target_words,
+        synopsis: None,
         created_at: Utc::now(),
         updated_at: Utc::now(),
         deleted_at: None,

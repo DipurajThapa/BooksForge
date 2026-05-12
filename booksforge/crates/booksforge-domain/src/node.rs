@@ -53,6 +53,14 @@ pub struct Node {
     pub pov: Option<String>,
     pub beat: Option<String>,
     pub target_words: Option<u32>,
+    /// Short writer-facing description of this node. Surfaced in the
+    /// OutlineView sidebar so writers can scan / bulk-edit summaries
+    /// without entering each scene's prose. None for never-set;
+    /// distinct from `Some("")` which is "explicitly cleared but
+    /// stored as empty" (the IPC update layer treats both the same
+    /// for now).
+    #[serde(default)]
+    pub synopsis: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,

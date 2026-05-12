@@ -58,6 +58,7 @@ fn make_node(id: Ulid, parent: Option<Ulid>, kind: NodeKind, title: &str, positi
         pov: None,
         beat: None,
         target_words: None,
+        synopsis: None,
         created_at: now,
         updated_at: now,
         deleted_at: None,

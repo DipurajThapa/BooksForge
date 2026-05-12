@@ -159,6 +159,7 @@ async fn setup(ollama: Arc<dyn OllamaClient>) -> Harness {
             pov: None,
             beat: None,
             target_words: None,
+            synopsis: None,
             created_at: now,
             updated_at: now,
             deleted_at: None,

@@ -104,7 +104,8 @@ impl StorageRepository for SqliteStorage {
         let rows = sqlx::query!(
             r#"
             SELECT id, parent_id, kind, title, position, status,
-                   pov, beat, target_words, created_at, updated_at, deleted_at
+                   pov, beat, target_words, synopsis,
+                   created_at, updated_at, deleted_at
             FROM nodes
             WHERE deleted_at IS NULL
             ORDER BY position ASC
@@ -125,6 +126,7 @@ impl StorageRepository for SqliteStorage {
                     pov: r.pov,
                     beat: r.beat,
                     target_words: r.target_words.map(|v| v as u32),
+                    synopsis: r.synopsis,
                     created_at: str_to_ts(&r.created_at)?,
                     updated_at: str_to_ts(&r.updated_at)?,
                     deleted_at: r.deleted_at.as_deref().map(str_to_ts).transpose()?,
@@ -144,8 +146,8 @@ impl StorageRepository for SqliteStorage {
             r#"
             INSERT INTO nodes
                 (id, parent_id, kind, title, position, status,
-                 pov, beat, target_words, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 pov, beat, target_words, synopsis, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             id,
             parent_id,
@@ -156,6 +158,7 @@ impl StorageRepository for SqliteStorage {
             node.pov,
             node.beat,
             node.target_words,
+            node.synopsis,
             created,
             updated,
         )
@@ -180,8 +183,8 @@ impl StorageRepository for SqliteStorage {
                 r#"
                 INSERT INTO nodes
                     (id, parent_id, kind, title, position, status,
-                     pov, beat, target_words, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     pov, beat, target_words, synopsis, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 "#,
                 id,
                 parent_id,
@@ -192,6 +195,7 @@ impl StorageRepository for SqliteStorage {
                 node.pov,
                 node.beat,
                 node.target_words,
+                node.synopsis,
                 created,
                 updated,
             )
@@ -213,8 +217,8 @@ impl StorageRepository for SqliteStorage {
             r#"
             INSERT INTO nodes
                 (id, parent_id, kind, title, position, status,
-                 pov, beat, target_words, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 pov, beat, target_words, synopsis, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 parent_id    = excluded.parent_id,
                 kind         = excluded.kind,
@@ -224,6 +228,7 @@ impl StorageRepository for SqliteStorage {
                 pov          = excluded.pov,
                 beat         = excluded.beat,
                 target_words = excluded.target_words,
+                synopsis     = excluded.synopsis,
                 updated_at   = excluded.updated_at,
                 deleted_at   = NULL
             "#,
@@ -236,6 +241,7 @@ impl StorageRepository for SqliteStorage {
             node.pov,
             node.beat,
             node.target_words,
+            node.synopsis,
             created,
             updated,
         )
@@ -252,7 +258,7 @@ impl StorageRepository for SqliteStorage {
             r#"
             UPDATE nodes
             SET title = ?, position = ?, status = ?,
-                pov = ?, beat = ?, target_words = ?,
+                pov = ?, beat = ?, target_words = ?, synopsis = ?,
                 updated_at = ?
             WHERE id = ?
             "#,
@@ -262,6 +268,7 @@ impl StorageRepository for SqliteStorage {
             node.pov,
             node.beat,
             node.target_words,
+            node.synopsis,
             updated,
             id,
         )
@@ -1176,7 +1183,8 @@ impl StorageRepository for SqliteStorage {
             let node_rows = sqlx::query!(
                 r#"
                 SELECT id, parent_id, kind, title, position, status,
-                       pov, beat, target_words, created_at, updated_at, deleted_at
+                       pov, beat, target_words, synopsis,
+                       created_at, updated_at, deleted_at
                 FROM nodes
                 WHERE deleted_at IS NULL
                 ORDER BY position ASC
@@ -1198,6 +1206,7 @@ impl StorageRepository for SqliteStorage {
                         pov: r.pov,
                         beat: r.beat,
                         target_words: r.target_words.map(|v| v as u32),
+                        synopsis: r.synopsis,
                         created_at: str_to_ts(&r.created_at)?,
                         updated_at: str_to_ts(&r.updated_at)?,
                         deleted_at: r.deleted_at.as_deref().map(str_to_ts).transpose()?,

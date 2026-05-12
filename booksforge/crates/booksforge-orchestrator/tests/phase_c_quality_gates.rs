@@ -72,6 +72,7 @@ async fn setup(mock: Arc<MockOllamaClient>) -> Harness {
             pov: None,
             beat: None,
             target_words: None,
+            synopsis: None,
             created_at: now,
             updated_at: now,
             deleted_at: None,

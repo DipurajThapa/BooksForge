@@ -20,6 +20,11 @@ pub struct NodeInfo {
     pub pov: Option<String>,
     pub beat: Option<String>,
     pub target_words: Option<u32>,
+    /// Short writer-facing description (added 2026-05 for the
+    /// OutlineView sidebar). Optional; null for never-set rows.
+    /// Defaulted via serde so old clients still deserialise.
+    #[serde(default)]
+    pub synopsis: Option<String>,
     pub word_count: u32,
     pub created_at: String,
     pub updated_at: String,
@@ -49,6 +54,15 @@ pub struct NodeUpdateInput {
     pub pov: Option<String>,
     pub beat: Option<String>,
     pub target_words: Option<u32>,
+    /// Optional synopsis patch. `None` (or omitted) leaves the
+    /// stored synopsis unchanged. `Some(s)` writes `s`. To clear
+    /// the synopsis explicitly, send an empty string for now —
+    /// the OutlineView treats `Some("")` as cleared so the writer
+    /// can blank the field via the input. A full Option<Option<_>>
+    /// "patch" payload can come later if anyone needs the
+    /// distinction between "unchanged" and "cleared to NULL".
+    #[serde(default)]
+    pub synopsis: Option<String>,
 }
 
 // ── Scene content types ───────────────────────────────────────────────────────
