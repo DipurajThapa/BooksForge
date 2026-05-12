@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import type { OpenProjectResult } from "@booksforge/shared-types";
 import { ipc } from "../lib/ipc";
 import { errorMessage } from "../lib/errorMessage";
+import { useToast } from "../components/ToastProvider";
 
 // Mirror of `booksforge_domain::ReaderExpectationMap`. Hand-typed
 // because we carry it as a JSON string in `proposal_json`.
@@ -41,6 +42,9 @@ type MapState =
 interface Props {
   project:    OpenProjectResult;
   onChanged?: () => void;
+  /** F5 — Called by "Save & continue" after a successful save so the
+   *  StageRail advances to the next stage. Optional. */
+  onAdvance?: () => void;
 }
 
 interface AudienceForm {
@@ -60,7 +64,7 @@ const EMPTY: AudienceForm = {
   forbidden_tropes:       "",
 };
 
-export default function Stage2_Audience({ project, onChanged }: Props) {
+export default function Stage2_Audience({ project, onChanged, onAdvance }: Props) {
   void project;
   const [form,         setForm]         = useState<AudienceForm>(EMPTY);
   const [loading,      setLoading]      = useState(true);
@@ -69,6 +73,7 @@ export default function Stage2_Audience({ project, onChanged }: Props) {
   const [error,        setError]        = useState<string | null>(null);
   const [savedHint,    setSavedHint]    = useState<string | null>(null);
   const [mapState,     setMapState]     = useState<MapState>({ kind: "idle", map: null });
+  const toast = useToast();
 
   // Load both the brief AND any existing audience_map on mount.
   useEffect(() => {
@@ -141,11 +146,15 @@ export default function Stage2_Audience({ project, onChanged }: Props) {
    */
   async function handleGenerateMap() {
     if (!loaded) {
-      setError("Save the brief first (Stage 1 → Book Setup).");
+      const msg = "Save the brief first (Stage 1 → Book Setup).";
+      setError(msg);
+      toast.push({ severity: "warning", body: msg });
       return;
     }
     // Save audience-form changes first so the agent sees them.
-    try { await handleSave(); } catch { return; }
+    // handleSave returns false on failure and already surfaces a toast.
+    const ok = await handleSave();
+    if (!ok) return;
     setMapState({ kind: "running", startedAt: Date.now() });
     try {
       const r = await ipc.agentRunAudienceMapper({
@@ -167,10 +176,17 @@ export default function Stage2_Audience({ project, onChanged }: Props) {
     }
   }
 
-  async function handleSave() {
+  /**
+   * Returns true on success, false on failure. Errors surface via
+   * toast so the writer notices even after they've scrolled past
+   * the inline banner.
+   */
+  async function handleSave(): Promise<boolean> {
     if (!form._fullBrief) {
-      setError("Cannot save — the brief hasn't loaded. Visit Stage 1 first.");
-      return;
+      const msg = "Cannot save — the brief hasn't loaded. Visit Stage 1 first.";
+      setError(msg);
+      toast.push({ severity: "warning", body: msg });
+      return false;
     }
     setSaving(true); setError(null);
     try {
@@ -190,10 +206,33 @@ export default function Stage2_Audience({ project, onChanged }: Props) {
       setForm((f) => ({ ...f, _fullBrief: r.brief_json as Record<string, unknown> }));
       setSavedHint("Audience map saved. Every agent run after this picks up the new values.");
       onChanged?.();
+      return true;
     } catch (e) {
-      setError(errorMessage(e));
+      const msg = errorMessage(e);
+      setError(msg);
+      toast.push({
+        severity: "error",
+        title: "Audience save failed",
+        body: msg,
+      });
+      return false;
     } finally {
       setSaving(false);
+    }
+  }
+
+  /**
+   * F5 — Save the audience map and advance to Stage 3 (Bibles) on
+   * success. Stays on this stage if the save fails.
+   */
+  async function handleSaveAndContinue() {
+    const ok = await handleSave();
+    if (ok) {
+      toast.push({
+        severity: "success",
+        body: "Audience saved. Next: Bibles (optional).",
+      });
+      onAdvance?.();
     }
   }
 
@@ -322,11 +361,20 @@ export default function Stage2_Audience({ project, onChanged }: Props) {
 
             <div style={s.actionsRow}>
               <button
-                style={{ ...s.primaryBtn, ...(saving ? s.primaryBtnBusy : {}) }}
-                onClick={handleSave}
+                style={s.ghostBtn}
+                onClick={() => { void handleSave(); }}
                 disabled={saving || !loaded}
+                title="Save without leaving this stage"
               >
-                {saving ? "Saving…" : "Save audience map"}
+                {saving ? "Saving…" : "Save"}
+              </button>
+              <button
+                style={{ ...s.primaryBtn, ...(saving ? s.primaryBtnBusy : {}) }}
+                onClick={handleSaveAndContinue}
+                disabled={saving || !loaded}
+                title="Save the audience map and move to Stage 3 — Bibles"
+              >
+                {saving ? "Saving…" : "Save & continue →"}
               </button>
             </div>
 
@@ -577,6 +625,13 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: "var(--font-ui)",
   },
   primaryBtnBusy: { opacity: 0.7, cursor: "wait" },
+  ghostBtn: {
+    padding: "10px 16px",
+    background: "transparent", color: "var(--color-neutral-700)",
+    border: "1px solid var(--color-neutral-300)", borderRadius: 5,
+    fontSize: 13, fontWeight: 500, cursor: "pointer",
+    fontFamily: "var(--font-ui)",
+  },
   code: {
     fontFamily: "var(--font-mono)", fontSize: 11,
     padding: "1px 4px",
