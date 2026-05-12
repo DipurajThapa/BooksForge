@@ -31,10 +31,11 @@ import type {
   OpenProjectResult,
   SceneLoadResult,
 } from "@booksforge/shared-types";
-import Binder from "../components/Binder";
+import Binder, { type BinderHandle } from "../components/Binder";
 import { ipc } from "../lib/ipc";
 import { errorMessage } from "../lib/errorMessage";
 import { useToast } from "../components/ToastProvider";
+import { useShortcut } from "../lib/keymap";
 
 interface Props {
   project:          OpenProjectResult;
@@ -169,12 +170,51 @@ export default function Manuscript({ project, initialSceneId, onSwitchToJourney 
     [nodes, selectedSceneId],
   );
 
+  // F8 — Inline rename handler. Backend uses `nodeUpdate`; we update
+  // local state optimistically so the binder reflects the new title
+  // even before the IPC settles. Errors surface via toast.
+  const handleRename = useCallback(async (id: string, newTitle: string) => {
+    setNodes((prev) => prev.map((n) => (
+      n.id === id ? { ...n, title: newTitle } : n
+    )));
+    try {
+      await ipc.nodeUpdate({
+        id,
+        title:        newTitle,
+        position:     null,
+        status:       null,
+        pov:          null,
+        beat:         null,
+        target_words: null,
+      });
+      toast.push({ severity: "success", body: `Renamed to "${newTitle}".` });
+    } catch (e) {
+      // Roll back local state — refetch from source of truth.
+      try {
+        const fresh = await ipc.nodeList();
+        setNodes(fresh);
+      } catch { /* ignore — keep the optimistic value */ }
+      toast.push({
+        severity: "error",
+        title: "Rename failed",
+        body: errorMessage(e),
+      });
+    }
+  }, [toast]);
+
+  // F8 — Imperative handle for the binder so the focus shortcut
+  // (mod+1) can ask it to focus the first row.
+  const binderRef = useRef<BinderHandle>(null);
+  useShortcut("binder.focus", () => binderRef.current?.focusFirstRow());
+
   return (
     <div style={s.shell}>
       <Binder
+        ref={binderRef}
         nodes={nodes}
         selectedSceneId={selectedSceneId}
         onSelectScene={setSelectedSceneId}
+        onRenameNode={handleRename}
       />
 
       <main style={s.editorPane}>

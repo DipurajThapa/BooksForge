@@ -25,13 +25,28 @@
  * That keeps the "Orchestrator is the only mutator" rule alive on
  * the UI side and lets a single owner refresh the tree after IPC.
  */
-import { useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import type { NodeInfo } from "@booksforge/shared-types";
+
+/** F8 — Imperative handle exposed to the parent route (Manuscript)
+ *  so a keyboard shortcut can focus the first row in the binder
+ *  without the parent having to manage DOM refs itself. */
+export interface BinderHandle {
+  /** Move keyboard focus to the first visible row. No-op if the
+   *  tree is empty. */
+  focusFirstRow(): void;
+}
 
 interface Props {
   nodes:            NodeInfo[];
   selectedSceneId:  string | null;
   onSelectScene:    (id: string) => void;
+  /** F8 — Optional rename handler. Called when the writer commits
+   *  an inline rename (Enter key or input blur). Returns the
+   *  IPC promise so the binder can show a transient state. If
+   *  omitted, rename UI is hidden. */
+  onRenameNode?:    (id: string, newTitle: string) => Promise<void>;
 }
 
 interface TreeNode {
@@ -69,7 +84,10 @@ function sumWords(node: TreeNode): number {
   return node.children.reduce((acc, c) => acc + sumWords(c), 0);
 }
 
-export default function Binder({ nodes, selectedSceneId, onSelectScene }: Props) {
+const Binder = forwardRef<BinderHandle, Props>(function Binder(
+  { nodes, selectedSceneId, onSelectScene, onRenameNode },
+  ref,
+) {
   const tree = useMemo(() => buildTree(nodes), [nodes]);
 
   // Local expand state per node id. Default: parts open, chapters open
@@ -84,12 +102,28 @@ export default function Binder({ nodes, selectedSceneId, onSelectScene }: Props)
     });
   }
 
+  // F8 — Rename state lifted into the parent so any descendant row
+  // can enter rename mode and the others stay read-only.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+
+  // F8 — DOM ref to the binder nav so the imperative handle can find
+  // the first focusable row.
+  const navRef = useRef<HTMLElement>(null);
+  useImperativeHandle(ref, () => ({
+    focusFirstRow() {
+      const first = navRef.current?.querySelector<HTMLButtonElement>(
+        "button[data-binder-row]"
+      );
+      first?.focus();
+    },
+  }), []);
+
   // Find the project root (kind === "project") to anchor the heading.
   const projectRoot = tree.find((t) => t.info.kind === "project");
   const topLevel = projectRoot ? projectRoot.children : tree;
 
   return (
-    <nav style={s.binder} aria-label="Manuscript binder">
+    <nav style={s.binder} aria-label="Manuscript binder" ref={navRef}>
       <h2 style={s.heading}>Binder</h2>
       <ol style={s.list}>
         {topLevel.length === 0 ? (
@@ -107,32 +141,49 @@ export default function Binder({ nodes, selectedSceneId, onSelectScene }: Props)
               collapsed={collapsed}
               onToggle={toggle}
               onSelect={onSelectScene}
+              renamingId={renamingId}
+              onStartRename={onRenameNode ? setRenamingId : undefined}
+              onCommitRename={onRenameNode}
+              onCancelRename={() => setRenamingId(null)}
             />
           ))
         )}
       </ol>
     </nav>
   );
-}
+});
 
-function BinderRow({
-  node, depth, selectedSceneId, collapsed, onToggle, onSelect,
-}: {
+export default Binder;
+
+interface BinderRowProps {
   node:             TreeNode;
   depth:            number;
   selectedSceneId:  string | null;
   collapsed:        Set<string>;
   onToggle:         (id: string) => void;
   onSelect:         (id: string) => void;
-}) {
+  // F8 — rename plumbing (all optional; when omitted, rows are not renamable)
+  renamingId?:      string | null;
+  onStartRename?:   (id: string) => void;
+  onCommitRename?:  (id: string, newTitle: string) => Promise<void>;
+  onCancelRename?:  () => void;
+}
+
+function BinderRow(props: BinderRowProps) {
+  const {
+    node, depth, selectedSceneId, collapsed, onToggle, onSelect,
+    renamingId, onStartRename, onCommitRename, onCancelRename,
+  } = props;
   const { info, children } = node;
   const isScene    = info.kind === "scene";
   const isExpanded = !collapsed.has(info.id);
   const isSelected = isScene && info.id === selectedSceneId;
   const hasChildren = children.length > 0;
   const wordRollup = isScene ? info.word_count : sumWords(node);
+  const isRenaming = renamingId === info.id;
 
   function handleClick() {
+    if (isRenaming) return; // ignore row clicks while editing the title
     if (isScene) {
       onSelect(info.id);
     } else if (hasChildren) {
@@ -140,30 +191,54 @@ function BinderRow({
     }
   }
 
+  function handleDoubleClick(e: ReactMouseEvent) {
+    // F8 — Double-click any row to rename. The handler is wired only
+    // when the parent passes `onStartRename`; otherwise nothing happens.
+    if (!onStartRename) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onStartRename(info.id);
+  }
+
   return (
     <li>
-      <button
-        style={{
-          ...s.row,
-          ...(isSelected ? s.rowSelected : {}),
-          paddingLeft: 8 + depth * 14,
-        }}
-        onClick={handleClick}
-        aria-expanded={hasChildren ? isExpanded : undefined}
-        aria-current={isSelected ? "page" : undefined}
-        title={isScene ? info.title : `${info.title} — ${wordRollup.toLocaleString()} words`}
-      >
-        <span style={s.disclosure} aria-hidden="true">
-          {hasChildren ? (isExpanded ? "▾" : "▸") : ""}
-        </span>
-        {isScene && (
-          <span style={statusDotStyle(info.status)} aria-hidden="true" />
-        )}
-        <span style={s.label}>{info.title || untitledLabel(info.kind)}</span>
-        {wordRollup > 0 && (
-          <span style={s.wordCount}>{wordRollup.toLocaleString()}</span>
-        )}
-      </button>
+      {isRenaming && onCommitRename && onCancelRename ? (
+        <RenameInput
+          initial={info.title || untitledLabel(info.kind)}
+          depth={depth}
+          onCommit={(next) => onCommitRename(info.id, next).finally(onCancelRename)}
+          onCancel={onCancelRename}
+        />
+      ) : (
+        <button
+          data-binder-row=""
+          style={{
+            ...s.row,
+            ...(isSelected ? s.rowSelected : {}),
+            paddingLeft: 8 + depth * 14,
+          }}
+          onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
+          aria-expanded={hasChildren ? isExpanded : undefined}
+          aria-current={isSelected ? "page" : undefined}
+          title={
+            isScene
+              ? `${info.title}${onStartRename ? " · double-click to rename" : ""}`
+              : `${info.title} — ${wordRollup.toLocaleString()} words${onStartRename ? " · double-click to rename" : ""}`
+          }
+        >
+          <span style={s.disclosure} aria-hidden="true">
+            {hasChildren ? (isExpanded ? "▾" : "▸") : ""}
+          </span>
+          {isScene && (
+            <span style={statusDotStyle(info.status)} aria-hidden="true" />
+          )}
+          <span style={s.label}>{info.title || untitledLabel(info.kind)}</span>
+          {wordRollup > 0 && (
+            <span style={s.wordCount}>{wordRollup.toLocaleString()}</span>
+          )}
+        </button>
+      )}
       {hasChildren && isExpanded && (
         <ol style={s.list}>
           {children.map((c) => (
@@ -175,11 +250,68 @@ function BinderRow({
               collapsed={collapsed}
               onToggle={onToggle}
               onSelect={onSelect}
+              renamingId={renamingId}
+              onStartRename={onStartRename}
+              onCommitRename={onCommitRename}
+              onCancelRename={onCancelRename}
             />
           ))}
         </ol>
       )}
     </li>
+  );
+}
+
+/**
+ * F8 — Inline rename input rendered in place of a binder row. Auto-
+ * focuses on mount, selects all text so the writer can type-replace,
+ * commits on Enter / blur, cancels on Escape.
+ *
+ * Empty / whitespace-only titles are NOT committed (the row keeps
+ * its old title); use Cancel for "I didn't mean to start renaming".
+ */
+function RenameInput({
+  initial, depth, onCommit, onCancel,
+}: {
+  initial:   string;
+  depth:     number;
+  onCommit:  (next: string) => void;
+  onCancel:  () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Track whether we already committed so a stray blur after Enter
+  // doesn't re-fire the IPC.
+  const committedRef = useRef(false);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+
+  function commit() {
+    if (committedRef.current) return;
+    const trimmed = value.trim();
+    if (trimmed.length === 0 || trimmed === initial) {
+      onCancel();
+      return;
+    }
+    committedRef.current = true;
+    onCommit(trimmed);
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      style={{ ...s.renameInput, marginLeft: 8 + depth * 14 }}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter")  { e.preventDefault(); commit(); }
+        if (e.key === "Escape") { e.preventDefault(); onCancel(); }
+      }}
+      onBlur={commit}
+    />
   );
 }
 
@@ -249,6 +381,22 @@ const s: Record<string, React.CSSProperties> = {
     background: "var(--color-amber-50, #fffbeb)",
     color: "var(--color-amber-700, #b45309)",
     fontWeight: 600,
+  },
+  // F8 — Inline rename input style: matches the row's text size and
+  // sits in the same horizontal track so it doesn't visually jump.
+  renameInput: {
+    display: "block",
+    boxSizing: "border-box",
+    width: "calc(100% - 24px)",
+    margin: "4px 12px 4px 0",
+    padding: "4px 8px",
+    border: "1px solid var(--color-amber-500, #f59e0b)",
+    borderRadius: 3,
+    background: "#fff",
+    color: "var(--color-neutral-900)",
+    fontFamily: "var(--font-ui)",
+    fontSize: 13,
+    outline: "none",
   },
   disclosure: {
     width: 12,
