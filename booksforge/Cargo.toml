@@ -158,7 +158,7 @@ proptest = "1.5"
 # EPUB packaging — deterministic ZIP construction.  No additional features
 # beyond the defaults; we want reproducible builds so we control the
 # datetime + compression manually.
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "8", default-features = false, features = ["deflate"] }
 
 # ── profile tweaks ───────────────────────────────────────────────────────────
 [profile.dev]
