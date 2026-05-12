@@ -17,6 +17,8 @@ import type { OpenProjectResult } from "@booksforge/shared-types";
 import { ipc } from "../lib/ipc";
 import { errorMessage } from "../lib/errorMessage";
 import { useToast } from "../components/ToastProvider";
+import { AxisBar, AXIS_FLOOR, COMPOSITE_THRESHOLD } from "../components/AxisBar";
+import { ScoreSummary, EditsList } from "../components/ScorePanel";
 
 // Mirror of `booksforge_domain::ConceptScoreProposal`. Hand-typed
 // because the domain crate doesn't derive ts-rs — the IPC carries the
@@ -39,8 +41,8 @@ type ScoreState =
   | { kind: "ready";   score: ConceptScore }
   | { kind: "error";   message: string };
 
-const AXIS_FLOOR          = 7.0;
-const COMPOSITE_THRESHOLD = 8.5;
+// AXIS_FLOOR and COMPOSITE_THRESHOLD imported from `../components/AxisBar`
+// (shared single source of truth — mirrors Rust `quality_gate` constants).
 
 interface Props {
   project:    OpenProjectResult;
@@ -406,7 +408,7 @@ export default function Stage1_Setup({ project, onChanged, onAdvance }: Props) {
               >
                 {scoreState.kind === "running"
                   ? "Scoring…"
-                  : "✨ Refine with AI"}
+                  : "✨ Score with AI"}
               </button>
               <button
                 style={s.ghostBtn}
@@ -453,7 +455,7 @@ function ScoreSection({
     return (
       <Section
         title="Quality gate"
-        hint={`Click ✨ Refine with AI above to score this concept. Pass threshold: composite ≥ ${COMPOSITE_THRESHOLD} AND every axis ≥ ${AXIS_FLOOR}.`}
+        hint={`Click ✨ Score with AI above to score this concept. Pass threshold: composite ≥ ${COMPOSITE_THRESHOLD} AND every axis ≥ ${AXIS_FLOOR}.`}
       >
         <ul style={s.gateList}>
           {GATE_AXES.map((a) => (
@@ -509,16 +511,7 @@ function ScoreSection({
         ? `Composite ${composite.toFixed(1)}/10 with every axis ≥ ${AXIS_FLOOR}. Move on to Stage 2.`
         : `Weakest axis: ${weakest[0]} (${weakest[1].score.toFixed(1)}/10). Apply edits below or revise manually.`}
     >
-      <div style={s.scoreSummary}>
-        <div style={{
-          ...s.scoreBig,
-          color: passes ? "var(--color-green-700, #15803d)" : "var(--color-amber-700, #b45309)",
-        }}>
-          {composite.toFixed(1)}
-          <span style={s.scoreBigDenom}>/10</span>
-        </div>
-        <div style={s.scoreBigLabel}>composite</div>
-      </div>
+      <ScoreSummary composite={composite} passing={passes} />
       <div style={s.axisGrid}>
         {axes.map(([name, axis]) => (
           <AxisBar key={name} label={name} axis={axis} threshold={AXIS_FLOOR} />
@@ -527,31 +520,17 @@ function ScoreSection({
       {score.overall_summary && (
         <div style={s.overallSummary}>{score.overall_summary}</div>
       )}
-      {(score.edits ?? []).length > 0 && (
-        <div style={s.editsBlock}>
-          <h4 style={s.editsH}>Suggested edits ({(score.edits ?? []).length})</h4>
-          <ul style={s.editsList}>
-            {(score.edits ?? []).map((edit, i) => (
-              <li key={i} style={s.editRow}>
-                <div style={s.editLeft}>
-                  <span style={s.editField}>{edit.field}</span>
-                  <span style={s.editSuggestion}>{edit.suggestion}</span>
-                  {edit.replacement && (
-                    <span style={s.editReplacement}>
-                      ↳ <em>{edit.replacement}</em>
-                    </span>
-                  )}
-                </div>
-                {edit.replacement && (
-                  <button style={s.smallBtn} onClick={() => onApplyEdit(edit)}>
-                    Apply
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <EditsList
+        title="Suggested edits"
+        edits={(score.edits ?? []).map((e) => ({
+          field:       e.field,
+          suggestion:  e.suggestion,
+          replacement: e.replacement,
+        }))}
+        renderApply={(e) => e.replacement
+          ? <button style={s.smallBtn} onClick={() => onApplyEdit(e as ConceptEdit)}>Apply</button>
+          : null}
+      />
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button style={s.smallBtn} onClick={onClear}>Clear score</button>
       </div>
@@ -559,30 +538,8 @@ function ScoreSection({
   );
 }
 
-function AxisBar({
-  label, axis, threshold,
-}: {
-  label: string; axis: ConceptScoreAxis; threshold: number;
-}) {
-  const pct = Math.min(100, Math.max(0, axis.score * 10));
-  const colour =
-    axis.score >= threshold
-      ? "var(--color-green-500, #22c55e)"
-      : "var(--color-red-500, #ef4444)";
-  return (
-    <div style={s.axisRow} title={axis.reason ?? ""}>
-      <div style={s.axisHeader}>
-        <span style={s.axisLabel}>{label}</span>
-        <span style={s.axisScore}>{axis.score.toFixed(1)}</span>
-      </div>
-      <div style={s.axisTrack}>
-        <div style={{ ...s.axisFill, width: `${pct}%`, background: colour }} />
-        <div style={{ ...s.axisFloor, left: `${threshold * 10}%` }} />
-      </div>
-      {axis.reason && <span style={s.axisReason}>{axis.reason}</span>}
-    </div>
-  );
-}
+// F3 — Local AxisBar removed; the shared component lives in
+// `../components/AxisBar.tsx`. Imported at the top of the file.
 
 function Section({ title, hint, children }: {
   title: string;
