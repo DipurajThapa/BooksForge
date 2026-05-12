@@ -340,10 +340,12 @@ function statusDotStyle(status: string): React.CSSProperties {
 
 const s: Record<string, React.CSSProperties> = {
   binder: {
-    width: 240,
-    flexShrink: 0,
-    padding: "16px 0",
-    borderRight: "1px solid var(--color-neutral-200)",
+    // Width + border now owned by the parent `.leftPane` wrapper in
+    // Manuscript so the tab bar above can sit at the pane edge. The
+    // Binder itself just fills the remaining vertical space.
+    flex: 1,
+    minHeight: 0,
+    padding: "8px 0 16px",
     background: "var(--color-neutral-50)",
     display: "flex", flexDirection: "column", gap: 8,
     fontFamily: "var(--font-ui)",

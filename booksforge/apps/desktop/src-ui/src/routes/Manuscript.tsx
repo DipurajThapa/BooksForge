@@ -32,6 +32,7 @@ import type {
   SceneLoadResult,
 } from "@booksforge/shared-types";
 import Binder, { type BinderHandle } from "../components/Binder";
+import OutlineView, { type OutlineUpdate } from "../components/OutlineView";
 import { ipc } from "../lib/ipc";
 import { errorMessage } from "../lib/errorMessage";
 import { useToast } from "../components/ToastProvider";
@@ -207,15 +208,77 @@ export default function Manuscript({ project, initialSceneId, onSwitchToJourney 
   const binderRef = useRef<BinderHandle>(null);
   useShortcut("binder.focus", () => binderRef.current?.focusFirstRow());
 
+  // Left-pane tab: tree (Binder) or flat outline (per spec §5.1).
+  const [leftTab, setLeftTab] = useState<"binder" | "outline">("binder");
+
+  // Generic per-node metadata patcher used by the outline view.
+  // Mirrors the rename optimistic-update pattern: write locally,
+  // call nodeUpdate, roll back via refetch on error.
+  const handleUpdateNode = useCallback(async (id: string, patch: OutlineUpdate) => {
+    setNodes((prev) => prev.map((n) => (
+      n.id === id
+        ? {
+            ...n,
+            title:        patch.title       ?? n.title,
+            status:       patch.status      ?? n.status,
+            pov:          patch.pov        !== undefined ? patch.pov         : n.pov,
+            beat:         patch.beat       !== undefined ? patch.beat        : n.beat,
+            target_words: patch.target_words !== undefined ? patch.target_words : n.target_words,
+          }
+        : n
+    )));
+    try {
+      await ipc.nodeUpdate({
+        id,
+        title:        patch.title        ?? null,
+        position:     null,
+        status:       patch.status       ?? null,
+        pov:          patch.pov         !== undefined ? patch.pov          : null,
+        beat:         patch.beat        !== undefined ? patch.beat         : null,
+        target_words: patch.target_words !== undefined ? patch.target_words : null,
+      });
+    } catch (e) {
+      try {
+        const fresh = await ipc.nodeList();
+        setNodes(fresh);
+      } catch { /* keep optimistic */ }
+      toast.push({
+        severity: "error",
+        title:    "Update failed",
+        body:     errorMessage(e),
+      });
+    }
+  }, [toast]);
+
   return (
     <div style={s.shell}>
-      <Binder
-        ref={binderRef}
-        nodes={nodes}
-        selectedSceneId={selectedSceneId}
-        onSelectScene={setSelectedSceneId}
-        onRenameNode={handleRename}
-      />
+      <div style={s.leftPane}>
+        <div style={s.tabBar} role="tablist" aria-label="Manuscript navigation">
+          <LeftTabBtn active={leftTab === "binder"}  onClick={() => setLeftTab("binder")}>
+            Binder
+          </LeftTabBtn>
+          <LeftTabBtn active={leftTab === "outline"} onClick={() => setLeftTab("outline")}>
+            Outline
+          </LeftTabBtn>
+        </div>
+        {leftTab === "binder" && (
+          <Binder
+            ref={binderRef}
+            nodes={nodes}
+            selectedSceneId={selectedSceneId}
+            onSelectScene={setSelectedSceneId}
+            onRenameNode={handleRename}
+          />
+        )}
+        {leftTab === "outline" && (
+          <OutlineView
+            nodes={nodes}
+            selectedSceneId={selectedSceneId}
+            onSelectScene={setSelectedSceneId}
+            onUpdateNode={handleUpdateNode}
+          />
+        )}
+      </div>
 
       <main style={s.editorPane}>
         <header style={s.editorHeader}>
@@ -263,6 +326,27 @@ export default function Manuscript({ project, initialSceneId, onSwitchToJourney 
         onRefreshTree={() => setRefreshKey((k) => k + 1)}
       />
     </div>
+  );
+}
+
+function LeftTabBtn({
+  active, onClick, children,
+}: {
+  active: boolean; onClick: () => void; children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      style={{
+        ...s.leftTabBtn,
+        ...(active ? s.leftTabBtnActive : {}),
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -349,6 +433,37 @@ const s: Record<string, React.CSSProperties> = {
     minHeight: 0,
     overflow: "hidden",
     fontFamily: "var(--font-ui)",
+  },
+  leftPane: {
+    width: 240,
+    flexShrink: 0,
+    display: "flex", flexDirection: "column",
+    background: "var(--color-neutral-50)",
+    borderRight: "1px solid var(--color-neutral-200)",
+    minHeight: 0,
+  },
+  tabBar: {
+    display: "flex",
+    padding: "8px 8px 0",
+    gap: 4,
+    flexShrink: 0,
+  },
+  leftTabBtn: {
+    flex: 1,
+    padding: "6px 8px",
+    background: "transparent",
+    border: "1px solid transparent",
+    borderRadius: 4,
+    fontFamily: "var(--font-ui)",
+    fontSize: 12, fontWeight: 500,
+    color: "var(--color-neutral-600)",
+    cursor: "pointer",
+  },
+  leftTabBtnActive: {
+    background: "#fff",
+    borderColor: "var(--color-neutral-300)",
+    color: "var(--color-amber-700, #b45309)",
+    fontWeight: 600,
   },
   editorPane: {
     flex: 1,
