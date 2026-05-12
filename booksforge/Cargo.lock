@@ -279,7 +279,7 @@ dependencies = [
  "proptest",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "ts-rs",
  "ulid",
 ]
@@ -290,7 +290,7 @@ version = "0.0.1"
 dependencies = [
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
 ]
@@ -303,7 +303,7 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "ulid",
 ]
 
@@ -317,7 +317,7 @@ dependencies = [
  "chrono",
  "serde",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
  "ulid",
  "zip",
@@ -357,7 +357,7 @@ dependencies = [
  "libc",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
  "toml 0.8.2",
  "ulid",
@@ -382,7 +382,7 @@ dependencies = [
  "booksforge-voice",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "ts-rs",
 ]
 
@@ -402,7 +402,7 @@ dependencies = [
  "reqwest 0.12.28",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-util",
  "toml 0.8.2",
@@ -430,7 +430,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -445,7 +445,7 @@ dependencies = [
  "minijinja",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "toml 0.8.2",
 ]
 
@@ -461,7 +461,7 @@ dependencies = [
  "proptest",
  "serde_json",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
  "ulid",
@@ -479,7 +479,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
  "ulid",
 ]
@@ -490,7 +490,7 @@ version = "0.0.1"
 dependencies = [
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "toml 0.8.2",
 ]
 
@@ -526,7 +526,7 @@ version = "0.0.1"
 dependencies = [
  "booksforge-domain",
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "toml 0.8.2",
 ]
 
