@@ -213,6 +213,41 @@ export default function Manuscript({ project, initialSceneId, onSwitchToJourney 
   // node + viewport cursor coords; `null` means the menu is closed.
   const [ctxMenu, setCtxMenu] = useState<BinderContextMenuAnchor | null>(null);
 
+  /**
+   * Drag-reorder handler. The Binder already computed the new
+   * LexoRank position via `lib/lexorank.positionBetween`; we just
+   * persist it via `nodeUpdate` and update local state optimistically.
+   * Same-parent only — cross-parent moves are rejected inside the
+   * Binder before this handler ever sees them (the IPC has no
+   * `parent_id` field).
+   */
+  const handleReorder = useCallback(async (id: string, newPosition: string) => {
+    setNodes((prev) => prev.map((n) => (
+      n.id === id ? { ...n, position: newPosition } : n
+    )));
+    try {
+      await ipc.nodeUpdate({
+        id,
+        title:        null,
+        position:     newPosition,
+        status:       null,
+        pov:          null,
+        beat:         null,
+        target_words: null,
+      });
+    } catch (e) {
+      try {
+        const fresh = await ipc.nodeList();
+        setNodes(fresh);
+      } catch { /* keep optimistic */ }
+      toast.push({
+        severity: "error",
+        title:    "Reorder failed",
+        body:     errorMessage(e),
+      });
+    }
+  }, [toast]);
+
   // ── Binder mutations ────────────────────────────────────────────────
 
   /**
@@ -383,6 +418,7 @@ export default function Manuscript({ project, initialSceneId, onSwitchToJourney 
         onSelectScene={setSelectedSceneId}
         onRenameNode={handleRename}
         onContextMenu={setCtxMenu}
+        onReorderNode={handleReorder}
       />
 
       <main style={s.editorPane}>

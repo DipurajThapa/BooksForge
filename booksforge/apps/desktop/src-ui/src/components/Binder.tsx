@@ -26,8 +26,22 @@
  * the UI side and lets a single owner refresh the tree after IPC.
  */
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from "react";
 import type { NodeInfo } from "@booksforge/shared-types";
+import { positionBetween } from "../lib/lexorank";
+
+/**
+ * Drag state lifted to the Binder so a row can know it's the drop
+ * target (for the indicator line) without each row owning the global
+ * "is anyone being dragged?" question.
+ */
+type DropPlacement = "before" | "after";
+interface DropTarget {
+  /** Target row's node id. */
+  id:        string;
+  /** Whether the drop will place the dragged row above or below. */
+  placement: DropPlacement;
+}
 
 /** F8 — Imperative handle exposed to the parent route (Manuscript)
  *  so a keyboard shortcut can focus the first row in the binder
@@ -51,6 +65,12 @@ interface Props {
    *  cursor coords so the parent can mount a context menu near
    *  the cursor. Omit to disable right-click affordances. */
   onContextMenu?:   (info: { node: NodeInfo; x: number; y: number }) => void;
+  /** Drag-reorder handler. Called when the writer drops a row onto
+   *  a new position within the same parent. The new `position` is
+   *  computed via `lib/lexorank.positionBetween`; the parent owns
+   *  the IPC (`nodeUpdate({ position })`). Cross-parent moves are
+   *  not supported — the IPC has no `parent_id` field. */
+  onReorderNode?:   (id: string, newPosition: string) => Promise<void>;
 }
 
 interface TreeNode {
@@ -89,7 +109,7 @@ function sumWords(node: TreeNode): number {
 }
 
 const Binder = forwardRef<BinderHandle, Props>(function Binder(
-  { nodes, selectedSceneId, onSelectScene, onRenameNode, onContextMenu },
+  { nodes, selectedSceneId, onSelectScene, onRenameNode, onContextMenu, onReorderNode },
   ref,
 ) {
   const tree = useMemo(() => buildTree(nodes), [nodes]);
@@ -109,6 +129,48 @@ const Binder = forwardRef<BinderHandle, Props>(function Binder(
   // F8 — Rename state lifted into the parent so any descendant row
   // can enter rename mode and the others stay read-only.
   const [renamingId, setRenamingId] = useState<string | null>(null);
+
+  // Drag-reorder state. Both refs and state are kept: refs for the
+  // synchronous handlers (dragover fires constantly and React batches
+  // updates), state for the rendered indicator line.
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const draggingIdRef = useRef<string | null>(null);
+  draggingIdRef.current = draggingId;
+
+  /**
+   * Compute the new position for the dropped row and call the
+   * parent's `onReorderNode`. Returns `false` when the move is a
+   * no-op (e.g. dropped on itself or onto a cross-parent target).
+   */
+  function commitReorder(target: DropTarget): boolean {
+    const dragging = draggingIdRef.current;
+    if (!dragging || dragging === target.id || !onReorderNode) return false;
+    const dragNode    = nodes.find((n) => n.id === dragging);
+    const targetNode  = nodes.find((n) => n.id === target.id);
+    if (!dragNode || !targetNode) return false;
+    // Same-parent only. Cross-chapter scene moves need a new IPC.
+    if (dragNode.parent_id !== targetNode.parent_id) return false;
+    const siblings = nodes
+      .filter((n) => n.parent_id === targetNode.parent_id && n.id !== dragging)
+      .sort((a, b) => a.position.localeCompare(b.position));
+    const targetIdx = siblings.findIndex((n) => n.id === targetNode.id);
+    if (targetIdx === -1) return false;
+    let prevPos: string | null;
+    let nextPos: string | null;
+    if (target.placement === "before") {
+      prevPos = targetIdx > 0 ? siblings[targetIdx - 1]!.position : null;
+      nextPos = siblings[targetIdx]!.position;
+    } else {
+      prevPos = siblings[targetIdx]!.position;
+      nextPos = targetIdx < siblings.length - 1 ? siblings[targetIdx + 1]!.position : null;
+    }
+    // If the row is already adjacent in that direction, skip.
+    if (prevPos === dragNode.position || nextPos === dragNode.position) return false;
+    const newPosition = positionBetween(prevPos, nextPos);
+    void onReorderNode(dragging, newPosition);
+    return true;
+  }
 
   // F8 — DOM ref to the binder nav so the imperative handle can find
   // the first focusable row.
@@ -150,6 +212,17 @@ const Binder = forwardRef<BinderHandle, Props>(function Binder(
               onCommitRename={onRenameNode}
               onCancelRename={() => setRenamingId(null)}
               onContextMenu={onContextMenu}
+              dragEnabled={!!onReorderNode}
+              draggingId={draggingId}
+              dropTarget={dropTarget}
+              onDragStartRow={(id) => { setDraggingId(id); setDropTarget(null); }}
+              onDropTargetChange={setDropTarget}
+              onDragEndRow={() => { setDraggingId(null); setDropTarget(null); }}
+              onDropRow={(target) => {
+                commitReorder(target);
+                setDraggingId(null);
+                setDropTarget(null);
+              }}
             />
           ))
         )}
@@ -174,6 +247,14 @@ interface BinderRowProps {
   onCancelRename?:  () => void;
   // Context-menu plumbing (parent owns the menu; we just forward the event).
   onContextMenu?:   (info: { node: NodeInfo; x: number; y: number }) => void;
+  // Drag-reorder plumbing. All passed from the Binder root.
+  dragEnabled?:     boolean;
+  draggingId?:      string | null;
+  dropTarget?:      DropTarget | null;
+  onDragStartRow?:  (id: string) => void;
+  onDropTargetChange?: (target: DropTarget | null) => void;
+  onDropRow?:       (target: DropTarget) => void;
+  onDragEndRow?:    () => void;
 }
 
 function BinderRow(props: BinderRowProps) {
@@ -181,6 +262,8 @@ function BinderRow(props: BinderRowProps) {
     node, depth, selectedSceneId, collapsed, onToggle, onSelect,
     renamingId, onStartRename, onCommitRename, onCancelRename,
     onContextMenu,
+    dragEnabled, draggingId, dropTarget,
+    onDragStartRow, onDropTargetChange, onDropRow, onDragEndRow,
   } = props;
   const { info, children } = node;
   const isScene    = info.kind === "scene";
@@ -189,6 +272,9 @@ function BinderRow(props: BinderRowProps) {
   const hasChildren = children.length > 0;
   const wordRollup = isScene ? info.word_count : sumWords(node);
   const isRenaming = renamingId === info.id;
+  const isBeingDragged = dragEnabled && draggingId === info.id;
+  const dropPlacement: DropPlacement | null =
+    dragEnabled && dropTarget && dropTarget.id === info.id ? dropTarget.placement : null;
 
   function handleClick() {
     if (isRenaming) return; // ignore row clicks while editing the title
@@ -215,6 +301,59 @@ function BinderRow(props: BinderRowProps) {
     onContextMenu({ node: info, x: e.clientX, y: e.clientY });
   }
 
+  // ── Drag handlers ──────────────────────────────────────────────────
+
+  function handleDragStart(e: ReactDragEvent) {
+    if (!dragEnabled) return;
+    onDragStartRow?.(info.id);
+    e.dataTransfer.effectAllowed = "move";
+    // Mark the payload — Tauri WebView accepts text/plain reliably.
+    e.dataTransfer.setData("text/plain", info.id);
+  }
+
+  function handleDragOver(e: ReactDragEvent) {
+    if (!dragEnabled || !draggingId || draggingId === info.id) return;
+    // Same-parent enforcement happens in the parent's `commitReorder`;
+    // the visual cue shows for any row but the drop is a no-op when
+    // parents differ. Cheap and predictable for v1.
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    // Bisect the row vertically to decide placement.
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const placement: DropPlacement = e.clientY < rect.top + rect.height / 2
+      ? "before"
+      : "after";
+    // Avoid spamming setState — only push if the placement changed.
+    if (dropTarget?.id !== info.id || dropTarget.placement !== placement) {
+      onDropTargetChange?.({ id: info.id, placement });
+    }
+  }
+
+  function handleDragLeave(e: ReactDragEvent) {
+    if (!dragEnabled) return;
+    // Only clear the target if we're leaving this row, not its child.
+    const related = e.relatedTarget;
+    if (related instanceof Node && (e.currentTarget as HTMLElement).contains(related)) {
+      return;
+    }
+    if (dropTarget?.id === info.id) onDropTargetChange?.(null);
+  }
+
+  function handleDrop(e: ReactDragEvent) {
+    if (!dragEnabled || !draggingId || draggingId === info.id) return;
+    e.preventDefault();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const placement: DropPlacement = e.clientY < rect.top + rect.height / 2
+      ? "before"
+      : "after";
+    onDropRow?.({ id: info.id, placement });
+  }
+
+  function handleDragEnd() {
+    if (!dragEnabled) return;
+    onDragEndRow?.();
+  }
+
   return (
     <li>
       {isRenaming && onCommitRename && onCancelRename ? (
@@ -227,20 +366,29 @@ function BinderRow(props: BinderRowProps) {
       ) : (
         <button
           data-binder-row=""
+          draggable={dragEnabled && !isRenaming}
           style={{
             ...s.row,
             ...(isSelected ? s.rowSelected : {}),
+            ...(isBeingDragged ? s.rowDragging : {}),
+            ...(dropPlacement === "before" ? s.rowDropBefore : {}),
+            ...(dropPlacement === "after"  ? s.rowDropAfter  : {}),
             paddingLeft: 8 + depth * 14,
           }}
           onClick={handleClick}
           onDoubleClick={handleDoubleClick}
           onContextMenu={handleContextMenu}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onDragEnd={handleDragEnd}
           aria-expanded={hasChildren ? isExpanded : undefined}
           aria-current={isSelected ? "page" : undefined}
           title={
             isScene
-              ? `${info.title}${onStartRename ? " · double-click to rename" : ""}`
-              : `${info.title} — ${wordRollup.toLocaleString()} words${onStartRename ? " · double-click to rename" : ""}`
+              ? `${info.title}${onStartRename ? " · double-click to rename" : ""}${dragEnabled ? " · drag to reorder" : ""}`
+              : `${info.title} — ${wordRollup.toLocaleString()} words${onStartRename ? " · double-click to rename" : ""}${dragEnabled ? " · drag to reorder" : ""}`
           }
         >
           <span style={s.disclosure} aria-hidden="true">
@@ -271,6 +419,13 @@ function BinderRow(props: BinderRowProps) {
               onCommitRename={onCommitRename}
               onCancelRename={onCancelRename}
               onContextMenu={onContextMenu}
+              dragEnabled={dragEnabled}
+              draggingId={draggingId}
+              dropTarget={dropTarget}
+              onDragStartRow={onDragStartRow}
+              onDropTargetChange={onDropTargetChange}
+              onDropRow={onDropRow}
+              onDragEndRow={onDragEndRow}
             />
           ))}
         </ol>
@@ -398,6 +553,18 @@ const s: Record<string, React.CSSProperties> = {
     background: "var(--color-amber-50, #fffbeb)",
     color: "var(--color-amber-700, #b45309)",
     fontWeight: 600,
+  },
+  // Drag-reorder visual states. Drop indicators use a `boxShadow`
+  // inset so the line sits exactly on the row edge without
+  // shifting the layout.
+  rowDragging: {
+    opacity: 0.45,
+  },
+  rowDropBefore: {
+    boxShadow: "inset 0 2px 0 0 var(--color-amber-500, #f59e0b)",
+  },
+  rowDropAfter: {
+    boxShadow: "inset 0 -2px 0 0 var(--color-amber-500, #f59e0b)",
   },
   // F8 — Inline rename input style: matches the row's text size and
   // sits in the same horizontal track so it doesn't visually jump.

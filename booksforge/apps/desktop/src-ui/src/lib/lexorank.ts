@@ -5,15 +5,15 @@
  * `crates/booksforge-domain/src/lexorank.rs`: positions are
  * `"0|<rank>:"` strings where `<rank>` is base-36 chars, sorted
  * lexicographically. The Rust side mints initial positions evenly
- * spaced between `"100000"` and `"yzzzzz"`; the frontend only needs
- * to mint *new* positions that sort after existing siblings (for
- * create-at-end). Drag-reorder + insert-between is a follow-up PR.
+ * spaced between `"100000"` and `"yzzzzz"`; the frontend mints
+ * new positions for create-at-end (`positionAtEnd`) and for
+ * insert-between drag-reorder (`positionBetween`).
  *
  * If the existing positions don't match the canonical format (e.g.
  * legacy data or external imports), the helpers fall back to plain
- * lexicographic append (`max + "z"`) which still sorts correctly
- * and is accepted by the Rust storage layer (no format validation
- * on the backend per current `commands/nodes.rs`).
+ * lexicographic append/insert (`max + "z"`, `prev + "m"`) which
+ * still sort correctly and are accepted by the Rust storage layer
+ * (no format validation on the backend per current `commands/nodes.rs`).
  */
 
 const BUCKET   = "0|";
@@ -66,4 +66,45 @@ export function positionAtEnd(siblings: Array<{ position: string }>): string {
   const next = parsed + Math.max(1, Math.floor((ceiling - parsed) / 2));
   if (next >= ceiling) return `${max}z`;
   return formatRank(next);
+}
+
+/**
+ * Mint a position string strictly between `prev` and `next` —
+ * used by drag-reorder.
+ *
+ * `prev = null` means "land at the top" (between `RANK_MIN` and
+ * `next`). `next = null` means "land at the bottom" (between `prev`
+ * and `RANK_MAX`). Both null returns a mid-bucket value.
+ *
+ * The drag-reorder UI places `prev` and `next` directly adjacent
+ * in the sibling list, so the midpoint is always unambiguous.
+ *
+ * Fallback when either endpoint doesn't parse cleanly or there's
+ * no integer room between them: lexicographic string insertion.
+ * `prev + "m"` sorts strictly after `prev` and (because `next`'s
+ * 7th+ characters are absent in the canonical 6-char form) sorts
+ * before `next` in the practical adjacent case. The Rust storage
+ * layer accepts arbitrary strings (no format validation), so the
+ * fallback round-trips fine.
+ */
+export function positionBetween(
+  prev: string | null,
+  next: string | null,
+): string {
+  const lo = parseInt(RANK_MIN, 36);
+  const hi = parseInt(RANK_MAX, 36);
+  const prevValue = prev != null ? parseRank(prev) : lo;
+  const nextValue = next != null ? parseRank(next) : hi;
+
+  if (prevValue !== null && nextValue !== null && nextValue > prevValue + 1) {
+    const mid = prevValue + Math.floor((nextValue - prevValue) / 2);
+    return formatRank(mid);
+  }
+  if (prev != null) return `${prev}m`;
+  if (next != null) {
+    // No `prev` — insert at the floor by minting a value strictly
+    // below `next`. Use the rank-min integer to be safe.
+    return formatRank(lo);
+  }
+  return formatRank((lo + hi) / 2);
 }
