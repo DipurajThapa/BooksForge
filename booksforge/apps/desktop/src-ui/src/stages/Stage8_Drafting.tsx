@@ -26,6 +26,12 @@ import { errorMessage } from "../lib/errorMessage";
 interface Props {
   project:    OpenProjectResult;
   onChanged?: () => void;
+  /** F1 — Called by the "Read manuscript →" CTA after a successful
+   *  drafting run. EditorShell uses it to flip from Journey view
+   *  to Manuscript view so the writer lands in the editor on the
+   *  freshly drafted prose. Optional so the panel can be rendered
+   *  standalone in tests. */
+  onSwitchToManuscript?: () => void;
 }
 
 interface StageState {
@@ -37,7 +43,7 @@ interface StageState {
   elapsed:  number;
 }
 
-export default function Stage8_Drafting({ project, onChanged }: Props) {
+export default function Stage8_Drafting({ project, onChanged, onSwitchToManuscript }: Props) {
   // Pre-flight state
   const [nodes,          setNodes]          = useState<NodeInfo[]>([]);
   const [hasCharBible,   setHasCharBible]   = useState<boolean>(false);
@@ -369,6 +375,15 @@ export default function Stage8_Drafting({ project, onChanged }: Props) {
                 <button style={s.ghostBtn} onClick={() => setResult(null)}>
                   Run again
                 </button>
+                {onSwitchToManuscript && (
+                  <button
+                    style={s.primaryBtn}
+                    onClick={onSwitchToManuscript}
+                    title="Open the manuscript view with the just-drafted prose"
+                  >
+                    📖 Read manuscript →
+                  </button>
+                )}
               </div>
             </div>
           </section>
