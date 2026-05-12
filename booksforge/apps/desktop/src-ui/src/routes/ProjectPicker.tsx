@@ -10,6 +10,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { OpenProjectResult, RecentProjectEntry } from "@booksforge/shared-types";
 import { ipc } from "../lib/ipc";
 import { errorMessage } from "../lib/errorMessage";
+import { useToast } from "../components/ToastProvider";
 
 interface Props {
   onProjectOpened: (result: OpenProjectResult) => void;
@@ -22,14 +23,25 @@ export default function ProjectPicker({ onProjectOpened, onNewProject }: Props) 
   const [loading, setLoading] = useState(true);
   const [hover,   setHover]   = useState<string | null>(null);
   const [busy,    setBusy]    = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     ipc
       .projectRecent()
       .then(setRecents)
-      .catch((e) => setError(errorMessage(e)))
+      .catch((e) => {
+        const msg = errorMessage(e);
+        setError(msg);
+        toast.push({
+          severity: "error",
+          title: "Could not load recent projects",
+          body: msg,
+        });
+      })
       .finally(() => setLoading(false));
-  }, []);
+    // toast is stable across renders (memoised in the provider), so
+    // depending on it here is safe and silences lint without re-running.
+  }, [toast]);
 
   async function openExisting() {
     setError(null);
@@ -45,7 +57,13 @@ export default function ProjectPicker({ onProjectOpened, onNewProject }: Props) 
       const result = await ipc.projectOpen({ bundle_path: path });
       onProjectOpened(result);
     } catch (e) {
-      setError(errorMessage(e));
+      const msg = errorMessage(e);
+      setError(msg);
+      toast.push({
+        severity: "error",
+        title: "Could not open project",
+        body: msg,
+      });
     }
   }
 
@@ -57,7 +75,13 @@ export default function ProjectPicker({ onProjectOpened, onNewProject }: Props) 
       const result = await ipc.projectOpen({ bundle_path: entry.path });
       onProjectOpened(result);
     } catch (e) {
-      setError(errorMessage(e));
+      const msg = errorMessage(e);
+      setError(msg);
+      toast.push({
+        severity: "error",
+        title: `Could not open "${entry.name}"`,
+        body: msg,
+      });
     } finally {
       setBusy(null);
     }
@@ -74,8 +98,18 @@ export default function ProjectPicker({ onProjectOpened, onNewProject }: Props) 
     try {
       const updated = await ipc.projectRecentRemove({ path: entry.path });
       setRecents(updated);
+      toast.push({
+        severity: "success",
+        body: `Removed "${entry.name}" from Recent. Files on disk are untouched.`,
+      });
     } catch (e) {
-      setError(errorMessage(e));
+      const msg = errorMessage(e);
+      setError(msg);
+      toast.push({
+        severity: "error",
+        title: "Could not remove from Recent",
+        body: msg,
+      });
     } finally {
       setBusy(null);
     }

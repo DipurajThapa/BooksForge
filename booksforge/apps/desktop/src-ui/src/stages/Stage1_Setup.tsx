@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import type { OpenProjectResult } from "@booksforge/shared-types";
 import { ipc } from "../lib/ipc";
 import { errorMessage } from "../lib/errorMessage";
+import { useToast } from "../components/ToastProvider";
 
 // Mirror of `booksforge_domain::ConceptScoreProposal`. Hand-typed
 // because the domain crate doesn't derive ts-rs — the IPC carries the
@@ -46,6 +47,10 @@ interface Props {
   /** Called after a successful save so the StageRail can refresh
    *  status. Optional — panels without save actions just ignore it. */
   onChanged?: () => void;
+  /** Called by the "Save & continue" CTA after a successful save.
+   *  Advances the rail to the next stage. Optional so the panel can
+   *  also be rendered standalone (e.g. in tests). */
+  onAdvance?: () => void;
 }
 
 // Local form shape — matches the wizard's brief shape but flattened
@@ -72,7 +77,7 @@ const EMPTY: BriefForm = {
   comp_titles_or_authors: "",
 };
 
-export default function Stage1_Setup({ project, onChanged }: Props) {
+export default function Stage1_Setup({ project, onChanged, onAdvance }: Props) {
   const [form,         setForm]         = useState<BriefForm>(EMPTY);
   const [loading,      setLoading]      = useState(true);
   const [saving,       setSaving]       = useState(false);
@@ -82,6 +87,7 @@ export default function Stage1_Setup({ project, onChanged }: Props) {
   const [briefSource,  setBriefSource]  = useState<string>("");
   const [briefSavedAt, setBriefSavedAt] = useState<string>("");
   const [scoreState,   setScoreState]   = useState<ScoreState>({ kind: "idle" });
+  const toast = useToast();
 
   // Load on mount.
   useEffect(() => {
@@ -136,19 +142,14 @@ export default function Stage1_Setup({ project, onChanged }: Props) {
    * current intent, not a stale version. Light tier auto-resolves.
    */
   async function handleRefine() {
-    // Save first so the agent reads what's on screen, not what's in memory.
+    // Save first so the agent reads what's on screen, not what's in
+    // memory. handleSave returns false on validation or IPC failure
+    // and already surfaces the error via toast + inline message —
+    // we just abort the refine so the score state doesn't go into
+    // "running" against a stale brief.
     if (loaded) {
-      // No await; we save in the background and immediately fire the
-      // score. The save IPC mutates `book:project_brief` synchronously
-      // on the Rust side before returning the new brief to the IPC
-      // caller, but concept-scorer reads memory at call time too.
-      // We await both to keep the flow deterministic.
-      try {
-        await handleSave();
-      } catch {
-        // handleSave already set error state; abort the refine.
-        return;
-      }
+      const ok = await handleSave();
+      if (!ok) return;
     }
     setScoreState({ kind: "running", startedAt: Date.now() });
     try {
@@ -202,23 +203,36 @@ export default function Stage1_Setup({ project, onChanged }: Props) {
     setError(null);
   }
 
-  async function handleSave() {
+  /**
+   * Returns true on success, false on validation/IPC failure. The
+   * "Save & continue" handler uses the return value to decide
+   * whether to advance the rail. We surface failures via toast in
+   * addition to the inline error so the writer notices even if
+   * they've scrolled away from the form.
+   */
+  async function handleSave(): Promise<boolean> {
     // Client-side validation matching the domain validator so the
     // user gets a clear error here instead of a generic IPC failure.
     const targetWords = Number(form.target_word_count);
     if (!Number.isFinite(targetWords) || targetWords < 5000 || targetWords > 250_000) {
-      setError("Target word count must be between 5 000 and 250 000.");
-      return;
+      const msg = "Target word count must be between 5 000 and 250 000.";
+      setError(msg);
+      toast.push({ severity: "warning", body: msg });
+      return false;
     }
     const promises = form.key_promises
       .split("\n").map((l) => l.trim()).filter(Boolean);
     if (promises.length === 0 || promises.length > 6) {
-      setError("Key promises must have 1–6 lines.");
-      return;
+      const msg = "Key promises must have 1–6 lines.";
+      setError(msg);
+      toast.push({ severity: "warning", body: msg });
+      return false;
     }
     if (!form.premise.trim()) {
-      setError("Premise is required.");
-      return;
+      const msg = "Premise is required.";
+      setError(msg);
+      toast.push({ severity: "warning", body: msg });
+      return false;
     }
     setSaving(true); setError(null);
     try {
@@ -247,10 +261,34 @@ export default function Stage1_Setup({ project, onChanged }: Props) {
       setBriefSavedAt((r as { updated_at?: string }).updated_at ?? new Date().toISOString());
       setSavedHint("Saved. Every agent run after this picks up the new brief.");
       onChanged?.();
+      return true;
     } catch (e) {
-      setError(errorMessage(e));
+      const msg = errorMessage(e);
+      setError(msg);
+      toast.push({
+        severity: "error",
+        title: "Brief save failed",
+        body: msg,
+      });
+      return false;
     } finally {
       setSaving(false);
+    }
+  }
+
+  /**
+   * F5 — Save the brief and, on success, advance to Stage 2. If the
+   * save fails the writer stays on this stage; toast + inline error
+   * tell them why.
+   */
+  async function handleSaveAndContinue() {
+    const ok = await handleSave();
+    if (ok) {
+      toast.push({
+        severity: "success",
+        body: "Brief saved. Next: Audience map.",
+      });
+      onAdvance?.();
     }
   }
 
@@ -359,13 +397,6 @@ export default function Stage1_Setup({ project, onChanged }: Props) {
 
             <div style={s.footer}>
               <button
-                style={{ ...s.primaryBtn, ...(saving ? s.primaryBtnBusy : {}) }}
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving ? "Saving…" : "Save brief"}
-              </button>
-              <button
                 style={s.ghostBtn}
                 onClick={handleRefine}
                 disabled={!loaded || scoreState.kind === "running" || saving}
@@ -376,6 +407,22 @@ export default function Stage1_Setup({ project, onChanged }: Props) {
                 {scoreState.kind === "running"
                   ? "Scoring…"
                   : "✨ Refine with AI"}
+              </button>
+              <button
+                style={s.ghostBtn}
+                onClick={() => { void handleSave(); }}
+                disabled={saving}
+                title="Save without leaving this stage"
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+              <button
+                style={{ ...s.primaryBtn, ...(saving ? s.primaryBtnBusy : {}) }}
+                onClick={handleSaveAndContinue}
+                disabled={saving}
+                title="Save the brief and move to Stage 2 — Audience"
+              >
+                {saving ? "Saving…" : "Save & continue →"}
               </button>
             </div>
 

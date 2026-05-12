@@ -54,6 +54,22 @@ export default function EditorShell({ project, onClose }: Props) {
     void refresh();
   }, [refresh]);
 
+  // F5 — "Save & continue" advances the rail one step forward. The
+  // panel calls this after a successful save so the writer doesn't
+  // have to click the rail manually. We refresh statuses along the
+  // way so the dot for the just-finished stage flips green before
+  // the next one mounts.
+  const handleStageAdvance = useCallback(() => {
+    const order = MVP_STAGES.map((s) => s.id);
+    setActive((current) => {
+      const idx = order.indexOf(current);
+      if (idx < 0 || idx >= order.length - 1) return current;
+      const next = order[idx + 1];
+      return next ?? current;
+    });
+    setRefreshKey((k) => k + 1);
+  }, []);
+
   // The rail merges the static stage definition with the live status.
   // Active stage always shows "in_progress" if it isn't already "passed"
   // — that's the dot the writer sees beside the stage they're typing in.
@@ -82,8 +98,8 @@ export default function EditorShell({ project, onClose }: Props) {
       <div style={s.body}>
         <StageRail stages={stages} active={active} onSelect={handleSelect} />
         <main style={s.main}>
-          {active === "setup"      && <Stage1_Setup      project={project} onChanged={handleStageProgress} />}
-          {active === "audience"   && <Stage2_Audience   project={project} onChanged={handleStageProgress} />}
+          {active === "setup"      && <Stage1_Setup      project={project} onChanged={handleStageProgress} onAdvance={handleStageAdvance} />}
+          {active === "audience"   && <Stage2_Audience   project={project} onChanged={handleStageProgress} onAdvance={handleStageAdvance} />}
           {active === "characters" && <Stage5_Characters project={project} onChanged={handleStageProgress} />}
           {active === "outline"    && <Stage7_Outline    project={project} onChanged={handleStageProgress} />}
           {active === "drafting"   && <Stage8_Drafting   project={project} onChanged={handleStageProgress} />}
