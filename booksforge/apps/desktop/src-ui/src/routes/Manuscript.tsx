@@ -25,13 +25,14 @@
  * same SQLite blob the AI pipeline writes during Drafting.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SceneEditor, type JSONContent } from "@booksforge/editor";
+import { SceneEditor, type Editor, type JSONContent } from "@booksforge/editor";
 import type {
   NodeInfo,
   OpenProjectResult,
   SceneLoadResult,
 } from "@booksforge/shared-types";
 import Binder, { type BinderHandle } from "../components/Binder";
+import QuickActionBar from "../components/QuickActionBar";
 import { ipc } from "../lib/ipc";
 import { errorMessage } from "../lib/errorMessage";
 import { useToast } from "../components/ToastProvider";
@@ -207,6 +208,28 @@ export default function Manuscript({ project, initialSceneId, onSwitchToJourney 
   const binderRef = useRef<BinderHandle>(null);
   useShortcut("binder.focus", () => binderRef.current?.focusFirstRow());
 
+  // Cmd+K quick-action bar state. Captures the editor's current
+  // selection (or surrounding paragraph) at open time so the bar's
+  // scope doesn't shift while the writer reviews the suggestion.
+  const editorRef = useRef<Editor | null>(null);
+  const [quickAction, setQuickAction] = useState<null | { scope: string }>(null);
+  useShortcut("agents.quick-action", () => {
+    if (!editorRef.current) return;
+    const ed = editorRef.current;
+    const { from, to, $from } = ed.state.selection;
+    let scope: string;
+    if (from !== to) {
+      scope = ed.state.doc.textBetween(from, to, "\n");
+    } else {
+      // No selection — take the surrounding paragraph so the writer
+      // doesn't have to highlight before invoking the bar.
+      const start = $from.before($from.depth);
+      const end   = $from.after($from.depth);
+      scope = ed.state.doc.textBetween(start, end, "\n").trim();
+    }
+    setQuickAction({ scope });
+  });
+
   return (
     <div style={s.shell}>
       <Binder
@@ -252,6 +275,7 @@ export default function Manuscript({ project, initialSceneId, onSwitchToJourney 
               key={selectedSceneId}
               initialDoc={sceneLoad.doc}
               onSave={handleSave}
+              onEditorReady={(ed) => { editorRef.current = ed; }}
             />
           )}
         </div>
@@ -262,6 +286,15 @@ export default function Manuscript({ project, initialSceneId, onSwitchToJourney 
         project={project}
         onRefreshTree={() => setRefreshKey((k) => k + 1)}
       />
+
+      {quickAction && (
+        <QuickActionBar
+          sceneNodeId={selectedSceneId}
+          initialScope={quickAction.scope}
+          editor={editorRef.current}
+          onClose={() => setQuickAction(null)}
+        />
+      )}
     </div>
   );
 }
