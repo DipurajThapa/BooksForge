@@ -18,6 +18,7 @@ import type { OpenProjectResult } from "@booksforge/shared-types";
 import { ipc } from "../lib/ipc";
 import { errorMessage } from "../lib/errorMessage";
 import { useToast } from "../components/ToastProvider";
+import type { StageId } from "../components/StageRail";
 
 // Mirror of `booksforge_domain::ReaderExpectationMap`. Hand-typed
 // because we carry it as a JSON string in `proposal_json`.
@@ -45,6 +46,11 @@ interface Props {
   /** F5 — Called by "Save & continue" after a successful save so the
    *  StageRail advances to the next stage. Optional. */
   onAdvance?: () => void;
+  /** F12 — Called by the "Go to Stage N" CTA in the missing-prereq
+   *  banner. EditorShell wires it to its stage-jump handler so the
+   *  writer doesn't have to navigate the rail by hand. Optional so
+   *  the panel can still render in isolation (tests). */
+  onJumpToStage?: (id: StageId) => void;
 }
 
 interface AudienceForm {
@@ -64,7 +70,7 @@ const EMPTY: AudienceForm = {
   forbidden_tropes:       "",
 };
 
-export default function Stage2_Audience({ project, onChanged, onAdvance }: Props) {
+export default function Stage2_Audience({ project, onChanged, onAdvance, onJumpToStage }: Props) {
   void project;
   const [form,         setForm]         = useState<AudienceForm>(EMPTY);
   const [loading,      setLoading]      = useState(true);
@@ -261,8 +267,18 @@ export default function Stage2_Audience({ project, onChanged, onAdvance }: Props
         )}
         {!loading && !loaded && (
           <div style={s.bannerWarn}>
-            <b>No brief saved yet.</b> Complete <b>Stage 1 — Book Setup</b>
-            first; the audience map saves into the same brief.
+            <div style={{ marginBottom: 8 }}>
+              <b>No brief saved yet.</b> The audience map saves into the
+              same brief that Stage 1 owns, so complete Stage 1 first.
+            </div>
+            {onJumpToStage && (
+              <button
+                style={s.jumpBtn}
+                onClick={() => onJumpToStage("setup")}
+              >
+                ← Go to Stage 1 — Book Setup
+              </button>
+            )}
           </div>
         )}
 
@@ -630,6 +646,16 @@ const s: Record<string, React.CSSProperties> = {
     background: "transparent", color: "var(--color-neutral-700)",
     border: "1px solid var(--color-neutral-300)", borderRadius: 5,
     fontSize: 13, fontWeight: 500, cursor: "pointer",
+    fontFamily: "var(--font-ui)",
+  },
+  // F12 — Inline jump button rendered inside warning banners that
+  // point the writer at a missing-prereq stage. Reads as a primary
+  // amber CTA so it stands out from the prose.
+  jumpBtn: {
+    padding: "8px 14px",
+    background: "var(--color-amber-600)", color: "#fff",
+    border: "none", borderRadius: 4,
+    fontSize: 13, fontWeight: 600, cursor: "pointer",
     fontFamily: "var(--font-ui)",
   },
   code: {

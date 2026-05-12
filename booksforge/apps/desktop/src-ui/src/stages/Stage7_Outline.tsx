@@ -36,10 +36,14 @@ import {
 } from "../components/AxisBar";
 import { ipc } from "../lib/ipc";
 import { errorMessage } from "../lib/errorMessage";
+import type { StageId } from "../components/StageRail";
 
 interface Props {
   project:    OpenProjectResult;
   onChanged?: () => void;
+  /** F12 — Called by the "Go to Stage N" CTA in the missing-prereq
+   *  banner. EditorShell wires it to its stage-jump handler. */
+  onJumpToStage?: (id: StageId) => void;
 }
 
 type StageState =
@@ -101,7 +105,7 @@ function scPasses(p: StructureCriticProposal): boolean {
   return axesPass && compositePass && noErrors;
 }
 
-export default function Stage7_Outline({ project, onChanged }: Props) {
+export default function Stage7_Outline({ project, onChanged, onJumpToStage }: Props) {
   const [state,          setState]          = useState<StageState>({ kind: "idle" });
   const [briefLoaded,    setBriefLoaded]    = useState<boolean>(false);
   const [briefJson,      setBriefJson]      = useState<unknown>(null);
@@ -335,10 +339,19 @@ export default function Stage7_Outline({ project, onChanged }: Props) {
 
         {state.kind === "no_brief" && (
           <div style={s.bannerWarn}>
-            <b>Brief required.</b> The outline architect reads the brief
-            (premise, key promises, audience) to know what to outline.
-            Open <b>Stage 1 — Book Setup</b> from the rail on the left
-            and save the brief first.
+            <div style={{ marginBottom: 8 }}>
+              <b>Brief required.</b> The outline architect reads the
+              brief (premise, key promises, audience) to know what to
+              outline. Save the brief on Stage 1 first.
+            </div>
+            {onJumpToStage && (
+              <button
+                style={s.jumpBtn}
+                onClick={() => onJumpToStage("setup")}
+              >
+                ← Go to Stage 1 — Book Setup
+              </button>
+            )}
           </div>
         )}
 
@@ -813,6 +826,14 @@ const s: Record<string, React.CSSProperties> = {
     background: "transparent", color: "var(--color-neutral-700)",
     border: "1px solid var(--color-neutral-300)", borderRadius: 5,
     fontSize: 13, fontWeight: 500, cursor: "pointer",
+    fontFamily: "var(--font-ui)",
+  },
+  // F12 — Inline jump button rendered inside missing-prereq banners.
+  jumpBtn: {
+    padding: "8px 14px",
+    background: "var(--color-amber-600)", color: "#fff",
+    border: "none", borderRadius: 4,
+    fontSize: 13, fontWeight: 600, cursor: "pointer",
     fontFamily: "var(--font-ui)",
   },
   runStatus: {

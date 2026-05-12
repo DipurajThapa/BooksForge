@@ -22,6 +22,7 @@ import {
   type RunBookPipelineResult,
 } from "../lib/ipc";
 import { errorMessage } from "../lib/errorMessage";
+import type { StageId } from "../components/StageRail";
 
 interface Props {
   project:    OpenProjectResult;
@@ -32,6 +33,9 @@ interface Props {
    *  freshly drafted prose. Optional so the panel can be rendered
    *  standalone in tests. */
   onSwitchToManuscript?: () => void;
+  /** F12 — Called by the "Go to Stage N" CTA in the missing-prereq
+   *  banner (no scenes yet → jump to Outline). */
+  onJumpToStage?: (id: StageId) => void;
 }
 
 interface StageState {
@@ -43,7 +47,7 @@ interface StageState {
   elapsed:  number;
 }
 
-export default function Stage8_Drafting({ project, onChanged, onSwitchToManuscript }: Props) {
+export default function Stage8_Drafting({ project, onChanged, onSwitchToManuscript, onJumpToStage }: Props) {
   // Pre-flight state
   const [nodes,          setNodes]          = useState<NodeInfo[]>([]);
   const [hasCharBible,   setHasCharBible]   = useState<boolean>(false);
@@ -178,10 +182,18 @@ export default function Stage8_Drafting({ project, onChanged, onSwitchToManuscri
         <div style={s.col}>
           <Header />
           <div style={s.bannerWarn}>
-            <b>No scenes to draft yet.</b> The drafter writes prose into
-            existing scene nodes. Open <b>Stage 4 — Outline &amp; Structure</b>
-            from the rail on the left, generate an outline, accept it, and
-            come back here.
+            <div style={{ marginBottom: 8 }}>
+              <b>No scenes to draft yet.</b> The drafter writes prose
+              into existing scene nodes. Generate an outline first.
+            </div>
+            {onJumpToStage && (
+              <button
+                style={s.jumpBtn}
+                onClick={() => onJumpToStage("outline")}
+              >
+                ← Go to Stage 4 — Outline &amp; Structure
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -562,6 +574,14 @@ const s: Record<string, React.CSSProperties> = {
     background: "transparent", color: "var(--color-neutral-700)",
     border: "1px solid var(--color-neutral-300)", borderRadius: 5,
     fontSize: 13, fontWeight: 500, cursor: "pointer",
+    fontFamily: "var(--font-ui)",
+  },
+  // F12 — Inline jump button rendered inside missing-prereq banners.
+  jumpBtn: {
+    padding: "8px 14px",
+    background: "var(--color-amber-600)", color: "#fff",
+    border: "none", borderRadius: 4,
+    fontSize: 13, fontWeight: 600, cursor: "pointer",
     fontFamily: "var(--font-ui)",
   },
   runStatus: {

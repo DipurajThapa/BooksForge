@@ -96,6 +96,17 @@ export default function EditorShell({ project, onClose }: Props) {
     setRefreshKey((k) => k + 1);
   }, []);
 
+  // F12 — Jump to an arbitrary stage. Wired into the "Go to Stage N"
+  // banners inside panels that detect missing prereqs, so the writer
+  // doesn't have to read prose telling them where to click — they
+  // just click. Also flips view back to Journey if the writer happens
+  // to invoke this from the Manuscript view.
+  const handleJumpToStage = useCallback((id: StageId) => {
+    setView("journey");
+    setActive(id);
+    setRefreshKey((k) => k + 1);
+  }, []);
+
   // The rail merges the static stage definition with the live status.
   // Active stage always shows "in_progress" if it isn't already "passed"
   // — that's the dot the writer sees beside the stage they're typing in.
@@ -128,14 +139,15 @@ export default function EditorShell({ project, onClose }: Props) {
             <StageRail stages={stages} active={active} onSelect={handleSelect} />
             <main style={s.main}>
               {active === "setup"      && <Stage1_Setup      project={project} onChanged={handleStageProgress} onAdvance={handleStageAdvance} />}
-              {active === "audience"   && <Stage2_Audience   project={project} onChanged={handleStageProgress} onAdvance={handleStageAdvance} />}
+              {active === "audience"   && <Stage2_Audience   project={project} onChanged={handleStageProgress} onAdvance={handleStageAdvance} onJumpToStage={handleJumpToStage} />}
               {active === "characters" && <Stage5_Characters project={project} onChanged={handleStageProgress} />}
-              {active === "outline"    && <Stage7_Outline    project={project} onChanged={handleStageProgress} />}
+              {active === "outline"    && <Stage7_Outline    project={project} onChanged={handleStageProgress} onJumpToStage={handleJumpToStage} />}
               {active === "drafting"   && (
                 <Stage8_Drafting
                   project={project}
                   onChanged={handleStageProgress}
                   onSwitchToManuscript={handleSwitchToManuscript}
+                  onJumpToStage={handleJumpToStage}
                 />
               )}
               {active === "export"     && <Stage13_14_Export project={project} onChanged={handleStageProgress} />}
