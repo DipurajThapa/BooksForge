@@ -24,8 +24,9 @@ pub mod types;
 
 pub use client::{HttpOllamaClient, OllamaClient};
 pub use types::{
-    CancelToken, ChatMessage, ChatOutcome, ChatRequest, GenerateOutcome, GenerateRequest,
-    LocalModel, ModelInfo, OllamaVersion, ProgressSink, PullProgress, TokenSink,
+    CancelToken, ChatMessage, ChatOutcome, ChatRequest, GenerateOptions, GenerateOutcome,
+    GenerateRequest, LocalModel, ModelInfo, OllamaVersion, ProgressSink, PullProgress,
+    ThinkingMode, TokenSink,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -48,8 +49,13 @@ pub enum OllamaError {
     #[error("out of memory — reduce model size or close other applications")]
     OutOfMemory,
 
-    #[error("insufficient disk space: need {required_bytes} bytes, only {available_bytes} available")]
-    DiskSpaceInsufficient { required_bytes: u64, available_bytes: u64 },
+    #[error(
+        "insufficient disk space: need {required_bytes} bytes, only {available_bytes} available"
+    )]
+    DiskSpaceInsufficient {
+        required_bytes: u64,
+        available_bytes: u64,
+    },
 
     #[error("generation cancelled")]
     Cancelled,

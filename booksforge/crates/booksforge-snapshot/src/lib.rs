@@ -33,8 +33,8 @@
 use std::sync::Arc;
 
 use booksforge_domain::{
-    AgentAppliedEdit, AppliedEditKind, Node, NodeKind, NodeStatus, SceneContent,
-    SnapshotRecord, SnapshotScope, SnapshotTree, SnapshotTrigger, TreeEntry,
+    AgentAppliedEdit, AppliedEditKind, Node, NodeKind, NodeStatus, SceneContent, SnapshotRecord,
+    SnapshotScope, SnapshotTree, SnapshotTrigger, TreeEntry,
 };
 use booksforge_fs::{BundleFilesystem, BundlePath};
 use booksforge_storage::{StorageError, StorageRepository};
@@ -74,7 +74,7 @@ pub enum SnapshotError {
     RestoreFailedAfterSafety {
         safety_id: Ulid,
         #[source]
-        source:    Box<SnapshotError>,
+        source: Box<SnapshotError>,
     },
 }
 
@@ -89,17 +89,21 @@ pub enum SnapshotError {
 /// share it across the orchestrator and the Tauri command layer.
 pub struct SnapshotService {
     storage: Arc<dyn StorageRepository>,
-    fs:      Arc<dyn BundleFilesystem>,
-    bundle:  BundlePath,
+    fs: Arc<dyn BundleFilesystem>,
+    bundle: BundlePath,
 }
 
 impl SnapshotService {
     pub fn new(
         storage: Arc<dyn StorageRepository>,
-        fs:      Arc<dyn BundleFilesystem>,
-        bundle:  BundlePath,
+        fs: Arc<dyn BundleFilesystem>,
+        bundle: BundlePath,
     ) -> Self {
-        Self { storage, fs, bundle }
+        Self {
+            storage,
+            fs,
+            bundle,
+        }
     }
 
     /// Capture the current project state into a new snapshot.
@@ -116,13 +120,16 @@ impl SnapshotService {
     /// 4. Insert a [`SnapshotRecord`] row pointing at the tree-hash.
     pub async fn create(
         &self,
-        scope:    SnapshotScope,
+        scope: SnapshotScope,
         scope_id: Option<Ulid>,
-        label:    Option<String>,
-        trigger:  SnapshotTrigger,
+        label: Option<String>,
+        trigger: SnapshotTrigger,
     ) -> Result<SnapshotRecord, SnapshotError> {
         // 1. Atomic read.
-        let (nodes, scenes) = self.storage.list_nodes_with_scene_content_consistent().await?;
+        let (nodes, scenes) = self
+            .storage
+            .list_nodes_with_scene_content_consistent()
+            .await?;
         let scenes_by_id: std::collections::HashMap<Ulid, &SceneContent> =
             scenes.iter().map(|s| (s.node_id, s)).collect();
 
@@ -133,7 +140,10 @@ impl SnapshotService {
         for node in &nodes {
             let mut content_hash: Option<String> = None;
 
-            if matches!(node.kind, NodeKind::Scene | NodeKind::FrontMatter | NodeKind::BackMatter) {
+            if matches!(
+                node.kind,
+                NodeKind::Scene | NodeKind::FrontMatter | NodeKind::BackMatter
+            ) {
                 if let Some(scene) = scenes_by_id.get(&node.id) {
                     let bytes = serde_json::to_vec(&scene.pm_doc)?;
                     let hash = self.fs.write_snapshot_object(&self.bundle, &bytes).await?;
@@ -150,12 +160,15 @@ impl SnapshotService {
         // 3. Build + write tree object.
         let tree = SnapshotTree::new(entries);
         let tree_bytes = serde_json::to_vec(&tree)?;
-        let tree_hash  = self.fs.write_snapshot_object(&self.bundle, &tree_bytes).await?;
+        let tree_hash = self
+            .fs
+            .write_snapshot_object(&self.bundle, &tree_bytes)
+            .await?;
         bytes_written += tree_bytes.len() as u64;
 
         // 4. Insert manifest row.
         let record = SnapshotRecord {
-            id:         Ulid::new(),
+            id: Ulid::new(),
             scope,
             scope_id,
             label,
@@ -194,8 +207,13 @@ impl SnapshotService {
     }
 
     async fn load_tree_by_hash(&self, hash: &str) -> Result<SnapshotTree, SnapshotError> {
-        let bytes = self.fs.read_snapshot_object(&self.bundle, hash).await
-            .map_err(|_| SnapshotError::TreeMissing { hash: hash.to_owned() })?;
+        let bytes = self
+            .fs
+            .read_snapshot_object(&self.bundle, hash)
+            .await
+            .map_err(|_| SnapshotError::TreeMissing {
+                hash: hash.to_owned(),
+            })?;
         let tree: SnapshotTree = serde_json::from_slice(&bytes)?;
         Ok(tree)
     }
@@ -223,17 +241,19 @@ impl SnapshotService {
     pub async fn restore(
         &self,
         snapshot_id: Ulid,
-        selective:   Option<Vec<Ulid>>,
+        selective: Option<Vec<Ulid>>,
     ) -> Result<RestoreReport, SnapshotError> {
         // Pre-restore safety snapshot (reuses Manual trigger; see ADR
         // discussion in MZ-06 audit — extending the enum would require a
         // schema migration we'd rather defer).
-        let pre = self.create(
-            SnapshotScope::Project,
-            None,
-            Some(format!("pre-restore of {snapshot_id}")),
-            SnapshotTrigger::PreRestore,
-        ).await?;
+        let pre = self
+            .create(
+                SnapshotScope::Project,
+                None,
+                Some(format!("pre-restore of {snapshot_id}")),
+                SnapshotTrigger::PreRestore,
+            )
+            .await?;
 
         // Past this point, the safety snapshot exists.  Any failure must
         // be wrapped in `RestoreFailedAfterSafety` so the UI can surface
@@ -244,12 +264,14 @@ impl SnapshotService {
             let target_ids: Option<std::collections::BTreeSet<Ulid>> =
                 selective.map(|v| v.into_iter().collect());
 
-            let mut nodes_restored  = 0u32;
+            let mut nodes_restored = 0u32;
             let mut scenes_restored = 0u32;
 
             for entry in &tree.entries {
                 if let Some(ref allow) = target_ids {
-                    if !allow.contains(&entry.node_id) { continue; }
+                    if !allow.contains(&entry.node_id) {
+                        continue;
+                    }
                 }
                 self.restore_entry(entry).await?;
                 nodes_restored += 1;
@@ -308,11 +330,11 @@ impl SnapshotService {
                 })?;
             let pm_doc: serde_json::Value = serde_json::from_slice(&bytes)?;
             let scene = SceneContent {
-                node_id:    entry.node_id,
+                node_id: entry.node_id,
                 pm_doc,
                 word_count: 0,
                 char_count: 0,
-                hash:       hash.clone(),
+                hash: hash.clone(),
                 updated_at: Utc::now(),
             };
             self.storage.save_scene(&scene).await?;
@@ -329,11 +351,12 @@ impl SnapshotService {
     /// later linking.
     pub async fn pre_agent_edit_snapshot(
         &self,
-        scope:    SnapshotScope,
+        scope: SnapshotScope,
         scope_id: Option<Ulid>,
-        label:    Option<String>,
+        label: Option<String>,
     ) -> Result<SnapshotRecord, SnapshotError> {
-        self.create(scope, scope_id, label, SnapshotTrigger::PreAgentEdit).await
+        self.create(scope, scope_id, label, SnapshotTrigger::PreAgentEdit)
+            .await
     }
 
     /// Take a `pre_ai` snapshot for a quick-action preset (MZ-08).
@@ -344,32 +367,33 @@ impl SnapshotService {
     /// trigger value lets the timeline UI distinguish the two later.
     pub async fn pre_ai_snapshot(
         &self,
-        scope:    SnapshotScope,
+        scope: SnapshotScope,
         scope_id: Option<Ulid>,
-        label:    Option<String>,
+        label: Option<String>,
     ) -> Result<SnapshotRecord, SnapshotError> {
-        self.create(scope, scope_id, label, SnapshotTrigger::PreAi).await
+        self.create(scope, scope_id, label, SnapshotTrigger::PreAi)
+            .await
     }
 
     /// Helper that constructs a typed [`AgentAppliedEdit`] record after a
     /// `pre_agent_edit_snapshot` has been taken.  Pure value construction —
     /// the caller must still call `storage.agent_applied_edit_insert`.
     pub fn build_applied_edit(
-        task_id:              Ulid,
-        node_id:              Ulid,
+        task_id: Ulid,
+        node_id: Ulid,
         pre_edit_snapshot_id: Ulid,
-        edit_kind:            AppliedEditKind,
-        edit_payload_json:    String,
+        edit_kind: AppliedEditKind,
+        edit_payload_json: String,
     ) -> AgentAppliedEdit {
         AgentAppliedEdit {
-            id:                   Ulid::new(),
+            id: Ulid::new(),
             task_id,
             node_id,
             pre_edit_snapshot_id,
-            applied_at:           Utc::now(),
+            applied_at: Utc::now(),
             edit_kind,
             edit_payload_json,
-            reverted_at:          None,
+            reverted_at: None,
         }
     }
 }
@@ -378,22 +402,22 @@ impl SnapshotService {
 #[derive(Debug, Clone)]
 pub struct RestoreReport {
     pub pre_restore_snapshot_id: Ulid,
-    pub nodes_restored:          u32,
-    pub scenes_restored:         u32,
+    pub nodes_restored: u32,
+    pub scenes_restored: u32,
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn node_to_entry(node: &Node, content_hash: Option<String>) -> TreeEntry {
     TreeEntry {
-        node_id:      node.id,
-        parent_id:    node.parent_id,
-        kind:         node_kind_str(node.kind).to_owned(),
-        title:        node.title.clone(),
-        position:     node.position.clone(),
-        status:       node_status_str(node.status).to_owned(),
-        pov:          node.pov.clone(),
-        beat:         node.beat.clone(),
+        node_id: node.id,
+        parent_id: node.parent_id,
+        kind: node_kind_str(node.kind).to_owned(),
+        title: node.title.clone(),
+        position: node.position.clone(),
+        status: node_status_str(node.status).to_owned(),
+        pov: node.pov.clone(),
+        beat: node.beat.clone(),
         target_words: node.target_words,
         content_hash,
     }
@@ -401,60 +425,64 @@ fn node_to_entry(node: &Node, content_hash: Option<String>) -> TreeEntry {
 
 fn entry_to_node(entry: &TreeEntry) -> Result<Node, SnapshotError> {
     Ok(Node {
-        id:           entry.node_id,
-        parent_id:    entry.parent_id,
-        kind:         parse_node_kind(&entry.kind)?,
-        title:        entry.title.clone(),
-        position:     entry.position.clone(),
-        status:       parse_node_status(&entry.status)?,
-        pov:          entry.pov.clone(),
-        beat:         entry.beat.clone(),
+        id: entry.node_id,
+        parent_id: entry.parent_id,
+        kind: parse_node_kind(&entry.kind)?,
+        title: entry.title.clone(),
+        position: entry.position.clone(),
+        status: parse_node_status(&entry.status)?,
+        pov: entry.pov.clone(),
+        beat: entry.beat.clone(),
         target_words: entry.target_words,
-        created_at:   Utc::now(),
-        updated_at:   Utc::now(),
-        deleted_at:   None,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+        deleted_at: None,
     })
 }
 
 fn node_kind_str(k: NodeKind) -> &'static str {
     match k {
-        NodeKind::Project     => "project",
-        NodeKind::Part        => "part",
-        NodeKind::Chapter     => "chapter",
-        NodeKind::Scene       => "scene",
+        NodeKind::Project => "project",
+        NodeKind::Part => "part",
+        NodeKind::Chapter => "chapter",
+        NodeKind::Scene => "scene",
         NodeKind::FrontMatter => "front_matter",
-        NodeKind::BackMatter  => "back_matter",
+        NodeKind::BackMatter => "back_matter",
     }
 }
 
 fn parse_node_kind(s: &str) -> Result<NodeKind, SnapshotError> {
     match s {
-        "project"      => Ok(NodeKind::Project),
-        "part"         => Ok(NodeKind::Part),
-        "chapter"      => Ok(NodeKind::Chapter),
-        "scene"        => Ok(NodeKind::Scene),
+        "project" => Ok(NodeKind::Project),
+        "part" => Ok(NodeKind::Part),
+        "chapter" => Ok(NodeKind::Chapter),
+        "scene" => Ok(NodeKind::Scene),
         "front_matter" => Ok(NodeKind::FrontMatter),
-        "back_matter"  => Ok(NodeKind::BackMatter),
-        other => Err(SnapshotError::Invalid(format!("unknown node kind: {other}"))),
+        "back_matter" => Ok(NodeKind::BackMatter),
+        other => Err(SnapshotError::Invalid(format!(
+            "unknown node kind: {other}"
+        ))),
     }
 }
 
 fn node_status_str(s: NodeStatus) -> &'static str {
     match s {
-        NodeStatus::Planned  => "planned",
+        NodeStatus::Planned => "planned",
         NodeStatus::Drafting => "drafting",
-        NodeStatus::Revised  => "revised",
-        NodeStatus::Final    => "final",
+        NodeStatus::Revised => "revised",
+        NodeStatus::Final => "final",
     }
 }
 
 fn parse_node_status(s: &str) -> Result<NodeStatus, SnapshotError> {
     match s {
-        "planned"  => Ok(NodeStatus::Planned),
+        "planned" => Ok(NodeStatus::Planned),
         "drafting" => Ok(NodeStatus::Drafting),
-        "revised"  => Ok(NodeStatus::Revised),
-        "final"    => Ok(NodeStatus::Final),
-        other => Err(SnapshotError::Invalid(format!("unknown node status: {other}"))),
+        "revised" => Ok(NodeStatus::Revised),
+        "final" => Ok(NodeStatus::Final),
+        other => Err(SnapshotError::Invalid(format!(
+            "unknown node status: {other}"
+        ))),
     }
 }
 
@@ -465,8 +493,12 @@ mod tests {
     #[test]
     fn node_kind_roundtrip() {
         for k in [
-            NodeKind::Project, NodeKind::Part, NodeKind::Chapter,
-            NodeKind::Scene,   NodeKind::FrontMatter, NodeKind::BackMatter,
+            NodeKind::Project,
+            NodeKind::Part,
+            NodeKind::Chapter,
+            NodeKind::Scene,
+            NodeKind::FrontMatter,
+            NodeKind::BackMatter,
         ] {
             assert_eq!(parse_node_kind(node_kind_str(k)).unwrap(), k);
         }
@@ -474,7 +506,12 @@ mod tests {
 
     #[test]
     fn node_status_roundtrip() {
-        for s in [NodeStatus::Planned, NodeStatus::Drafting, NodeStatus::Revised, NodeStatus::Final] {
+        for s in [
+            NodeStatus::Planned,
+            NodeStatus::Drafting,
+            NodeStatus::Revised,
+            NodeStatus::Final,
+        ] {
             assert_eq!(parse_node_status(node_status_str(s)).unwrap(), s);
         }
     }

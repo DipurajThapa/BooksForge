@@ -3,4 +3,10 @@
 /**
  * Returned by `project_create` and `project_open` on success.
  */
-export type OpenProjectResult = { project_id: string, title: string, author: string, bundle_path: string, };
+export type OpenProjectResult = { project_id: string, title: string, author: string, bundle_path: string, 
+/**
+ * Current project classification (Phase 4 of PRODUCT_ROADMAP_E2E.md).
+ * `None` for projects created before BookKind landed; the desktop
+ * app surfaces an onboarding overlay so the user can backfill it.
+ */
+book_kind: string | null, };

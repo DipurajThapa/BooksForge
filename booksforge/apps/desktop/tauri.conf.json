@@ -4,8 +4,8 @@
   "version": "0.0.1",
   "identifier": "com.booksforge.app",
   "build": {
-    "beforeDevCommand": "pnpm -C src-ui dev",
-    "beforeBuildCommand": "pnpm -C src-ui build",
+    "beforeDevCommand": "pnpm --filter @booksforge/desktop-ui dev",
+    "beforeBuildCommand": "pnpm --filter @booksforge/desktop-ui build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../apps/desktop/src-ui/dist"
   },

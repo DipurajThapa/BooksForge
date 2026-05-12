@@ -28,6 +28,28 @@ Constraints on output:
   - `title_suggestions` has 1–4 short candidate titles; you may invent these.
   - `premise` is 1–3 sentences, in the writer's own register where possible.
 
+Uniqueness extraction (every story should be its own thing — extract
+these signals so the downstream agents braid them through every scene).
+EXTRACT ONLY when the writer's idea text actually mentions or implies
+them. NEVER invent. Empty array / null is the correct answer when absent.
+
+  - `comp_titles_or_authors` : titles, authors, or films the writer
+    invokes as touchstones. "in the spirit of Le Guin", "like Station
+    Eleven but in Lagos", etc.  ≤ 5 entries.
+  - `theme_keywords`         : recurring obsessions named or implied.
+    "loneliness", "inheritance", "second-language identity". 0–6 entries.
+  - `forbidden_tropes`       : patterns the writer says they want to
+    avoid. "no chosen-one plot", "no AI prose tells", "no love
+    triangles". 0–6 entries.
+  - `era_setting`            : time-and-place anchor if named ("1990s
+    rural Pennsylvania", "near-future Lagos"). Null if not specified.
+  - `cultural_context`       : cultural lens shaping voice and stakes
+    if named ("Bengali-American immigrant", "post-Soviet Estonia").
+    Null if not specified.
+  - `creative_seed`          : the writer's structural angle if they
+    state one ("tell it backwards from the funeral", "each chapter is a
+    deposition transcript"). Null if not specified.
+
 Output strictly valid JSON matching `ProjectBrief`.  No prose outside.
 """
 
@@ -42,15 +64,21 @@ WRITER'S IDEA:
 
 Return JSON of shape `ProjectBrief`:
 {
-  "title_suggestions": ["string", "..."],
-  "mode":              "fiction" | "non_fiction" | "memoir" | "academic",
-  "genre":             "string",
-  "audience":          "string",
-  "tone":              "string",
-  "target_word_count": integer,
-  "premise":           "string (1–3 sentences)",
-  "key_promises":      ["string", "..."],
-  "questions_for_user": ["string", "..."]
+  "title_suggestions":      ["string", "..."],
+  "mode":                   "fiction" | "non_fiction" | "memoir" | "academic",
+  "genre":                  "string",
+  "audience":               "string",
+  "tone":                   "string",
+  "target_word_count":      integer,
+  "premise":                "string (1–3 sentences)",
+  "key_promises":           ["string", "..."],
+  "questions_for_user":     ["string", "..."],
+  "comp_titles_or_authors": ["string", "..."],   // [] if writer named none
+  "theme_keywords":         ["string", "..."],   // [] if not derivable
+  "forbidden_tropes":       ["string", "..."],   // [] if writer named none
+  "era_setting":            "string or null",
+  "cultural_context":       "string or null",
+  "creative_seed":          "string or null"
 }
 {{ prompt_guard }}
 """

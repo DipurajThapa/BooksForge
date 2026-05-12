@@ -12,13 +12,13 @@ use ts_rs::TS;
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct MemoryEntryDto {
-    pub id:         String,
+    pub id: String,
     /// "book" | "chapter" | "entity" | "style".
-    pub scope:      String,
-    pub key:        String,
+    pub scope: String,
+    pub key: String,
     /// JSON-stringified value — the structure depends on scope.
     pub value_json: String,
-    pub agent_id:   String,
+    pub agent_id: String,
     /// ISO-8601 UTC.
     pub created_at: String,
     pub updated_at: String,
@@ -36,18 +36,18 @@ pub struct MemoryListInput {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct VocabEntryDto {
-    pub id:           String,
-    pub layer:        String,
-    pub term:         String,
+    pub id: String,
+    pub layer: String,
+    pub term: String,
     pub display_term: String,
     /// "prefer" | "avoid" | "replace".
-    pub kind:         String,
-    pub replacement:  Option<String>,
-    pub rationale:    Option<String>,
+    pub kind: String,
+    pub replacement: Option<String>,
+    pub rationale: Option<String>,
     /// "starter" | "user" | "agent".
-    pub source:       String,
-    pub created_at:   String,
-    pub updated_at:   String,
+    pub source: String,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -83,7 +83,10 @@ pub struct MemoryUpsertInput {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct MemoryDeleteInput {
-    pub id: String,
+    /// Scope of the entry to delete ("book" | "chapter" | "entity" | "style").
+    /// Required because storage keys entries by (scope, key), not by ULID.
+    pub scope: String,
+    pub key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

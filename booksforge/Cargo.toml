@@ -18,7 +18,11 @@ members = [
     "crates/booksforge-snapshot",
     "crates/booksforge-export-epub",
     "crates/booksforge-export-pandoc",
+    "crates/booksforge-export-typst",
     "crates/booksforge-epubcheck",
+    "crates/booksforge-voice",
+    "crates/booksforge-anti-ai-tells",
+    "crates/booksforge-genre-packs",
     "crates/booksforge-test-fixtures",
 ]
 

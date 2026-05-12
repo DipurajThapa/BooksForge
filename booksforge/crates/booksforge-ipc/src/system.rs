@@ -14,7 +14,7 @@ pub struct AppVersion {
     /// `string | null`.  Earlier versions used `skip_serializing_if`
     /// which ts-rs 10 can't parse; emitting `null` is just as clear and
     /// keeps the bindings deterministic.
-    pub pre:   Option<String>,
+    pub pre: Option<String>,
 }
 
 impl AppVersion {
@@ -22,6 +22,6 @@ impl AppVersion {
         major: 0,
         minor: 0,
         patch: 1,
-        pre:   None,
+        pre: None,
     };
 }

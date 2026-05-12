@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum EmDash {
     #[default]
-    Em,     // —
+    Em, // —
     En,     // –
     Hyphen, // -
 }
@@ -15,7 +15,7 @@ pub enum EmDash {
 #[serde(rename_all = "snake_case")]
 pub enum QuoteStyle {
     #[default]
-    Smart,    // "curly"
+    Smart, // "curly"
     Straight, // "straight"
 }
 
@@ -25,7 +25,7 @@ pub enum QuoteStyle {
 pub enum EllipsisForm {
     #[default]
     SingleGlyph, // …
-    ThreeDots,   // ...
+    ThreeDots, // ...
 }
 
 /// Per-project mechanical-style choices.
@@ -35,27 +35,27 @@ pub enum EllipsisForm {
 /// into `manifest.toml [style_book]` for portability.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StyleBook {
-    pub em_dash:                EmDash,
-    pub oxford_comma:           bool,
-    pub quote_style:            QuoteStyle,
-    pub spaces_after_period:    u8,
-    pub ellipsis_form:          EllipsisForm,
-    pub spelling_locale:        String,
+    pub em_dash: EmDash,
+    pub oxford_comma: bool,
+    pub quote_style: QuoteStyle,
+    pub spaces_after_period: u8,
+    pub ellipsis_form: EllipsisForm,
+    pub spelling_locale: String,
     pub capitalize_after_colon: bool,
-    pub bold_emphasis_allowed:  bool,
+    pub bold_emphasis_allowed: bool,
 }
 
 impl Default for StyleBook {
     fn default() -> Self {
         Self {
-            em_dash:                EmDash::Em,
-            oxford_comma:           true,
-            quote_style:            QuoteStyle::Smart,
-            spaces_after_period:    1,
-            ellipsis_form:          EllipsisForm::SingleGlyph,
-            spelling_locale:        "en-US".to_owned(),
+            em_dash: EmDash::Em,
+            oxford_comma: true,
+            quote_style: QuoteStyle::Smart,
+            spaces_after_period: 1,
+            ellipsis_form: EllipsisForm::SingleGlyph,
+            spelling_locale: "en-US".to_owned(),
             capitalize_after_colon: false,
-            bold_emphasis_allowed:  false,
+            bold_emphasis_allowed: false,
         }
     }
 }

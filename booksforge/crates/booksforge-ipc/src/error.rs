@@ -32,7 +32,10 @@ pub enum BooksForgeError {
     Cancelled,
 
     #[error("schema too new: project requires app v{required_min}, running v{running}")]
-    SchemaTooNew { required_min: String, running: String },
+    SchemaTooNew {
+        required_min: String,
+        running: String,
+    },
 
     #[error("internal error — please report this: {message}")]
     Internal { message: String },
@@ -40,14 +43,20 @@ pub enum BooksForgeError {
 
 impl BooksForgeError {
     pub fn internal(message: impl Into<String>) -> Self {
-        Self::Internal { message: message.into() }
+        Self::Internal {
+            message: message.into(),
+        }
     }
 
     pub fn not_found(resource: impl Into<String>) -> Self {
-        Self::NotFound { resource: resource.into() }
+        Self::NotFound {
+            resource: resource.into(),
+        }
     }
 
     pub fn validation(message: impl Into<String>) -> Self {
-        Self::Validation { message: message.into() }
+        Self::Validation {
+            message: message.into(),
+        }
     }
 }

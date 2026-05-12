@@ -11,9 +11,11 @@
 //! (a regression that loses an item from the `pub use` list breaks
 //! these tests).
 
-use booksforge_memory::{
-    allowed_write_scopes, authorise_write, MemoryError, MemoryScope,
-};
+// Integration tests live in a separate `tests/` crate, so the workspace's
+// `cfg(test) allow expect_used` does not apply automatically.
+#![allow(clippy::expect_used, clippy::unwrap_used)]
+
+use booksforge_memory::{allowed_write_scopes, authorise_write, MemoryError, MemoryScope};
 
 /// Every agent that's named in AGENTS.md, plus a fictional one to
 /// confirm the deny-by-default fallback.
@@ -46,16 +48,25 @@ fn allowed_write_scopes_is_disjoint_per_agent_per_audit() {
     // is a `(agent, expected_scopes)` pair that, if changed, must
     // also be reflected in the spec doc.
     let cases: &[(&str, &[MemoryScope])] = &[
-        ("memory-curator",    &[MemoryScope::Book, MemoryScope::Chapter, MemoryScope::Entity]),
-        ("vocab-dictionary",  &[MemoryScope::Style, MemoryScope::Entity]),
-        ("continuity",        &[MemoryScope::Entity]),
-        ("copyeditor",        &[MemoryScope::Style]),
+        (
+            "memory-curator",
+            &[MemoryScope::Book, MemoryScope::Chapter, MemoryScope::Entity],
+        ),
+        (
+            "vocab-dictionary",
+            &[MemoryScope::Style, MemoryScope::Entity],
+        ),
+        ("continuity", &[MemoryScope::Entity]),
+        ("copyeditor", &[MemoryScope::Style]),
         ("outline-architect", &[MemoryScope::Book]),
+        // Intake also writes book-scope memory now (BACKLOG §A13 finish
+        // — the typed `project_brief` is persisted at intake time so
+        // downstream fiction agents can find it without re-running).
+        ("intake", &[MemoryScope::Book]),
         // Read-only agents:
-        ("intake",            &[]),
-        ("chapter-drafter",   &[]),
-        ("dev-editor",        &[]),
-        ("humanization",      &[]),
+        ("chapter-drafter", &[]),
+        ("dev-editor", &[]),
+        ("humanization", &[]),
         ("final-review-editor", &[]),
         ("proposal-validator", &[]),
         // Unknown agents: deny-by-default:
@@ -83,9 +94,7 @@ fn authorise_write_accepts_only_listed_scopes() {
                     "{agent} should be allowed to write {scope:?}, got {res:?}",
                 );
             } else {
-                let err = res.expect_err(&format!(
-                    "{agent} should be denied write to {scope:?}",
-                ));
+                let err = res.expect_err(&format!("{agent} should be denied write to {scope:?}",));
                 assert!(
                     matches!(err, MemoryError::OutOfScopeWrite { .. }),
                     "expected OutOfScopeWrite, got {err:?}",
@@ -97,10 +106,15 @@ fn authorise_write_accepts_only_listed_scopes() {
 
 #[test]
 fn out_of_scope_write_error_carries_agent_and_scope() {
-    let err = authorise_write("intake", MemoryScope::Book)
-        .expect_err("intake must NOT write to book scope");
+    // Use chapter-drafter (genuine read-only) as the example, since
+    // intake now writes book-scope per BACKLOG §A13 finish.
+    let err = authorise_write("chapter-drafter", MemoryScope::Book)
+        .expect_err("chapter-drafter must NOT write to book scope");
     let s = err.to_string();
-    assert!(s.contains("intake"), "error should mention agent: {s}");
+    assert!(
+        s.contains("chapter-drafter"),
+        "error should mention agent: {s}"
+    );
     assert!(s.contains("Book"), "error should mention scope: {s}");
 }
 

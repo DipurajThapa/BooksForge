@@ -39,25 +39,24 @@ pub async fn load_consent(storage: &Arc<SqliteStorage>) -> OriginalityConsent {
         .flatten();
     match entry {
         Some(e) => serde_json::from_value(e.value_json).unwrap_or_default(),
-        None    => OriginalityConsent::default(),
+        None => OriginalityConsent::default(),
     }
 }
 
 /// Persist a consent record.  `agent_id` is stamped on the memory row
 /// for audit (typically `"user"` for an interactive consent change).
 pub async fn save_consent(
-    storage:  &Arc<SqliteStorage>,
-    consent:  &OriginalityConsent,
+    storage: &Arc<SqliteStorage>,
+    consent: &OriginalityConsent,
     agent_id: &str,
 ) -> Result<(), booksforge_storage::StorageError> {
     let now = Utc::now();
     let entry = MemoryEntry {
-        id:         Ulid::new(),
-        scope:      MemoryScope::Style,
-        key:        CONSENT_KEY.to_owned(),
-        value_json: serde_json::to_value(consent)
-            .unwrap_or_else(|_| serde_json::json!({})),
-        agent_id:   agent_id.to_owned(),
+        id: Ulid::new(),
+        scope: MemoryScope::Style,
+        key: CONSENT_KEY.to_owned(),
+        value_json: serde_json::to_value(consent).unwrap_or_else(|_| serde_json::json!({})),
+        agent_id: agent_id.to_owned(),
         created_at: now,
         updated_at: now,
     };
@@ -67,7 +66,7 @@ pub async fn save_consent(
 /// Reset to the default `LocalOnly` consent.  Equivalent to "revoke
 /// any opt-in to a remote provider".
 pub async fn clear_consent(
-    storage:  &Arc<SqliteStorage>,
+    storage: &Arc<SqliteStorage>,
     agent_id: &str,
 ) -> Result<(), booksforge_storage::StorageError> {
     save_consent(storage, &OriginalityConsent::default(), agent_id).await
@@ -88,24 +87,28 @@ pub async fn active_provider(storage: &Arc<SqliteStorage>) -> OriginalityProvide
 /// `min_words` defaults to `booksforge_validator::originality::DEFAULT_MIN_WORDS`
 /// (12) when the caller passes `None`.
 pub fn scan_local(
-    output:       &str,
-    source:       Option<&str>,
+    output: &str,
+    source: Option<&str>,
     prior_corpus: Option<&str>,
-    min_words:    Option<usize>,
+    min_words: Option<usize>,
 ) -> OriginalityCheckResult {
     let mw = min_words.unwrap_or(booksforge_validator::originality::DEFAULT_MIN_WORDS);
     let mut hits = Vec::new();
     if let Some(src) = source {
-        hits.extend(booksforge_validator::detect_verbatim_overlap(output, src, mw));
+        hits.extend(booksforge_validator::detect_verbatim_overlap(
+            output, src, mw,
+        ));
     }
     if let Some(prior) = prior_corpus {
-        hits.extend(booksforge_validator::detect_self_plagiarism(output, prior, mw));
+        hits.extend(booksforge_validator::detect_self_plagiarism(
+            output, prior, mw,
+        ));
     }
     let longest = hits.iter().map(|h| h.words).max().unwrap_or(0);
     let samples = hits.iter().take(10).map(|h| h.quote.clone()).collect();
     OriginalityCheckResult {
-        provider:          OriginalityProviderId::LocalOnly,
-        hit_count:         hits.len() as u32,
+        provider: OriginalityProviderId::LocalOnly,
+        hit_count: hits.len() as u32,
         longest_run_words: longest,
         samples,
     }
@@ -134,17 +137,32 @@ mod tests {
     async fn active_provider_reflects_saved_consent() {
         let (storage, _d) = fresh_storage().await;
         // Default: local only.
-        assert_eq!(active_provider(&storage).await, OriginalityProviderId::LocalOnly);
+        assert_eq!(
+            active_provider(&storage).await,
+            OriginalityProviderId::LocalOnly
+        );
         // Save a hypothetical remote consent — active_provider must reflect it.
-        save_consent(&storage, &OriginalityConsent {
-            provider:    OriginalityProviderId::Copyleaks,
-            accepted_at: "2026-05-07T12:00:00Z".into(),
-            note:        "test".into(),
-        }, "user").await.unwrap();
-        assert_eq!(active_provider(&storage).await, OriginalityProviderId::Copyleaks);
+        save_consent(
+            &storage,
+            &OriginalityConsent {
+                provider: OriginalityProviderId::Copyleaks,
+                accepted_at: "2026-05-07T12:00:00Z".into(),
+                note: "test".into(),
+            },
+            "user",
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            active_provider(&storage).await,
+            OriginalityProviderId::Copyleaks
+        );
         // Clearing returns us to local.
         clear_consent(&storage, "user").await.unwrap();
-        assert_eq!(active_provider(&storage).await, OriginalityProviderId::LocalOnly);
+        assert_eq!(
+            active_provider(&storage).await,
+            OriginalityProviderId::LocalOnly
+        );
     }
 
     #[test]

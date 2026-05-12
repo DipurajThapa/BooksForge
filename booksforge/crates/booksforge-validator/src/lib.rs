@@ -13,9 +13,7 @@
 use std::time::Instant;
 
 use booksforge_domain::{
-    validator::{
-        Severity, ValidationReport, ValidatorIssue, ValidatorRun, ValidatorRunStatus,
-    },
+    validator::{Severity, ValidationReport, ValidatorIssue, ValidatorRun, ValidatorRunStatus},
     Node, NodeKind, StyleBook, VocabEntry,
 };
 use chrono::Utc;
@@ -27,12 +25,10 @@ pub mod originality;
 pub mod validators;
 
 pub use agent_outputs::{validate_agent_output, AgentOutputContext, AgentOutputReport};
-pub use originality::{
-    detect_self_plagiarism, detect_verbatim_overlap, OverlapHit, OverlapKind,
-};
 pub use continuity::{
     detect_name_drift, detect_pov_drift, detect_tense_drift, detect_timeline, lint_scene,
 };
+pub use originality::{detect_self_plagiarism, detect_verbatim_overlap, OverlapHit, OverlapKind};
 pub use validators::ALL_VALIDATORS;
 
 // ── Context ──────────────────────────────────────────────────────────────────
@@ -41,40 +37,44 @@ pub use validators::ALL_VALIDATORS;
 #[derive(Debug, Clone)]
 pub struct SceneText {
     pub node_id: Ulid,
-    pub text:    String,
+    pub text: String,
 }
 
 /// Project metadata snapshot — kept tiny so callers can synthesise from
 /// either the manifest or the AppState without pulling everything in.
 #[derive(Debug, Clone, Default)]
 pub struct ProjectMetaSummary {
-    pub title:    String,
-    pub author:   String,
+    pub title: String,
+    pub author: String,
     /// BCP-47 language tag.  Empty when the project hasn't recorded one.
     pub language: String,
     /// Optional ISBN — only validated when present.
-    pub isbn:     Option<String>,
+    pub isbn: Option<String>,
 }
 
 /// Everything a validator needs to run.  Pure logic — caller (the
 /// Tauri command) is responsible for fetching nodes / scenes / vocab from
 /// storage and rendering pm_doc to plain text.
 pub struct ValidatorContext<'a> {
-    pub nodes:               &'a [Node],
-    pub scenes:              &'a [SceneText],
-    pub style:               &'a StyleBook,
-    pub vocab:               &'a [VocabEntry],
+    pub nodes: &'a [Node],
+    pub scenes: &'a [SceneText],
+    pub style: &'a StyleBook,
+    pub vocab: &'a [VocabEntry],
     pub active_vocab_layers: &'a [&'a str],
     /// Project meta summary used by the KDP metadata validator (G3).
     /// `None` is interpreted as "metadata not available" — KDP checks
     /// gracefully no-op so existing projects don't suddenly fail.
-    pub project:             Option<&'a ProjectMetaSummary>,
+    pub project: Option<&'a ProjectMetaSummary>,
 }
 
 impl ValidatorContext<'_> {
     /// Find the title of a node by id (best-effort, blank string on miss).
     pub fn node_title(&self, id: Ulid) -> &str {
-        self.nodes.iter().find(|n| n.id == id).map(|n| n.title.as_str()).unwrap_or("")
+        self.nodes
+            .iter()
+            .find(|n| n.id == id)
+            .map(|n| n.title.as_str())
+            .unwrap_or("")
     }
 }
 
@@ -90,19 +90,20 @@ pub fn run_all_validators(ctx: &ValidatorContext) -> ValidationReport {
         issues.extend((v.run)(ctx));
     }
     issues.sort_by(|a, b| {
-        b.severity.cmp(&a.severity)
+        b.severity
+            .cmp(&a.severity)
             .then(a.validator_id.cmp(&b.validator_id))
             .then(a.message.cmp(&b.message))
     });
 
     let duration_ms = started.elapsed().as_millis() as u64;
-    let scope_hash  = compute_scope_hash(ctx);
+    let scope_hash = compute_scope_hash(ctx);
 
     let run = ValidatorRun {
-        id:           Ulid::new(),
+        id: Ulid::new(),
         validator_id: "batch:all".into(),
-        ran_at:       Utc::now(),
-        status:       ValidatorRunStatus::from_issues(&issues),
+        ran_at: Utc::now(),
+        status: ValidatorRunStatus::from_issues(&issues),
         duration_ms,
         scope_hash,
     };
@@ -137,14 +138,14 @@ pub fn compute_scope_hash(ctx: &ValidatorContext) -> String {
 
 /// One validator's metadata + run function.
 pub struct Validator {
-    pub id:          &'static str,
+    pub id: &'static str,
     pub description: &'static str,
-    pub run:         fn(&ValidatorContext) -> Vec<ValidatorIssue>,
+    pub run: fn(&ValidatorContext) -> Vec<ValidatorIssue>,
     /// Optional one-click deterministic fix.  Operates on the scene's
     /// `pm_doc` JSON in place and returns the number of replacements
     /// applied (0 → caller can no-op, > 0 → caller persists).  Validators
     /// that mark issues as `auto_fixable: true` should always supply one.
-    pub fix:         Option<fn(&mut serde_json::Value, &ValidatorContext) -> u32>,
+    pub fix: Option<fn(&mut serde_json::Value, &ValidatorContext) -> u32>,
 }
 
 // ── pm_doc text-node walker (used by every fix) ───────────────────────────────
@@ -157,7 +158,11 @@ pub fn walk_text_nodes_mut(
     pm_doc: &mut serde_json::Value,
     mut f: impl FnMut(&str) -> Option<String>,
 ) -> u32 {
-    fn walk(node: &mut serde_json::Value, f: &mut dyn FnMut(&str) -> Option<String>, count: &mut u32) {
+    fn walk(
+        node: &mut serde_json::Value,
+        f: &mut dyn FnMut(&str) -> Option<String>,
+        count: &mut u32,
+    ) {
         if let Some(obj) = node.as_object_mut() {
             // Text leaves: rewrite their `text` field if `f` returns Some.
             if obj.get("type").and_then(|v| v.as_str()) == Some("text") {
@@ -189,10 +194,12 @@ pub fn walk_text_nodes_mut(
 /// changed text nodes.  Returns `None` if the validator has no fix.
 pub fn apply_fix(
     validator_id: &str,
-    pm_doc:       &mut serde_json::Value,
-    ctx:          &ValidatorContext,
+    pm_doc: &mut serde_json::Value,
+    ctx: &ValidatorContext,
 ) -> Option<u32> {
-    ALL_VALIDATORS.iter().find(|v| v.id == validator_id)
+    ALL_VALIDATORS
+        .iter()
+        .find(|v| v.id == validator_id)
         .and_then(|v| v.fix)
         .map(|f| f(pm_doc, ctx))
 }
@@ -201,19 +208,19 @@ pub fn apply_fix(
 
 pub(crate) fn issue(
     validator_id: &str,
-    code:         &str,
-    severity:     Severity,
-    message:      impl Into<String>,
-    node_id:      Option<Ulid>,
-    offset_from:  Option<u32>,
-    offset_to:    Option<u32>,
+    code: &str,
+    severity: Severity,
+    message: impl Into<String>,
+    node_id: Option<Ulid>,
+    offset_from: Option<u32>,
+    offset_to: Option<u32>,
     auto_fixable: bool,
 ) -> ValidatorIssue {
     ValidatorIssue {
         validator_id: validator_id.to_owned(),
-        code:         code.to_owned(),
+        code: code.to_owned(),
         severity,
-        message:      message.into(),
+        message: message.into(),
         node_id,
         offset_from,
         offset_to,
@@ -230,5 +237,8 @@ pub fn scene_word_count(text: &str) -> u32 {
 
 /// Whether `kind` denotes a node we expect to contain prose body text.
 pub fn is_prose_node(kind: NodeKind) -> bool {
-    matches!(kind, NodeKind::Scene | NodeKind::FrontMatter | NodeKind::BackMatter)
+    matches!(
+        kind,
+        NodeKind::Scene | NodeKind::FrontMatter | NodeKind::BackMatter
+    )
 }

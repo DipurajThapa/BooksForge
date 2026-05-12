@@ -41,8 +41,8 @@ pub enum EntryKind {
 impl EntryKind {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Prefer  => "prefer",
-            Self::Avoid   => "avoid",
+            Self::Prefer => "prefer",
+            Self::Avoid => "avoid",
             Self::Replace => "replace",
         }
     }
@@ -50,10 +50,10 @@ impl EntryKind {
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
-            "prefer"  => Some(Self::Prefer),
-            "avoid"   => Some(Self::Avoid),
+            "prefer" => Some(Self::Prefer),
+            "avoid" => Some(Self::Avoid),
             "replace" => Some(Self::Replace),
-            _         => None,
+            _ => None,
         }
     }
 }
@@ -73,8 +73,8 @@ impl EntrySource {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Starter => "starter",
-            Self::User    => "user",
-            Self::Agent   => "agent",
+            Self::User => "user",
+            Self::Agent => "agent",
         }
     }
 
@@ -82,9 +82,9 @@ impl EntrySource {
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "starter" => Some(Self::Starter),
-            "user"    => Some(Self::User),
-            "agent"   => Some(Self::Agent),
-            _         => None,
+            "user" => Some(Self::User),
+            "agent" => Some(Self::Agent),
+            _ => None,
         }
     }
 }
@@ -92,43 +92,43 @@ impl EntrySource {
 /// One row in `vocab_entries`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VocabEntry {
-    pub id:           Ulid,
+    pub id: Ulid,
     /// Layer slug — `"project"`, `"genre:fantasy"`, `"ai_tells"`, …
-    pub layer:        String,
+    pub layer: String,
     /// Lowercased lookup form of the term.
-    pub term:         String,
+    pub term: String,
     /// Original-cased term for UI display.
     pub display_term: String,
-    pub kind:         EntryKind,
-    pub replacement:  Option<String>,
-    pub rationale:    Option<String>,
-    pub source:       EntrySource,
-    pub created_at:   DateTime<Utc>,
-    pub updated_at:   DateTime<Utc>,
+    pub kind: EntryKind,
+    pub replacement: Option<String>,
+    pub rationale: Option<String>,
+    pub source: EntrySource,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl VocabEntry {
     /// Construct a fresh entry — caller supplies the layer + term+kind +
     /// optional replacement/rationale.  Lowercases the term automatically.
     pub fn new(
-        layer:       impl Into<String>,
+        layer: impl Into<String>,
         display_term: impl Into<String>,
-        kind:        EntryKind,
-        source:      EntrySource,
+        kind: EntryKind,
+        source: EntrySource,
     ) -> Self {
         let display = display_term.into();
         let now = Utc::now();
         Self {
-            id:           Ulid::new(),
-            layer:        layer.into(),
-            term:         display.to_lowercase(),
+            id: Ulid::new(),
+            layer: layer.into(),
+            term: display.to_lowercase(),
             display_term: display,
             kind,
-            replacement:  None,
-            rationale:    None,
+            replacement: None,
+            rationale: None,
             source,
-            created_at:   now,
-            updated_at:   now,
+            created_at: now,
+            updated_at: now,
         }
     }
 
@@ -156,14 +156,30 @@ pub enum VocabError {
 /// The implementation pack pins this order; it must match
 /// `VOCABULARY_DICTIONARIES.md`.
 pub fn layer_specificity(layer: &str) -> u32 {
-    if layer == "ai_tells"             { return 0; }
-    if layer.starts_with("audience:")  { return 1; }
-    if layer.starts_with("chapter_type:") { return 2; }
-    if layer.starts_with("voice:")     { return 3; }
-    if layer.starts_with("domain:")    { return 4; }
-    if layer.starts_with("subgenre:")  { return 5; }
-    if layer.starts_with("genre:")     { return 6; }
-    if layer == "project"              { return 7; }
+    if layer == "ai_tells" {
+        return 0;
+    }
+    if layer.starts_with("audience:") {
+        return 1;
+    }
+    if layer.starts_with("chapter_type:") {
+        return 2;
+    }
+    if layer.starts_with("voice:") {
+        return 3;
+    }
+    if layer.starts_with("domain:") {
+        return 4;
+    }
+    if layer.starts_with("subgenre:") {
+        return 5;
+    }
+    if layer.starts_with("genre:") {
+        return 6;
+    }
+    if layer == "project" {
+        return 7;
+    }
     // Unknown layer — treat as least specific so it can be overridden.
     0
 }
@@ -196,7 +212,11 @@ pub fn resolve<'a>(entries: &'a [VocabEntry], active_layers: &[&str]) -> Vec<&'a
     }
 
     let mut out: Vec<&VocabEntry> = chosen.into_values().collect();
-    out.sort_by(|a, b| a.term.cmp(&b.term).then(a.kind.as_str().cmp(b.kind.as_str())));
+    out.sort_by(|a, b| {
+        a.term
+            .cmp(&b.term)
+            .then(a.kind.as_str().cmp(b.kind.as_str()))
+    });
     out
 }
 
@@ -239,16 +259,20 @@ mod tests {
     #[test]
     fn project_layer_beats_genre() {
         let entries = vec![
-            entry("genre:fantasy", "Delve",   EntryKind::Avoid),
-            entry("project",       "Delve",   EntryKind::Prefer), // overrides
+            entry("genre:fantasy", "Delve", EntryKind::Avoid),
+            entry("project", "Delve", EntryKind::Prefer), // overrides
         ];
         let merged = resolve(&entries, &["project", "genre:fantasy"]);
-        assert_eq!(merged.len(), 2, "different (term, kind) keys → both retained");
+        assert_eq!(
+            merged.len(),
+            2,
+            "different (term, kind) keys → both retained"
+        );
         // Same (term, kind) collisions: prefer wins by precedence test below.
 
         let entries2 = vec![
-            entry("genre:fantasy", "Delve",   EntryKind::Avoid),
-            entry("project",       "Delve",   EntryKind::Avoid), // same kind → project wins
+            entry("genre:fantasy", "Delve", EntryKind::Avoid),
+            entry("project", "Delve", EntryKind::Avoid), // same kind → project wins
         ];
         let merged2 = resolve(&entries2, &["project", "genre:fantasy"]);
         assert_eq!(merged2.len(), 1);
@@ -276,7 +300,7 @@ mod tests {
     fn replacement_lookup_picks_most_specific() {
         let entries = vec![
             entry("ai_tells", "Tapestry", EntryKind::Replace).with_replacement("pattern"),
-            entry("project",  "Tapestry", EntryKind::Replace).with_replacement("weave"),
+            entry("project", "Tapestry", EntryKind::Replace).with_replacement("weave"),
         ];
         assert_eq!(
             replacement_for(&entries, &["project", "ai_tells"], "tapestry"),
@@ -286,9 +310,8 @@ mod tests {
 
     #[test]
     fn lowercase_is_case_insensitive() {
-        let entries = vec![
-            entry("ai_tells", "Tapestry", EntryKind::Replace).with_replacement("pattern"),
-        ];
+        let entries =
+            vec![entry("ai_tells", "Tapestry", EntryKind::Replace).with_replacement("pattern")];
         assert!(replacement_for(&entries, &["ai_tells"], "TAPESTRY").is_some());
         assert!(replacement_for(&entries, &["ai_tells"], "tApEsTrY").is_some());
     }

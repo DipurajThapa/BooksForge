@@ -30,7 +30,9 @@
 use std::path::PathBuf;
 
 use tracing_appender::{non_blocking::WorkerGuard, rolling};
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer as _};
+use tracing_subscriber::{
+    fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer as _,
+};
 
 /// Initialise tracing with the rotating file appender + stdout +
 /// redaction.  Returns the rotating-file worker guard; drop it on
@@ -40,8 +42,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 // available at this point in the lifecycle.
 #[allow(clippy::print_stderr)]
 pub fn init_tracing() -> Option<WorkerGuard> {
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     let (file_layer, guard) = if std::env::var_os("BOOKSFORGE_NO_FILE_LOG").is_some() {
         (None, None)
@@ -85,9 +86,7 @@ pub fn init_tracing() -> Option<WorkerGuard> {
         }
     };
 
-    let stdout_layer = fmt::layer()
-        .with_ansi(true)
-        .with_target(true);
+    let stdout_layer = fmt::layer().with_ansi(true).with_target(true);
 
     // Compose layers: env-filter at the top so both sinks see the same
     // filtered events; redact event field strings via a custom Layer.
@@ -118,7 +117,8 @@ fn log_directory() -> Option<PathBuf> {
         dirs::data_local_dir().map(|d| d.join("BooksForge").join("Logs"))
     } else {
         // ~/.local/state/booksforge (XDG state)
-        dirs::state_dir().map(|d| d.join("booksforge"))
+        dirs::state_dir()
+            .map(|d| d.join("booksforge"))
             .or_else(|| dirs::home_dir().map(|h| h.join(".local").join("state").join("booksforge")))
     }
 }
@@ -150,11 +150,7 @@ mod redact {
     pub(super) struct RedactionLayer;
 
     impl<S: Subscriber> Layer<S> for RedactionLayer {
-        fn on_event(
-            &self,
-            event: &tracing::Event<'_>,
-            _ctx: Context<'_, S>,
-        ) {
+        fn on_event(&self, event: &tracing::Event<'_>, _ctx: Context<'_, S>) {
             // We can't *modify* the event's fields once recorded;
             // instead we use a Visitor to detect leaks and emit a
             // sibling warn event.  Real redaction happens in the
@@ -172,14 +168,20 @@ mod redact {
         }
     }
 
-    struct ScanVisitor { found_pii: bool }
+    struct ScanVisitor {
+        found_pii: bool,
+    }
     impl Visit for ScanVisitor {
         fn record_str(&mut self, _field: &tracing::field::Field, value: &str) {
-            if contains_pii(value) { self.found_pii = true; }
+            if contains_pii(value) {
+                self.found_pii = true;
+            }
         }
         fn record_debug(&mut self, _field: &tracing::field::Field, value: &dyn Debug) {
             let s = format!("{value:?}");
-            if contains_pii(&s) { self.found_pii = true; }
+            if contains_pii(&s) {
+                self.found_pii = true;
+            }
         }
     }
 
@@ -205,7 +207,8 @@ mod redact {
             let c = bytes[i] as char;
             if c == '@' && i > 0 && i + 1 < bytes.len() {
                 // Walk back to find email start.
-                let local_start = (0..i).rev()
+                let local_start = (0..i)
+                    .rev()
                     .take_while(|&j| {
                         let ch = bytes[j] as char;
                         ch.is_alphanumeric() || ch == '.' || ch == '_' || ch == '+' || ch == '-'
@@ -216,13 +219,17 @@ mod redact {
                 let mut j = i + 1;
                 while j < bytes.len() {
                     let ch = bytes[j] as char;
-                    if !(ch.is_alphanumeric() || ch == '.' || ch == '-') { break; }
+                    if !(ch.is_alphanumeric() || ch == '.' || ch == '-') {
+                        break;
+                    }
                     j += 1;
                 }
                 // Require at least one '.' between @ and end of domain.
                 let dom = &s[i + 1..j];
                 if !dom.contains('.') || dom.starts_with('.') || dom.ends_with('.') {
-                    out.push(c); i += 1; continue;
+                    out.push(c);
+                    i += 1;
+                    continue;
                 }
                 // Trim everything we already pushed for the local part
                 // by truncating `out` back to where the local started.
@@ -267,7 +274,9 @@ mod redact {
         let mut idx = start;
         for (k, octet_slot) in octets.iter_mut().enumerate() {
             if k > 0 {
-                if idx >= chars.len() || chars[idx] != '.' { return None; }
+                if idx >= chars.len() || chars[idx] != '.' {
+                    return None;
+                }
                 idx += 1;
             }
             let mut val = 0u32;
@@ -277,9 +286,12 @@ mod redact {
                 // always Some — the unwrap_or(0) keeps us within the
                 // strict-policy lints with no behavioural change.
                 val = val * 10 + chars[idx].to_digit(10).unwrap_or(0);
-                idx += 1; digits += 1;
+                idx += 1;
+                digits += 1;
             }
-            if digits == 0 || val > 255 { return None; }
+            if digits == 0 || val > 255 {
+                return None;
+            }
             *octet_slot = val;
         }
         // Reject if next char would extend the number (avoid matching inside larger token).
@@ -320,19 +332,28 @@ mod redact {
     }
 
     fn match_prefix(chars: &[char], start: usize, prefix: &[char]) -> Option<usize> {
-        if start + prefix.len() > chars.len() { return None; }
+        if start + prefix.len() > chars.len() {
+            return None;
+        }
         for (k, c) in prefix.iter().enumerate() {
-            if chars[start + k] != *c { return None; }
+            if chars[start + k] != *c {
+                return None;
+            }
         }
         // Username token after prefix, up to next slash / whitespace / end.
         let mut j = start + prefix.len();
         let mut took = 0;
         while j < chars.len() {
             let c = chars[j];
-            if c == '/' || c == '\\' || c.is_whitespace() { break; }
-            j += 1; took += 1;
+            if c == '/' || c == '\\' || c.is_whitespace() {
+                break;
+            }
+            j += 1;
+            took += 1;
         }
-        if took == 0 { return None; }
+        if took == 0 {
+            return None;
+        }
         Some(j)
     }
 
@@ -345,17 +366,26 @@ mod redact {
     fn match_windows_home(chars: &[char], start: usize) -> Option<usize> {
         // `C:\Users\` is 9 chars: C : \ U s e r s \
         const PREFIX_LEN: usize = 9;
-        if start + PREFIX_LEN > chars.len() { return None; }
+        if start + PREFIX_LEN > chars.len() {
+            return None;
+        }
         let head: String = chars[start..start + PREFIX_LEN].iter().collect();
-        if !head.eq_ignore_ascii_case("C:\\Users\\") { return None; }
+        if !head.eq_ignore_ascii_case("C:\\Users\\") {
+            return None;
+        }
         let mut j = start + PREFIX_LEN;
         let mut took = 0;
         while j < chars.len() {
             let c = chars[j];
-            if c == '/' || c == '\\' || c.is_whitespace() { break; }
-            j += 1; took += 1;
+            if c == '/' || c == '\\' || c.is_whitespace() {
+                break;
+            }
+            j += 1;
+            took += 1;
         }
-        if took == 0 { return None; }
+        if took == 0 {
+            return None;
+        }
         Some(j)
     }
 

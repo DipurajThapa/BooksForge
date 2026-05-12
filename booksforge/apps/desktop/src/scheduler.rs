@@ -61,14 +61,19 @@ pub async fn tick_once(app: &AppHandle) -> Result<(), String> {
         let guard = state.open_project.lock().await;
         guard.as_ref().cloned()
     };
-    let Some(project) = project else { return Ok(()); };
+    let Some(project) = project else {
+        return Ok(());
+    };
 
-    let storage_arc      = Arc::clone(&project.storage);
+    let storage_arc = Arc::clone(&project.storage);
     let storage_trait: Arc<dyn StorageRepository> = storage_arc.clone();
-    let fs:               Arc<dyn BundleFilesystem> = Arc::new(OsFilesystem);
+    let fs: Arc<dyn BundleFilesystem> = Arc::new(OsFilesystem);
     let svc = SnapshotService::new(storage_trait, fs, project.bundle.clone());
 
-    let label = Some(format!("hourly auto · {}", chrono::Utc::now().format("%Y-%m-%d %H:%M")));
+    let label = Some(format!(
+        "hourly auto · {}",
+        chrono::Utc::now().format("%Y-%m-%d %H:%M")
+    ));
     svc.create(SnapshotScope::Project, None, label, SnapshotTrigger::Auto)
         .await
         .map_err(|e| format!("snapshot create failed: {e}"))?;

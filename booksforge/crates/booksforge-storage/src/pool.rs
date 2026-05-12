@@ -1,8 +1,11 @@
 //! SQLite connection pool — WAL mode, FK enforcement, busy-timeout.
 
-use std::path::Path;
-use sqlx::{sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous}, SqlitePool};
 use crate::StorageError;
+use sqlx::{
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
+    SqlitePool,
+};
+use std::path::Path;
 
 /// Alias so callers import from this crate only.
 pub type DbPool = SqlitePool;

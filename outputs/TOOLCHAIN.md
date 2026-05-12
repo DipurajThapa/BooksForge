@@ -165,9 +165,10 @@ The Ubuntu job runs `cargo build` and `cargo test` only — it catches Linux dri
 | Binary | Version | Source | Note |
 |--------|---------|--------|------|
 | Pandoc | `3.5` | pandoc.org | GPL; sidecar process only — never statically linked |
-| EPUBCheck | `5.1.0` | w3c/epubcheck | Java-based; bundled JRE TBD in M5 |
+| EPUBCheck | `5.3.0` | w3c/epubcheck | Java-based; bundled JRE TBD in M5. Pin bumped from 5.1.0 → 5.3.0 on 2026-05-09 (BACKLOG §A12); BF-E2E test confirmed 0 errors / 0 warnings on the 8-chapter test EPUB |
+| Typst | `0.14.x` | typst/typst | Apache-2.0; sidecar process for PDF interior generation. Single ~30 MB binary, no LaTeX dependency. Replaces the unspecified PDF engine that pandoc previously needed. Wrapped by `booksforge-export-typst` (BACKLOG §A11) |
 
-Pandoc and EPUBCheck versions are pinned in `booksforge-export-pandoc/sidecar.toml` and `booksforge-epubcheck/sidecar.toml`. The SHA-256 of each binary is recorded and verified at startup.
+Pandoc, EPUBCheck, and Typst versions are pinned in their respective sidecar TOML files (`booksforge-export-pandoc/sidecar.toml`, `booksforge-epubcheck/sidecar.toml`, `booksforge-export-typst/sidecar.toml`). The SHA-256 of each binary is recorded and verified at startup.
 
 ---
 

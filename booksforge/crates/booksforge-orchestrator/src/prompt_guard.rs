@@ -24,23 +24,20 @@
 //! responsible for its task; the guard is appended as an "Always
 //! observe these constraints" section.
 
-use booksforge_domain::{VoiceFingerprint, EntryKind};
+use booksforge_domain::{EntryKind, VoiceFingerprint};
 
 /// One vocab `avoid` rule rendered for the prompt.
 #[derive(Debug, Clone)]
 pub struct AvoidRule<'a> {
-    pub term:        &'a str,
-    pub kind:        EntryKind,
+    pub term: &'a str,
+    pub kind: EntryKind,
     pub replacement: Option<&'a str>,
-    pub rationale:   &'a str,
+    pub rationale: &'a str,
 }
 
 /// Render the full guard block.  Caller passes the project's resolved
 /// `avoid`/`replace` rules plus the `VoiceFingerprint`.
-pub fn render(
-    avoid_rules: &[AvoidRule<'_>],
-    fingerprint: &VoiceFingerprint,
-) -> String {
+pub fn render(avoid_rules: &[AvoidRule<'_>], fingerprint: &VoiceFingerprint) -> String {
     let mut out = String::with_capacity(2_500);
     out.push_str("\n\n=== ALWAYS-OBSERVE CONSTRAINTS ===\n");
     out.push_str(&render_originality_ethics());
@@ -142,19 +139,32 @@ fn render_avoid_block(rules: &[AvoidRule<'_>]) -> String {
     let mut buf = String::from("Avoid-rules — these terms are flagged for this project\n");
     for (i, r) in rules.iter().take(40).enumerate() {
         let kind_str = match r.kind {
-            EntryKind::Avoid   => "AVOID",
+            EntryKind::Avoid => "AVOID",
             EntryKind::Replace => "REPLACE",
-            EntryKind::Prefer  => "PREFER",
+            EntryKind::Prefer => "PREFER",
         };
         let line = match (r.kind, r.replacement) {
-            (EntryKind::Replace, Some(rep)) => format!("  {:>2}. [{kind_str}] \"{}\" → \"{rep}\" — {}", i + 1, r.term, r.rationale),
-            _                               => format!("  {:>2}. [{kind_str}] \"{}\" — {}",            i + 1, r.term, r.rationale),
+            (EntryKind::Replace, Some(rep)) => format!(
+                "  {:>2}. [{kind_str}] \"{}\" → \"{rep}\" — {}",
+                i + 1,
+                r.term,
+                r.rationale
+            ),
+            _ => format!(
+                "  {:>2}. [{kind_str}] \"{}\" — {}",
+                i + 1,
+                r.term,
+                r.rationale
+            ),
         };
         buf.push_str(&line);
         buf.push('\n');
     }
     if rules.len() > 40 {
-        buf.push_str(&format!("  …and {} more (truncated to fit context).\n", rules.len() - 40));
+        buf.push_str(&format!(
+            "  …and {} more (truncated to fit context).\n",
+            rules.len() - 40
+        ));
     }
     buf
 }
@@ -166,9 +176,12 @@ mod tests {
     fn sample_fp() -> VoiceFingerprint {
         VoiceFingerprint {
             corpus_tokens: 5_000,
-            sentence_words_mean: 14.0, sentence_words_stddev: 9.0,
-            em_dash_per_1000: 1.0, ly_adverb_per_1000: 8.0,
-            ai_tell_triad_per_1000: 0.0, discourse_marker_per_1000: 0.5,
+            sentence_words_mean: 14.0,
+            sentence_words_stddev: 9.0,
+            em_dash_per_1000: 1.0,
+            ly_adverb_per_1000: 8.0,
+            ai_tell_triad_per_1000: 0.0,
+            discourse_marker_per_1000: 0.5,
             type_token_ratio: 0.50,
         }
     }
@@ -201,9 +214,14 @@ mod tests {
 
     #[test]
     fn avoid_block_truncates_long_lists() {
-        let rules: Vec<AvoidRule> = (0..100).map(|_| AvoidRule {
-            term: "x", kind: EntryKind::Avoid, replacement: None, rationale: "y",
-        }).collect();
+        let rules: Vec<AvoidRule> = (0..100)
+            .map(|_| AvoidRule {
+                term: "x",
+                kind: EntryKind::Avoid,
+                replacement: None,
+                rationale: "y",
+            })
+            .collect();
         let block = render_avoid_block(&rules);
         assert!(block.contains("more (truncated"));
     }

@@ -7,15 +7,31 @@
 use booksforge_prompt::PromptTemplateId;
 
 use crate::spec::{
-    AgentSpec, ContextBudget, CrossCuttingValidator, FailureMode, ModelFamily, ModelPreference,
-    ModelSizeHint, UserGate, WhenToRun,
+    AgentSpec, ContextBudget, CrossCuttingValidator, DefaultThinking, FailureMode, ModelFamily,
+    ModelPreference, ModelSizeHint, UserGate, WhenToRun,
 };
 
 const FAILURE_MODES: &[FailureMode] = &[
-    FailureMode { id: "empty-idea",          description: "Idea text is empty or whitespace.",                recoverable: false },
-    FailureMode { id: "off-topic",           description: "Idea text is not a book pitch (e.g., a poem).",    recoverable: false },
-    FailureMode { id: "word-count-extreme",  description: "Target word count outside 5k–250k range.",         recoverable: true  },
-    FailureMode { id: "too-many-promises",   description: "key_promises array > 6 items.",                    recoverable: true  },
+    FailureMode {
+        id: "empty-idea",
+        description: "Idea text is empty or whitespace.",
+        recoverable: false,
+    },
+    FailureMode {
+        id: "off-topic",
+        description: "Idea text is not a book pitch (e.g., a poem).",
+        recoverable: false,
+    },
+    FailureMode {
+        id: "word-count-extreme",
+        description: "Target word count outside 5k–250k range.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "too-many-promises",
+        description: "key_promises array > 6 items.",
+        recoverable: true,
+    },
 ];
 
 pub fn spec() -> AgentSpec {
@@ -43,15 +59,18 @@ pub fn spec() -> AgentSpec {
         failure_modes: FAILURE_MODES,
         when_to_run:   WhenToRun::OnDemand,
         user_gate:     UserGate::Required,
+        default_thinking: DefaultThinking::Disabled,
     }
 }
 
 /// Parse the model's raw output into a typed `ProjectBrief` and run the
 /// brief's own `validate()`.  Returns `Err(reason)` so the runner can retry.
 pub fn parse_and_validate(raw: &str) -> Result<booksforge_domain::ProjectBrief, String> {
-    let brief: booksforge_domain::ProjectBrief = serde_json::from_str(raw)
-        .map_err(|e| format!("JSON parse error: {e}"))?;
-    brief.validate().map_err(|e| format!("brief validation failed: {e}"))?;
+    let brief: booksforge_domain::ProjectBrief =
+        serde_json::from_str(raw).map_err(|e| format!("JSON parse error: {e}"))?;
+    brief
+        .validate()
+        .map_err(|e| format!("brief validation failed: {e}"))?;
     Ok(brief)
 }
 

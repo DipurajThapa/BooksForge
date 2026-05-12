@@ -1,0 +1,51 @@
+{
+  "title": "The Hour Between",
+  "genre": "literary",
+  "premise": "A clockmaker's widow in a small mountain town receives a wound clock she does not remember accepting for repair. As she traces its provenance, she discovers her late husband's quiet life was not quite the one she shared with him.",
+  "voice_samples": [
+    "She did not turn the light on. Eight years she had lived in this kitchen and her hand still went to the wrong wall, every time, a small witness to who she had once been. The fridge was clicking. Outside the window, snow was settling on the garden chairs they had never put away.",
+    "He had been a careful man. That was the word people kept using at the funeral, and she had nodded each time, because it was true, and because she had not yet found the word that would be more true. Careful. As though carefulness were a virtue, and not a way of moving through the world by leaving small parts of yourself behind.",
+    "The boy at the post office said, sorry, ma'am, I shouldn't have, and then said it again, and she watched him put the package back behind the counter and thought about how rarely anyone said sorry for the thing they had actually done."
+  ],
+  "chapters": [
+    {
+      "number": 1,
+      "title": "The Wound Clock",
+      "scenes": [
+        {
+          "goal": "Ada returns home from the funeral to find a stranger's clock waiting on the workshop bench, wound and ticking.",
+          "conflict": "She does not remember accepting it. The note that comes with it is in handwriting she does not know.",
+          "reveal": "The note is signed only with an initial — H — and addressed not to the workshop but to her late husband, by a name she has never heard him called.",
+          "target_words": 1200
+        },
+        {
+          "goal": "Ada decides whether to open the clock or return it. She opens it.",
+          "conflict": "She has not touched the workshop tools since his death; her hands remember more than she does.",
+          "reveal": "Inside the case, taped to the back of the dial, is a photograph of her husband she has never seen, on a porch she does not recognise.",
+          "target_words": 1100
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "title": "The Name H",
+      "scenes": [
+        {
+          "goal": "Ada drives into town to ask the postmaster who sent the clock.",
+          "conflict": "The postmaster is the husband of an old friend; the question makes the room change shape.",
+          "reveal": "The package was hand-delivered by a woman the postmaster has never seen before.",
+          "target_words": 1200
+        },
+        {
+          "goal": "Ada returns to the workshop and looks for the porch in the photograph.",
+          "conflict": "There are dozens of porches like it in the county. She begins, slowly, to find she does not want to know.",
+          "reveal": "She closes the case and sets the clock back on the bench. It is still ticking.",
+          "target_words": 1000
+        }
+      ]
+    }
+  ],
+  "draft_model": "qwen3.5:27b",
+  "polish_model": "qwen3.5:27b",
+  "scorer_model": "qwen3.6:latest"
+}

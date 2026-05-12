@@ -42,10 +42,12 @@ pub fn flat_text_to_pm_doc(flat: &str) -> serde_json::Value {
     let blocks: Vec<serde_json::Value> = flat
         .split('\n')
         .filter(|line| !line.is_empty())
-        .map(|line| serde_json::json!({
-            "type": "paragraph",
-            "content": [{ "type": "text", "text": line }],
-        }))
+        .map(|line| {
+            serde_json::json!({
+                "type": "paragraph",
+                "content": [{ "type": "text", "text": line }],
+            })
+        })
         .collect();
     serde_json::json!({
         "type":    "doc",

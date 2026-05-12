@@ -22,15 +22,15 @@ pub struct ExportMarkdownInput {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ExportMarkdownResult {
-    pub export_id:     String,
-    pub output_path:   String,
-    pub bytes:         u64,
-    pub part_count:    u32,
+    pub export_id: String,
+    pub output_path: String,
+    pub bytes: u64,
+    pub part_count: u32,
     pub chapter_count: u32,
-    pub scene_count:   u32,
-    pub word_count:    u32,
+    pub scene_count: u32,
+    pub word_count: u32,
     /// blake3 hex of the rendered bytes (matches `exports.hash`).
-    pub hash:          String,
+    pub hash: String,
 }
 
 /// Input to the unified `export_run` command (Phase 6).
@@ -42,7 +42,7 @@ pub struct ExportMarkdownResult {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ExportRunInput {
-    pub profile:     String,
+    pub profile: String,
     pub output_path: String,
     /// Genre-aware typography profile.  String form so the UI can drive
     /// it from a `<select>`.  One of: `"fiction_trade_mass"`,
@@ -60,20 +60,20 @@ pub struct ExportRunInput {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ExportRunResult {
-    pub export_id:     String,
-    pub profile:       String,
-    pub output_path:   String,
-    pub bytes:         u64,
-    pub hash:          String,
+    pub export_id: String,
+    pub profile: String,
+    pub output_path: String,
+    pub bytes: u64,
+    pub hash: String,
     /// True if EPUBCheck ran and reported zero ERROR/FATAL issues.
     /// Always `true` for non-EPUB profiles.  False if EPUBCheck is
     /// unavailable on this machine — `validation_message` carries the
     /// reason so the UI can show "Local-only — install Java + EPUBCheck
     /// to validate".
-    pub validation_ok:      bool,
+    pub validation_ok: bool,
     pub validation_message: Option<String>,
-    pub error_count:        u32,
-    pub warning_count:      u32,
+    pub error_count: u32,
+    pub warning_count: u32,
 }
 
 /// Status of an external binary the export pipeline depends on.
@@ -84,18 +84,18 @@ pub struct ExportRunResult {
 #[ts(export)]
 pub struct ExportDependencyStatus {
     /// Identifier: `"pandoc"` | `"java"` | `"epubcheck"`.
-    pub id:        String,
+    pub id: String,
     /// Display name (e.g. "Pandoc").
-    pub name:      String,
+    pub name: String,
     /// True if the binary / JAR was found.
-    pub found:     bool,
+    pub found: bool,
     /// Resolved path (binary) when found.  Empty when missing.
-    pub path:      String,
+    pub path: String,
     /// Version string when probable; empty when not.
-    pub version:   String,
+    pub version: String,
     /// Profiles unlocked by this dependency.  UI uses to grey out
     /// disabled cards.
-    pub unlocks:   Vec<String>,
+    pub unlocks: Vec<String>,
     /// One-line hint for the user when the dependency is missing
     /// (where to download / how to install).
     pub install_hint: String,
@@ -112,10 +112,10 @@ pub struct ExportDependencyReport {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ExportHistoryEntry {
-    pub id:          String,
-    pub profile:     String,
+    pub id: String,
+    pub profile: String,
     pub output_path: String,
-    pub hash:        String,
+    pub hash: String,
     /// ISO-8601 created_at.
-    pub created_at:  String,
+    pub created_at: String,
 }

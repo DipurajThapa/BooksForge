@@ -25,18 +25,18 @@ pub enum EntityKind {
 /// entity template.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entity {
-    pub id:          Ulid,
-    pub kind:        EntityKind,
+    pub id: Ulid,
+    pub kind: EntityKind,
     /// The canonical display name (primary key for matching).
-    pub name:        String,
+    pub name: String,
     /// Alternate spellings / nicknames, loaded from `entity_aliases`.
-    pub aliases:     Vec<String>,
+    pub aliases: Vec<String>,
     /// Kind-specific structured attributes as JSON.
     pub fields_json: serde_json::Value,
-    pub notes:       String,
-    pub created_at:  DateTime<Utc>,
-    pub updated_at:  DateTime<Utc>,
-    pub deleted_at:  Option<DateTime<Utc>>,
+    pub notes: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 impl Entity {
@@ -48,8 +48,7 @@ impl Entity {
     /// (case-insensitive, trimmed).
     pub fn matches_name(&self, query: &str) -> bool {
         let lower = query.trim().to_lowercase();
-        self.name.to_lowercase() == lower
-            || self.aliases.iter().any(|a| a.to_lowercase() == lower)
+        self.name.to_lowercase() == lower || self.aliases.iter().any(|a| a.to_lowercase() == lower)
     }
 }
 
@@ -59,15 +58,15 @@ mod tests {
 
     fn make_entity(name: &str, aliases: &[&str]) -> Entity {
         Entity {
-            id:          Ulid::new(),
-            kind:        EntityKind::Character,
-            name:        name.to_owned(),
-            aliases:     aliases.iter().map(|s| (*s).to_string()).collect(),
+            id: Ulid::new(),
+            kind: EntityKind::Character,
+            name: name.to_owned(),
+            aliases: aliases.iter().map(|s| (*s).to_string()).collect(),
             fields_json: serde_json::json!({}),
-            notes:       String::new(),
-            created_at:  Utc::now(),
-            updated_at:  Utc::now(),
-            deleted_at:  None,
+            notes: String::new(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            deleted_at: None,
         }
     }
 

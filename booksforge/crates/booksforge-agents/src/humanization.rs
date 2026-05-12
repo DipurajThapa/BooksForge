@@ -9,15 +9,31 @@ use booksforge_domain::HumanizationProposals;
 use booksforge_prompt::PromptTemplateId;
 
 use crate::spec::{
-    AgentSpec, ContextBudget, CrossCuttingValidator, FailureMode, ModelFamily, ModelPreference,
-    ModelSizeHint, UserGate, WhenToRun,
+    AgentSpec, ContextBudget, CrossCuttingValidator, DefaultThinking, FailureMode, ModelFamily,
+    ModelPreference, ModelSizeHint, UserGate, WhenToRun,
 };
 
 const FAILURE_MODES: &[FailureMode] = &[
-    FailureMode { id: "rule-not-in-vocab",   description: "triggered_rule does not match any active vocab `avoid` entry.", recoverable: true  },
-    FailureMode { id: "range-mismatch",      description: "before-text doesn't match source at the given range.",          recoverable: true  },
-    FailureMode { id: "voice-drift",         description: "Replacement deviates from the project's style memory.",         recoverable: true  },
-    FailureMode { id: "over-correction",     description: "Replaces a vocab term with another flagged term.",              recoverable: true  },
+    FailureMode {
+        id: "rule-not-in-vocab",
+        description: "triggered_rule does not match any active vocab `avoid` entry.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "range-mismatch",
+        description: "before-text doesn't match source at the given range.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "voice-drift",
+        description: "Replacement deviates from the project's style memory.",
+        recoverable: true,
+    },
+    FailureMode {
+        id: "over-correction",
+        description: "Replaces a vocab term with another flagged term.",
+        recoverable: true,
+    },
 ];
 
 pub fn spec() -> AgentSpec {
@@ -46,15 +62,13 @@ pub fn spec() -> AgentSpec {
         failure_modes: FAILURE_MODES,
         when_to_run:   WhenToRun::OnDemand,
         user_gate:     UserGate::Required,
+        default_thinking: DefaultThinking::Disabled,
     }
 }
 
-pub fn parse_and_validate(
-    raw: &str,
-    source_text: &str,
-) -> Result<HumanizationProposals, String> {
-    let parsed: HumanizationProposals = serde_json::from_str(raw)
-        .map_err(|e| format!("JSON parse error: {e}"))?;
+pub fn parse_and_validate(raw: &str, source_text: &str) -> Result<HumanizationProposals, String> {
+    let parsed: HumanizationProposals =
+        serde_json::from_str(raw).map_err(|e| format!("JSON parse error: {e}"))?;
     let errs = parsed.validate(source_text);
     if !errs.is_empty() {
         return Err(format!("semantic validation failed: {}", errs.join("; ")));

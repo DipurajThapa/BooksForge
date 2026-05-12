@@ -16,7 +16,9 @@ use booksforge_ipc::{
     AiSuggestStartedResult, AiSuggestTokenEvent, BooksForgeError,
 };
 use booksforge_ollama::{HttpOllamaClient, TokenSink};
-use booksforge_orchestrator::{quick_action::QuickActionOptions, ApplyOp, Orchestrator, OrchestratorConfig};
+use booksforge_orchestrator::{
+    quick_action::QuickActionOptions, ApplyOp, Orchestrator, OrchestratorConfig,
+};
 use booksforge_snapshot::SnapshotService;
 use booksforge_storage::StorageRepository;
 use tauri::{AppHandle, Emitter as _, Manager as _, State};
@@ -26,9 +28,7 @@ use crate::state::AppState;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async fn open_orchestrator(
-    state: &State<'_, AppState>,
-) -> Result<Orchestrator, BooksForgeError> {
+async fn open_orchestrator(state: &State<'_, AppState>) -> Result<Orchestrator, BooksForgeError> {
     let project = {
         let guard = state.open_project.lock().await;
         guard.as_ref().cloned()
@@ -47,8 +47,10 @@ async fn open_orchestrator(
     let ollama: Arc<dyn booksforge_ollama::client::OllamaClient> =
         Arc::new(HttpOllamaClient::new());
 
-    Ok(Orchestrator::new(ollama, storage_arc, OrchestratorConfig::default())
-        .with_snapshot(snapshot))
+    Ok(
+        Orchestrator::new(ollama, storage_arc, OrchestratorConfig::default())
+            .with_snapshot(snapshot),
+    )
 }
 
 fn parse_preset(s: &str) -> Result<QuickActionPreset, BooksForgeError> {
@@ -59,15 +61,19 @@ fn parse_preset(s: &str) -> Result<QuickActionPreset, BooksForgeError> {
 fn parse_apply_op(s: &str) -> Result<ApplyOp, BooksForgeError> {
     match s {
         "replace" => Ok(ApplyOp::Replace),
-        "append"  => Ok(ApplyOp::Append),
-        other     => Err(BooksForgeError::validation(format!("unknown apply op: {other}"))),
+        "append" => Ok(ApplyOp::Append),
+        other => Err(BooksForgeError::validation(format!(
+            "unknown apply op: {other}"
+        ))),
     }
 }
 
 fn parse_options(json: Option<&str>) -> Result<QuickActionOptions, BooksForgeError> {
     let mut opts = QuickActionOptions::default();
     if let Some(raw) = json {
-        if raw.trim().is_empty() { return Ok(opts); }
+        if raw.trim().is_empty() {
+            return Ok(opts);
+        }
         let val: serde_json::Value = serde_json::from_str(raw)
             .map_err(|e| BooksForgeError::validation(format!("invalid options_json: {e}")))?;
         if let Some(obj) = val.as_object() {
@@ -84,16 +90,17 @@ fn parse_options(json: Option<&str>) -> Result<QuickActionOptions, BooksForgeErr
 #[tauri::command]
 pub async fn ai_suggest(
     input: AiSuggestInput,
-    app:   AppHandle,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<AiSuggestStartedResult, BooksForgeError> {
-    let preset  = parse_preset(&input.preset)?;
+    let preset = parse_preset(&input.preset)?;
     let node_id = Ulid::from_string(&input.node_id)
         .map_err(|_| BooksForgeError::validation("invalid node_id ULID".to_owned()))?;
     let options = parse_options(input.options_json.as_deref())?;
-    let model   = input.model.clone().unwrap_or_else(|| {
-        booksforge_domain::OllamaSettings::DEFAULT_MODEL.to_owned()
-    });
+    let model = input
+        .model
+        .clone()
+        .unwrap_or_else(|| booksforge_domain::OllamaSettings::DEFAULT_MODEL.to_owned());
 
     let job_id = Ulid::new().to_string();
     let cancel = state.register_job(&job_id).await;
@@ -103,19 +110,22 @@ pub async fn ai_suggest(
     let orchestrator = open_orchestrator(&state).await?;
 
     let job_id_for_task = job_id.clone();
-    let app_clone       = app.clone();
-    let scope_text      = input.scope_text.clone();
+    let app_clone = app.clone();
+    let scope_text = input.scope_text.clone();
 
     // Spawn the streaming call.  The token sink emits Tauri events scoped to
     // this job_id; the done event is emitted at the end with the audit row id.
     tokio::spawn(async move {
         let token_channel = format!("ai-suggest:{job_id_for_task}:token");
-        let app_for_sink  = app_clone.clone();
-        let job_for_sink  = job_id_for_task.clone();
+        let app_for_sink = app_clone.clone();
+        let job_for_sink = job_id_for_task.clone();
         let sink: TokenSink = Box::new(move |delta: &str| {
             let _ = app_for_sink.emit(
                 &token_channel,
-                AiSuggestTokenEvent { job_id: job_for_sink.clone(), delta: delta.to_owned() },
+                AiSuggestTokenEvent {
+                    job_id: job_for_sink.clone(),
+                    delta: delta.to_owned(),
+                },
             );
         });
 
@@ -125,20 +135,20 @@ pub async fn ai_suggest(
 
         let done = match outcome {
             Ok(o) => AiSuggestDoneEvent {
-                job_id:      job_id_for_task.clone(),
-                status:      o.status.as_str().to_owned(),
-                ai_call_id:  o.ai_call_id.to_string(),
-                full_text:   o.output_text,
+                job_id: job_id_for_task.clone(),
+                status: o.status.as_str().to_owned(),
+                ai_call_id: o.ai_call_id.to_string(),
+                full_text: o.output_text,
                 duration_ms: o.duration_ms,
-                error:       o.error,
+                error: o.error,
             },
             Err(e) => AiSuggestDoneEvent {
-                job_id:      job_id_for_task.clone(),
-                status:      "error".to_owned(),
-                ai_call_id:  String::new(),
-                full_text:   String::new(),
+                job_id: job_id_for_task.clone(),
+                status: "error".to_owned(),
+                ai_call_id: String::new(),
+                full_text: String::new(),
                 duration_ms: 0,
-                error:       Some(e.to_string()),
+                error: Some(e.to_string()),
             },
         };
         let done_channel = format!("ai-suggest:{job_id_for_task}:done");
@@ -184,8 +194,8 @@ pub async fn ai_apply(
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
 
     Ok(AiApplyResult {
-        ai_call_id:      result.ai_call_id.to_string(),
+        ai_call_id: result.ai_call_id.to_string(),
         pre_snapshot_id: result.pre_snapshot_id.to_string(),
-        applied_at:      result.applied_at.to_rfc3339(),
+        applied_at: result.applied_at.to_rfc3339(),
     })
 }

@@ -58,10 +58,10 @@ pub enum PeerReviewFocus {
 #[derive(Debug, Clone, Copy)]
 pub struct PeerReviewPairing {
     pub reviewer_agent_id: &'static str,
-    pub focus:             PeerReviewFocus,
+    pub focus: PeerReviewFocus,
     /// `true` = always run for high-stakes work.  `false` = opt-in
     /// behind a project-level flag.
-    pub default_on:        bool,
+    pub default_on: bool,
 }
 
 /// AGENTS.md §6.5 (added in Phase 5): the canonical peer-review pairings
@@ -74,38 +74,82 @@ pub struct PeerReviewPairing {
 pub fn peer_reviewers_for(primary_agent_id: &str) -> &'static [PeerReviewPairing] {
     match primary_agent_id {
         // Outline-architect: verify it didn't invent characters absent from the brief.
-        "outline-architect" => &[
-            PeerReviewPairing { reviewer_agent_id: "memory-curator", focus: PeerReviewFocus::FactFidelity,        default_on: false },
-        ],
+        "outline-architect" => &[PeerReviewPairing {
+            reviewer_agent_id: "memory-curator",
+            focus: PeerReviewFocus::FactFidelity,
+            default_on: false,
+        }],
         // Chapter-drafter: highest-stakes prose creation.  Three reviewers default-on.
         "chapter-drafter" => &[
-            PeerReviewPairing { reviewer_agent_id: "memory-curator", focus: PeerReviewFocus::MemoryConsistency,   default_on: true  },
-            PeerReviewPairing { reviewer_agent_id: "continuity",     focus: PeerReviewFocus::NamePovPreservation, default_on: true  },
-            PeerReviewPairing { reviewer_agent_id: "humanization",   focus: PeerReviewFocus::AiTellResidue,       default_on: true  },
-            PeerReviewPairing { reviewer_agent_id: "dev-editor",     focus: PeerReviewFocus::StructuralPurpose,   default_on: false },
+            PeerReviewPairing {
+                reviewer_agent_id: "memory-curator",
+                focus: PeerReviewFocus::MemoryConsistency,
+                default_on: true,
+            },
+            PeerReviewPairing {
+                reviewer_agent_id: "continuity",
+                focus: PeerReviewFocus::NamePovPreservation,
+                default_on: true,
+            },
+            PeerReviewPairing {
+                reviewer_agent_id: "humanization",
+                focus: PeerReviewFocus::AiTellResidue,
+                default_on: true,
+            },
+            PeerReviewPairing {
+                reviewer_agent_id: "dev-editor",
+                focus: PeerReviewFocus::StructuralPurpose,
+                default_on: false,
+            },
         ],
         // Copyeditor: small mechanical fixes; verify nothing structural changed.
-        "copyeditor" => &[
-            PeerReviewPairing { reviewer_agent_id: "continuity", focus: PeerReviewFocus::NamePovPreservation, default_on: true  },
-        ],
+        "copyeditor" => &[PeerReviewPairing {
+            reviewer_agent_id: "continuity",
+            focus: PeerReviewFocus::NamePovPreservation,
+            default_on: true,
+        }],
         // Humanization: rewriting prose to remove AI-tells; verify it didn't break facts/voice.
         "humanization" => &[
-            PeerReviewPairing { reviewer_agent_id: "memory-curator",      focus: PeerReviewFocus::FactFidelity,      default_on: true },
-            PeerReviewPairing { reviewer_agent_id: "final-review-editor", focus: PeerReviewFocus::VoicePreservation, default_on: false },
+            PeerReviewPairing {
+                reviewer_agent_id: "memory-curator",
+                focus: PeerReviewFocus::FactFidelity,
+                default_on: true,
+            },
+            PeerReviewPairing {
+                reviewer_agent_id: "final-review-editor",
+                focus: PeerReviewFocus::VoicePreservation,
+                default_on: false,
+            },
         ],
         // Continuity: rename/annotate proposals; verify they don't contradict memory.
-        "continuity" => &[
-            PeerReviewPairing { reviewer_agent_id: "memory-curator", focus: PeerReviewFocus::MemoryConsistency, default_on: true },
-        ],
+        "continuity" => &[PeerReviewPairing {
+            reviewer_agent_id: "memory-curator",
+            focus: PeerReviewFocus::MemoryConsistency,
+            default_on: true,
+        }],
         // Dev-editor: structural notes; verify they're consistent with established memory.
-        "dev-editor" => &[
-            PeerReviewPairing { reviewer_agent_id: "memory-curator", focus: PeerReviewFocus::MemoryConsistency, default_on: false },
-        ],
+        "dev-editor" => &[PeerReviewPairing {
+            reviewer_agent_id: "memory-curator",
+            focus: PeerReviewFocus::MemoryConsistency,
+            default_on: false,
+        }],
         // Final-review-editor: world-class polish; verify it didn't strip humanity.
         "final-review-editor" => &[
-            PeerReviewPairing { reviewer_agent_id: "humanization",   focus: PeerReviewFocus::AiTellResidue,       default_on: true  },
-            PeerReviewPairing { reviewer_agent_id: "memory-curator", focus: PeerReviewFocus::FactFidelity,        default_on: true  },
-            PeerReviewPairing { reviewer_agent_id: "continuity",     focus: PeerReviewFocus::NamePovPreservation, default_on: false },
+            PeerReviewPairing {
+                reviewer_agent_id: "humanization",
+                focus: PeerReviewFocus::AiTellResidue,
+                default_on: true,
+            },
+            PeerReviewPairing {
+                reviewer_agent_id: "memory-curator",
+                focus: PeerReviewFocus::FactFidelity,
+                default_on: true,
+            },
+            PeerReviewPairing {
+                reviewer_agent_id: "continuity",
+                focus: PeerReviewFocus::NamePovPreservation,
+                default_on: false,
+            },
         ],
         // Memory-curator + vocab-dictionary: meta-agents that mutate memory/vocab.
         // No peer reviewers in MVP — Tier-1 ProposalValidator + MemoryScope check is enough.
@@ -126,14 +170,14 @@ pub struct PeerReviewRequest {
     /// The primary agent whose work is being reviewed.
     pub primary_agent_id: String,
     /// The primary's `agent_tasks.id` (so the audit trail can stitch them).
-    pub primary_task_id:  String,
+    pub primary_task_id: String,
     /// JSON-serialised primary output.  The reviewer should not mutate it.
-    pub primary_output:   serde_json::Value,
+    pub primary_output: serde_json::Value,
     /// What to focus on (drives which axes the reviewer's prompt asks about).
-    pub focus:            PeerReviewFocus,
+    pub focus: PeerReviewFocus,
     /// Excerpt of the source text or context the primary saw, so the
     /// reviewer can verify against the same ground truth.
-    pub context_excerpt:  String,
+    pub context_excerpt: String,
 }
 
 /// What a peer reviewer returns.  Same shape regardless of which agent
@@ -141,16 +185,16 @@ pub struct PeerReviewRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PeerReviewResult {
     pub reviewer_agent_id: String,
-    pub primary_task_id:   String,
-    pub focus:             PeerReviewFocus,
+    pub primary_task_id: String,
+    pub focus: PeerReviewFocus,
     /// `pass` / `warn` / `block`.  Verdict aggregation: any `block` from
     /// any reviewer escalates the council verdict to `block`.
-    pub verdict:           ValidationVerdict,
+    pub verdict: ValidationVerdict,
     /// Specific concerns the reviewer raised.  Each concern carries
     /// evidence (a quoted span, a referenced memory key, etc.).
-    pub concerns:          Vec<PeerReviewConcern>,
+    pub concerns: Vec<PeerReviewConcern>,
     /// Reviewer's freeform recommendation (≤80 words).
-    pub recommendation:    String,
+    pub recommendation: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -159,9 +203,9 @@ pub struct PeerReviewConcern {
     /// per-reviewer aggregate).
     pub severity: PeerConcernSeverity,
     /// Quote from the primary's output that triggered the concern.
-    pub quote:    String,
+    pub quote: String,
     /// Reviewer's reasoning.
-    pub reason:   String,
+    pub reason: String,
     /// Evidence: a memory key, an entity id, a vocab term, a prior
     /// chapter reference, etc.  Free-form so future reviewers can
     /// reference whatever they need.
@@ -170,7 +214,11 @@ pub struct PeerReviewConcern {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum PeerConcernSeverity { Info, Warning, Error }
+pub enum PeerConcernSeverity {
+    Info,
+    Warning,
+    Error,
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Aggregated verification report
@@ -183,7 +231,7 @@ pub enum PeerConcernSeverity { Info, Warning, Error }
 pub struct VerificationReport {
     /// Primary agent + task.
     pub primary_agent_id: String,
-    pub primary_task_id:  String,
+    pub primary_task_id: String,
     /// Tier-1 always ran.
     pub tier_1: ProposalValidation,
     /// Tier-2 ran iff `validators.tier_2_enabled`.
@@ -201,14 +249,26 @@ impl VerificationReport {
     pub fn aggregate_verdicts(
         tier_1: &ProposalValidation,
         tier_2: Option<&ProposalValidation>,
-        peers:  &[PeerReviewResult],
+        peers: &[PeerReviewResult],
     ) -> ValidationVerdict {
         let mut verdicts: Vec<ValidationVerdict> = vec![tier_1.verdict];
-        if let Some(t2) = tier_2 { verdicts.push(t2.verdict); }
+        if let Some(t2) = tier_2 {
+            verdicts.push(t2.verdict);
+        }
         verdicts.extend(peers.iter().map(|p| p.verdict));
-        if verdicts.iter().any(|v| matches!(v, ValidationVerdict::Block))     { ValidationVerdict::Block }
-        else if verdicts.iter().any(|v| matches!(v, ValidationVerdict::Warn)) { ValidationVerdict::Warn  }
-        else                                                                  { ValidationVerdict::Pass  }
+        if verdicts
+            .iter()
+            .any(|v| matches!(v, ValidationVerdict::Block))
+        {
+            ValidationVerdict::Block
+        } else if verdicts
+            .iter()
+            .any(|v| matches!(v, ValidationVerdict::Warn))
+        {
+            ValidationVerdict::Warn
+        } else {
+            ValidationVerdict::Pass
+        }
     }
 }
 
@@ -218,16 +278,21 @@ mod tests {
     use crate::agent_io::{ValidationOutcome, ValidationVerdict};
 
     fn pv(verdict: ValidationVerdict) -> ProposalValidation {
-        ProposalValidation { verdict, checks: Vec::new(), summary: "x".into(), tier_2_ran: false }
+        ProposalValidation {
+            verdict,
+            checks: Vec::new(),
+            summary: "x".into(),
+            tier_2_ran: false,
+        }
     }
     fn peer(verdict: ValidationVerdict) -> PeerReviewResult {
         PeerReviewResult {
             reviewer_agent_id: "memory-curator".into(),
-            primary_task_id:   "01HX".into(),
-            focus:             PeerReviewFocus::FactFidelity,
+            primary_task_id: "01HX".into(),
+            focus: PeerReviewFocus::FactFidelity,
             verdict,
-            concerns:          Vec::new(),
-            recommendation:    String::new(),
+            concerns: Vec::new(),
+            recommendation: String::new(),
         }
     }
 
@@ -278,5 +343,7 @@ mod tests {
 
     // Reference one of the imports so it isn't flagged unused if removed later.
     #[allow(dead_code)]
-    fn _ref_outcome() -> ValidationOutcome { ValidationOutcome::Pass }
+    fn _ref_outcome() -> ValidationOutcome {
+        ValidationOutcome::Pass
+    }
 }

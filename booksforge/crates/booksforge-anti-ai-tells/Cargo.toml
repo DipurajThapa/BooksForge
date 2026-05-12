@@ -1,0 +1,15 @@
+[package]
+name        = "booksforge-anti-ai-tells"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+
+[dependencies]
+booksforge-voice     = { path = "../booksforge-voice" }
+serde.workspace      = true
+serde_json.workspace = true
+ts-rs.workspace      = true
+regex                = "1.10"
+
+[lints]
+workspace = true

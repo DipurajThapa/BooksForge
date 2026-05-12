@@ -25,7 +25,7 @@ pub struct AppState {
     /// (currently `scene_save`).  Read by the scheduled-snapshot task to
     /// decide whether the user has been editing since the last hourly auto
     /// snapshot.  Defaults to 0 — meaning "no activity recorded yet".
-    pub last_change_at:    Arc<AtomicI64>,
+    pub last_change_at: Arc<AtomicI64>,
     /// Unix-seconds timestamp of the last successful `Auto`-triggered
     /// snapshot.  Only incremented by the scheduler.
     pub last_auto_snap_at: Arc<AtomicI64>,
@@ -45,10 +45,10 @@ pub struct OpenProject {
 impl AppState {
     pub fn new() -> Self {
         Self {
-            ollama:            HttpOllamaClient::new(),
-            open_project:      Mutex::new(None),
-            jobs:              Mutex::new(HashMap::new()),
-            last_change_at:    Arc::new(AtomicI64::new(0)),
+            ollama: HttpOllamaClient::new(),
+            open_project: Mutex::new(None),
+            jobs: Mutex::new(HashMap::new()),
+            last_change_at: Arc::new(AtomicI64::new(0)),
             last_auto_snap_at: Arc::new(AtomicI64::new(0)),
         }
     }
@@ -78,7 +78,10 @@ impl AppState {
     /// it once the job is done.
     pub async fn register_job(&self, job_id: &str) -> CancelToken {
         let token = CancelToken::new();
-        self.jobs.lock().await.insert(job_id.to_owned(), token.clone());
+        self.jobs
+            .lock()
+            .await
+            .insert(job_id.to_owned(), token.clone());
         token
     }
 

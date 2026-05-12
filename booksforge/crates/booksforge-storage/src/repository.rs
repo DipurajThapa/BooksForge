@@ -5,8 +5,8 @@
 
 use async_trait::async_trait;
 use booksforge_domain::{
-    AgentAppliedEdit, AgentOutput, AgentRun, AgentTask, AgentTaskStatus, AiCall, AppliedEditKind, Entity,
-    ExportRecord, MemoryEntry, MemoryScope, Node, SceneContent, SnapshotRecord, StyleBook,
+    AgentAppliedEdit, AgentOutput, AgentRun, AgentTask, AgentTaskStatus, AiCall, AppliedEditKind,
+    Entity, ExportRecord, MemoryEntry, MemoryScope, Node, SceneContent, SnapshotRecord, StyleBook,
     ValidatorIssue, ValidatorRun, VocabEntry,
 };
 use chrono::{DateTime, Utc};
@@ -89,10 +89,7 @@ pub trait StorageRepository: Send + Sync {
     /// Enforces the invariant `pre_edit_snapshot.created_at < applied_at`;
     /// returns `StorageError::ConstraintViolation` if violated, missing, or
     /// the snapshot does not exist.
-    async fn agent_applied_edit_insert(
-        &self,
-        edit: &AgentAppliedEdit,
-    ) -> Result<(), StorageError>;
+    async fn agent_applied_edit_insert(&self, edit: &AgentAppliedEdit) -> Result<(), StorageError>;
 
     /// List applied-edit rows for all tasks in a given run, oldest first.
     async fn list_applied_edits_for_run(
@@ -103,10 +100,7 @@ pub trait StorageRepository: Send + Sync {
     /// Count applied-edit rows linked to a single task.  Used for the
     /// idempotency guard in `apply_outline` — re-applying the same proposal
     /// must be a no-op rather than producing duplicate rows.
-    async fn count_applied_edits_for_task(
-        &self,
-        task_id: Ulid,
-    ) -> Result<u32, StorageError>;
+    async fn count_applied_edits_for_task(&self, task_id: Ulid) -> Result<u32, StorageError>;
 
     /// List applied-edit rows linked to a single task, oldest first.
     /// Used by per-edit apply paths (Copyedit, Humanization) so the caller
@@ -124,8 +118,8 @@ pub trait StorageRepository: Send + Sync {
     async fn recent_applied_edits_for_project(
         &self,
         project_id: Ulid,
-        kind:       AppliedEditKind,
-        limit:      u32,
+        kind: AppliedEditKind,
+        limit: u32,
     ) -> Result<Vec<AgentAppliedEdit>, StorageError>;
 
     // ── Agent audit ledger ─────────────────────────────────────────────────
@@ -136,9 +130,9 @@ pub trait StorageRepository: Send + Sync {
     /// Update the status and completion fields of an existing run.
     async fn agent_run_update(
         &self,
-        id:            Ulid,
-        status:        AgentTaskStatus,
-        total_tokens:  Option<u32>,
+        id: Ulid,
+        status: AgentTaskStatus,
+        total_tokens: Option<u32>,
         error_message: Option<&str>,
     ) -> Result<(), StorageError>;
 
@@ -148,15 +142,15 @@ pub trait StorageRepository: Send + Sync {
     /// Update the status, hashes, and metrics of a task row.
     async fn agent_task_update(
         &self,
-        id:             Ulid,
-        status:         AgentTaskStatus,
-        output_hash:    Option<&str>,
+        id: Ulid,
+        status: AgentTaskStatus,
+        output_hash: Option<&str>,
         context_tokens: Option<u32>,
-        output_tokens:  Option<u32>,
-        duration_ms:    Option<u64>,
-        retries:        u32,
+        output_tokens: Option<u32>,
+        duration_ms: Option<u64>,
+        retries: u32,
         error_category: Option<&str>,
-        error_message:  Option<&str>,
+        error_message: Option<&str>,
     ) -> Result<(), StorageError>;
 
     /// Insert the validated output for a completed task.
@@ -164,6 +158,25 @@ pub trait StorageRepository: Send + Sync {
 
     /// Load the output for a given task, if any.
     async fn agent_output_load(&self, task_id: Ulid) -> Result<Option<AgentOutput>, StorageError>;
+
+    /// O3 of `docs/VSM_LLM_OPTIMIZATION.md` — find an existing
+    /// `agent_outputs` row produced by an EARLIER task with the same
+    /// `(prompt_template_hash, model, input_hash)` triple. Used by the
+    /// runner to short-circuit duplicate LLM calls — when the writer
+    /// re-runs an agent on identical inputs, return the cached output
+    /// instead of paying for another inference.
+    ///
+    /// Determinism contract: two tasks with the same template hash,
+    /// model, and input hash MUST produce semantically equivalent
+    /// outputs (the prompt-guard / creative-profile blocks are
+    /// already part of `vars` and therefore baked into `input_hash`).
+    /// Returns the most recent matching output, or `None`.
+    async fn agent_output_lookup_by_input(
+        &self,
+        prompt_template_hash: &str,
+        model: &str,
+        input_hash: &str,
+    ) -> Result<Option<AgentOutput>, StorageError>;
 
     // ── Quick-action ledger (MZ-08) ────────────────────────────────────────
 
@@ -176,9 +189,9 @@ pub trait StorageRepository: Send + Sync {
     /// snapshot has been taken and the scene_content has been mutated.
     async fn ai_call_update_apply(
         &self,
-        id:                   Ulid,
+        id: Ulid,
         pre_edit_snapshot_id: Ulid,
-        applied_at:           DateTime<Utc>,
+        applied_at: DateTime<Utc>,
     ) -> Result<(), StorageError>;
 
     /// Fetch a single `ai_calls` row by id.  Used by `apply_quick_action`
@@ -225,7 +238,7 @@ pub trait StorageRepository: Send + Sync {
     async fn memory_get(
         &self,
         scope: MemoryScope,
-        key:   &str,
+        key: &str,
     ) -> Result<Option<MemoryEntry>, StorageError>;
 
     /// List all entries for a given scope, ordered by key.
@@ -236,11 +249,7 @@ pub trait StorageRepository: Send + Sync {
 
     /// Delete a memory entry by `(scope, key)`.  Returns the number of
     /// rows affected (0 or 1).
-    async fn memory_delete(
-        &self,
-        scope: MemoryScope,
-        key:   &str,
-    ) -> Result<u32, StorageError>;
+    async fn memory_delete(&self, scope: MemoryScope, key: &str) -> Result<u32, StorageError>;
 
     // ── Vocabulary ledger ────────────────────────────────────────────────
 
@@ -256,10 +265,7 @@ pub trait StorageRepository: Send + Sync {
 
     /// List every entry whose layer is in `layers`.  Pure-logic
     /// `resolve_vocab` collapses the result into the merged active set.
-    async fn vocab_list_by_layers(
-        &self,
-        layers: &[&str],
-    ) -> Result<Vec<VocabEntry>, StorageError>;
+    async fn vocab_list_by_layers(&self, layers: &[&str]) -> Result<Vec<VocabEntry>, StorageError>;
 
     /// Count rows for a single layer — useful for assertions in tests.
     async fn vocab_count_by_layer(&self, layer: &str) -> Result<u32, StorageError>;
@@ -270,7 +276,7 @@ pub trait StorageRepository: Send + Sync {
     /// single transaction.  Used by the `validators_run` Tauri command.
     async fn validator_run_persist(
         &self,
-        run:    &ValidatorRun,
+        run: &ValidatorRun,
         issues: &[ValidatorIssue],
     ) -> Result<(), StorageError>;
 

@@ -7,12 +7,9 @@ rust-version.workspace = true
 [dependencies]
 booksforge-domain  = { path = "../booksforge-domain" }
 booksforge-export  = { path = "../booksforge-export" }
-booksforge-fs      = { path = "../booksforge-fs" }
 serde.workspace      = true
-serde_json.workspace = true
 thiserror.workspace  = true
 tokio.workspace      = true
-tracing.workspace    = true
 blake3.workspace     = true
 zip.workspace        = true
 chrono.workspace     = true

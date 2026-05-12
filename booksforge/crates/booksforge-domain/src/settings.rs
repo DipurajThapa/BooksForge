@@ -5,11 +5,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecentProject {
     /// Project ULID from `manifest.toml [project] id`.
-    pub id:          String,
+    pub id: String,
     /// Absolute path to the `.booksforge/` bundle directory.
-    pub path:        String,
+    pub path: String,
     /// Display name (`manifest.toml [meta] title`).
-    pub name:        String,
+    pub name: String,
     pub last_opened: DateTime<Utc>,
 }
 
@@ -53,7 +53,7 @@ impl RecentProjectsList {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OllamaSettings {
-    pub host:          String,
+    pub host: String,
     pub default_model: String,
 }
 
@@ -67,7 +67,7 @@ impl OllamaSettings {
 impl Default for OllamaSettings {
     fn default() -> Self {
         Self {
-            host:          "http://127.0.0.1:11434".to_owned(),
+            host: "http://127.0.0.1:11434".to_owned(),
             default_model: Self::DEFAULT_MODEL.to_owned(),
         }
     }
@@ -92,9 +92,9 @@ mod tests {
 
     fn entry(path: &str) -> RecentProject {
         RecentProject {
-            id:          "01TEST".to_owned(),
-            path:        path.to_owned(),
-            name:        path.to_owned(),
+            id: "01TEST".to_owned(),
+            path: path.to_owned(),
+            name: path.to_owned(),
             last_opened: chrono::Utc::now(),
         }
     }

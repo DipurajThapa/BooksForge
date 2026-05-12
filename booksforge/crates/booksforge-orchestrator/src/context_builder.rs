@@ -50,24 +50,28 @@ pub const DEFAULT_CHARS_PER_TOKEN: f32 = 3.6;
 pub fn estimate_tokens(s: &str, chars_per_token: f32) -> u32 {
     let chars = s.chars().count() as f32;
     let est = (chars / chars_per_token).ceil();
-    if est < 1.0 { 0 } else { est as u32 }
+    if est < 1.0 {
+        0
+    } else {
+        est as u32
+    }
 }
 
 /// What the builder needs to choose from.  Pre-ordered by relevance —
 /// the caller is responsible for ranking.
 #[derive(Debug, Clone)]
 pub struct AvailableContext<'a> {
-    pub entity_bible:        &'a [Entity],
-    pub active_avoid_rules:  &'a [VocabEntry],
-    pub voice_fingerprint:   &'a VoiceFingerprint,
+    pub entity_bible: &'a [Entity],
+    pub active_avoid_rules: &'a [VocabEntry],
+    pub voice_fingerprint: &'a VoiceFingerprint,
     /// Memory entries the caller wants to consider, ordered by
     /// preference.  Typically: recent chapter summaries first, then
     /// entity notes, then style notes.
-    pub memory_entries:      &'a [MemoryEntry],
+    pub memory_entries: &'a [MemoryEntry],
     /// The scene or chapter the agent is operating on.  Always
     /// included verbatim if it fits; truncated only if a single
     /// focus blob exceeds the entire budget.
-    pub focus_excerpt:       Option<&'a str>,
+    pub focus_excerpt: Option<&'a str>,
     /// Optional prior-scene excerpts for cross-chapter continuity,
     /// ordered most-recent-first.  Each entry: `(label, body)`.
     pub prior_scene_excerpts: &'a [(String, String)],
@@ -78,16 +82,16 @@ pub struct AvailableContext<'a> {
 /// caller log "of N memory entries supplied, M fit".
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuiltContext {
-    pub voice_fingerprint:    VoiceFingerprint,
-    pub entity_bible:         Vec<Entity>,
-    pub active_avoid_rules:   Vec<VocabEntry>,
-    pub focus_excerpt:        Option<String>,
-    pub memory_entries:       Vec<MemoryEntry>,
+    pub voice_fingerprint: VoiceFingerprint,
+    pub entity_bible: Vec<Entity>,
+    pub active_avoid_rules: Vec<VocabEntry>,
+    pub focus_excerpt: Option<String>,
+    pub memory_entries: Vec<MemoryEntry>,
     pub prior_scene_excerpts: Vec<(String, String)>,
     /// Total estimated tokens used.
-    pub used_tokens:          u32,
+    pub used_tokens: u32,
     /// What we asked for (`ContextBudget.max_context_tokens`).
-    pub budget_tokens:        u32,
+    pub budget_tokens: u32,
     /// Per-section count of items dropped because they didn't fit.
     pub dropped: BTreeMap<String, u32>,
 }
@@ -98,7 +102,10 @@ impl BuiltContext {
     /// window — only the first N words were considered" hint.
     pub fn focus_was_truncated(&self) -> bool {
         // Set by `build_with_ratio` when truncation happens.
-        self.dropped.get("focus_truncated_chars").map(|n| *n > 0).unwrap_or(false)
+        self.dropped
+            .get("focus_truncated_chars")
+            .map(|n| *n > 0)
+            .unwrap_or(false)
     }
 }
 
@@ -111,15 +118,16 @@ pub fn build(available: &AvailableContext<'_>, budget_tokens: u32) -> BuiltConte
 /// Same as `build` with an explicit chars-per-token override — useful
 /// for tests and for non-English projects.
 pub fn build_with_ratio(
-    available:       &AvailableContext<'_>,
-    budget_tokens:   u32,
+    available: &AvailableContext<'_>,
+    budget_tokens: u32,
     chars_per_token: f32,
 ) -> BuiltContext {
     let mut used = 0u32;
     let mut dropped: BTreeMap<String, u32> = BTreeMap::new();
 
     // ── 1. Voice fingerprint — always include if it fits.
-    let voice_tokens = estimate_voice_fingerprint_tokens(available.voice_fingerprint, chars_per_token);
+    let voice_tokens =
+        estimate_voice_fingerprint_tokens(available.voice_fingerprint, chars_per_token);
     let voice_kept = if used + voice_tokens <= budget_tokens {
         used += voice_tokens;
         available.voice_fingerprint.clone()
@@ -140,7 +148,9 @@ pub fn build_with_ratio(
             entities_dropped += 1;
         }
     }
-    if entities_dropped > 0 { dropped.insert("entity_bible".into(), entities_dropped); }
+    if entities_dropped > 0 {
+        dropped.insert("entity_bible".into(), entities_dropped);
+    }
 
     // ── 3. Active avoid-rules.
     let mut avoid_kept = Vec::with_capacity(available.active_avoid_rules.len());
@@ -154,7 +164,9 @@ pub fn build_with_ratio(
             avoid_dropped += 1;
         }
     }
-    if avoid_dropped > 0 { dropped.insert("active_avoid_rules".into(), avoid_dropped); }
+    if avoid_dropped > 0 {
+        dropped.insert("active_avoid_rules".into(), avoid_dropped);
+    }
 
     // ── 4. Focus excerpt — verbatim if it fits, truncated by chars
     //    if it's the *only* thing left over budget.
@@ -173,7 +185,11 @@ pub fn build_with_ratio(
                 } else {
                     let max_chars = (remaining as f32 * chars_per_token) as usize;
                     let truncated: String = focus.chars().take(max_chars).collect();
-                    let dropped_chars = focus.chars().count().saturating_sub(truncated.chars().count()) as u32;
+                    let dropped_chars = focus
+                        .chars()
+                        .count()
+                        .saturating_sub(truncated.chars().count())
+                        as u32;
                     dropped.insert("focus_truncated_chars".into(), dropped_chars);
                     used += estimate_tokens(&truncated, chars_per_token);
                     Some(truncated)
@@ -194,14 +210,15 @@ pub fn build_with_ratio(
             memory_dropped += 1;
         }
     }
-    if memory_dropped > 0 { dropped.insert("memory_entries".into(), memory_dropped); }
+    if memory_dropped > 0 {
+        dropped.insert("memory_entries".into(), memory_dropped);
+    }
 
     // ── 6. Prior-scene excerpts.
     let mut prior_kept = Vec::with_capacity(available.prior_scene_excerpts.len());
     let mut prior_dropped = 0u32;
     for (label, body) in available.prior_scene_excerpts {
-        let cost = estimate_tokens(label, chars_per_token)
-                 + estimate_tokens(body,  chars_per_token);
+        let cost = estimate_tokens(label, chars_per_token) + estimate_tokens(body, chars_per_token);
         if used + cost <= budget_tokens {
             used += cost;
             prior_kept.push((label.clone(), body.clone()));
@@ -209,16 +226,18 @@ pub fn build_with_ratio(
             prior_dropped += 1;
         }
     }
-    if prior_dropped > 0 { dropped.insert("prior_scene_excerpts".into(), prior_dropped); }
+    if prior_dropped > 0 {
+        dropped.insert("prior_scene_excerpts".into(), prior_dropped);
+    }
 
     BuiltContext {
-        voice_fingerprint:    voice_kept,
-        entity_bible:         entities_kept,
-        active_avoid_rules:   avoid_kept,
-        focus_excerpt:        focus_kept,
-        memory_entries:       memory_kept,
+        voice_fingerprint: voice_kept,
+        entity_bible: entities_kept,
+        active_avoid_rules: avoid_kept,
+        focus_excerpt: focus_kept,
+        memory_entries: memory_kept,
         prior_scene_excerpts: prior_kept,
-        used_tokens:          used,
+        used_tokens: used,
         budget_tokens,
         dropped,
     }
@@ -235,17 +254,28 @@ fn estimate_voice_fingerprint_tokens(_fp: &VoiceFingerprint, _ratio: f32) -> u32
 
 fn estimate_entity_tokens(entity: &Entity, ratio: f32) -> u32 {
     let mut chars = entity.name.chars().count();
-    for alias in &entity.aliases { chars += alias.chars().count() + 2; }
+    for alias in &entity.aliases {
+        chars += alias.chars().count() + 2;
+    }
     chars += entity.notes.chars().count();
     chars += serde_json::to_string(&entity.fields_json)
-        .map(|s| s.chars().count()).unwrap_or(0);
+        .map(|s| s.chars().count())
+        .unwrap_or(0);
     estimate_tokens_from_chars(chars as u32, ratio)
 }
 
 fn estimate_vocab_tokens(rule: &VocabEntry, ratio: f32) -> u32 {
     let mut chars = rule.display_term.chars().count();
-    chars += rule.replacement.as_deref().map(|s| s.chars().count()).unwrap_or(0);
-    chars += rule.rationale.as_deref().map(|s| s.chars().count()).unwrap_or(0);
+    chars += rule
+        .replacement
+        .as_deref()
+        .map(|s| s.chars().count())
+        .unwrap_or(0);
+    chars += rule
+        .rationale
+        .as_deref()
+        .map(|s| s.chars().count())
+        .unwrap_or(0);
     // Plus a few overhead chars for the rendered "avoid: X / replace with: Y" line.
     estimate_tokens_from_chars((chars + 25) as u32, ratio)
 }
@@ -253,13 +283,18 @@ fn estimate_vocab_tokens(rule: &VocabEntry, ratio: f32) -> u32 {
 fn estimate_memory_tokens(entry: &MemoryEntry, ratio: f32) -> u32 {
     let key_chars = entry.key.chars().count();
     let val_chars = serde_json::to_string(&entry.value_json)
-        .map(|s| s.chars().count()).unwrap_or(0);
+        .map(|s| s.chars().count())
+        .unwrap_or(0);
     estimate_tokens_from_chars((key_chars + val_chars) as u32, ratio)
 }
 
 fn estimate_tokens_from_chars(chars: u32, ratio: f32) -> u32 {
     let est = (chars as f32 / ratio).ceil();
-    if est < 1.0 { 0 } else { est as u32 }
+    if est < 1.0 {
+        0
+    } else {
+        est as u32
+    }
 }
 
 #[cfg(test)]
@@ -272,15 +307,15 @@ mod tests {
     fn entity(name: &str, aliases: Vec<&str>) -> Entity {
         let now = Utc::now();
         Entity {
-            id:           Ulid::new(),
-            kind:         EntityKind::Character,
-            name:         name.to_owned(),
-            aliases:      aliases.into_iter().map(|s| s.to_owned()).collect(),
-            fields_json:  serde_json::json!({}),
-            notes:        String::new(),
-            created_at:   now,
-            updated_at:   now,
-            deleted_at:   None,
+            id: Ulid::new(),
+            kind: EntityKind::Character,
+            name: name.to_owned(),
+            aliases: aliases.into_iter().map(|s| s.to_owned()).collect(),
+            fields_json: serde_json::json!({}),
+            notes: String::new(),
+            created_at: now,
+            updated_at: now,
+            deleted_at: None,
         }
     }
 
@@ -288,7 +323,9 @@ mod tests {
         VocabEntry::new("project", term, EntryKind::Avoid, EntrySource::User)
     }
 
-    fn empty_voice() -> VoiceFingerprint { VoiceFingerprint::default() }
+    fn empty_voice() -> VoiceFingerprint {
+        VoiceFingerprint::default()
+    }
 
     #[test]
     fn estimate_tokens_uses_chars_per_token_ratio() {
@@ -302,13 +339,13 @@ mod tests {
     fn build_includes_high_priority_first() {
         let voice = empty_voice();
         let entities = vec![entity("Alice", vec![])];
-        let avoid    = vec![vocab("very")];
+        let avoid = vec![vocab("very")];
         let avail = AvailableContext {
-            entity_bible:        &entities,
-            active_avoid_rules:  &avoid,
-            voice_fingerprint:   &voice,
-            memory_entries:      &[],
-            focus_excerpt:       None,
+            entity_bible: &entities,
+            active_avoid_rules: &avoid,
+            voice_fingerprint: &voice,
+            memory_entries: &[],
+            focus_excerpt: None,
             prior_scene_excerpts: &[],
         };
         let ctx = build(&avail, 1_000);
@@ -323,27 +360,34 @@ mod tests {
         let voice = empty_voice();
         // Big entities — each carries a 200-char notes blob → ~60 tokens
         // each, so 50 of them is far over budget.
-        let entities: Vec<Entity> = (0..50).map(|i| {
-            let mut e = entity(&format!("Character{i}"), vec!["alias-a", "alias-b"]);
-            e.notes = "a".repeat(200);
-            e
-        }).collect();
-        let avoid    = vec![vocab("very"), vocab("really")];
-        let prior: Vec<(String, String)> = vec![
-            ("scene-1".into(), "a".repeat(2000)),
-        ];
+        let entities: Vec<Entity> = (0..50)
+            .map(|i| {
+                let mut e = entity(&format!("Character{i}"), vec!["alias-a", "alias-b"]);
+                e.notes = "a".repeat(200);
+                e
+            })
+            .collect();
+        let avoid = vec![vocab("very"), vocab("really")];
+        let prior: Vec<(String, String)> = vec![("scene-1".into(), "a".repeat(2000))];
         let avail = AvailableContext {
-            entity_bible:        &entities,
-            active_avoid_rules:  &avoid,
-            voice_fingerprint:   &voice,
-            memory_entries:      &[],
-            focus_excerpt:       None,
+            entity_bible: &entities,
+            active_avoid_rules: &avoid,
+            voice_fingerprint: &voice,
+            memory_entries: &[],
+            focus_excerpt: None,
             prior_scene_excerpts: &prior,
         };
         // 200 tokens — fits voice + first few entities, drops the rest + prior.
         let ctx = build(&avail, 200);
-        assert!(ctx.entity_bible.len() < 50, "expected drops, kept {}", ctx.entity_bible.len());
-        assert!(ctx.dropped.contains_key("entity_bible") || ctx.dropped.contains_key("prior_scene_excerpts"));
+        assert!(
+            ctx.entity_bible.len() < 50,
+            "expected drops, kept {}",
+            ctx.entity_bible.len()
+        );
+        assert!(
+            ctx.dropped.contains_key("entity_bible")
+                || ctx.dropped.contains_key("prior_scene_excerpts")
+        );
         assert!(ctx.used_tokens <= 200);
     }
 
@@ -352,11 +396,11 @@ mod tests {
         let voice = empty_voice();
         let huge_focus = "a".repeat(20_000); // ~5500 tokens
         let avail = AvailableContext {
-            entity_bible:        &[],
-            active_avoid_rules:  &[],
-            voice_fingerprint:   &voice,
-            memory_entries:      &[],
-            focus_excerpt:       Some(&huge_focus),
+            entity_bible: &[],
+            active_avoid_rules: &[],
+            voice_fingerprint: &voice,
+            memory_entries: &[],
+            focus_excerpt: Some(&huge_focus),
             prior_scene_excerpts: &[],
         };
         let ctx = build(&avail, 1_000);
@@ -370,14 +414,16 @@ mod tests {
     fn focus_excerpt_dropped_when_no_room_left() {
         let voice = empty_voice();
         // Stuff entities until we're at the budget.
-        let entities: Vec<Entity> = (0..200).map(|i| entity(&format!("Char{i}"), vec![])).collect();
+        let entities: Vec<Entity> = (0..200)
+            .map(|i| entity(&format!("Char{i}"), vec![]))
+            .collect();
         let focus = "this should not fit".to_owned();
         let avail = AvailableContext {
-            entity_bible:        &entities,
-            active_avoid_rules:  &[],
-            voice_fingerprint:   &voice,
-            memory_entries:      &[],
-            focus_excerpt:       Some(&focus),
+            entity_bible: &entities,
+            active_avoid_rules: &[],
+            voice_fingerprint: &voice,
+            memory_entries: &[],
+            focus_excerpt: Some(&focus),
             prior_scene_excerpts: &[],
         };
         // 100 tokens — voice eats 50, leaves 50 for entities; some fit
@@ -392,21 +438,23 @@ mod tests {
     #[test]
     fn diagnostics_record_what_was_dropped() {
         let voice = empty_voice();
-        let mems: Vec<MemoryEntry> = (0..30).map(|i| MemoryEntry {
-            id:         Ulid::new(),
-            scope:      booksforge_domain::MemoryScope::Book,
-            key:        format!("k{i}"),
-            value_json: serde_json::json!("a".repeat(500)),
-            agent_id:   "test".into(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        }).collect();
+        let mems: Vec<MemoryEntry> = (0..30)
+            .map(|i| MemoryEntry {
+                id: Ulid::new(),
+                scope: booksforge_domain::MemoryScope::Book,
+                key: format!("k{i}"),
+                value_json: serde_json::json!("a".repeat(500)),
+                agent_id: "test".into(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            })
+            .collect();
         let avail = AvailableContext {
-            entity_bible:        &[],
-            active_avoid_rules:  &[],
-            voice_fingerprint:   &voice,
-            memory_entries:      &mems,
-            focus_excerpt:       None,
+            entity_bible: &[],
+            active_avoid_rules: &[],
+            voice_fingerprint: &voice,
+            memory_entries: &mems,
+            focus_excerpt: None,
             prior_scene_excerpts: &[],
         };
         let ctx = build(&avail, 200);
@@ -418,11 +466,11 @@ mod tests {
     fn empty_inputs_return_empty_context_with_zero_tokens() {
         let voice = empty_voice();
         let avail = AvailableContext {
-            entity_bible:        &[],
-            active_avoid_rules:  &[],
-            voice_fingerprint:   &voice,
-            memory_entries:      &[],
-            focus_excerpt:       None,
+            entity_bible: &[],
+            active_avoid_rules: &[],
+            voice_fingerprint: &voice,
+            memory_entries: &[],
+            focus_excerpt: None,
             prior_scene_excerpts: &[],
         };
         let ctx = build(&avail, 1_000);

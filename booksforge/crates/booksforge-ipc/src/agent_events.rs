@@ -24,8 +24,8 @@ pub struct AgentRunStartedEvent {
     /// pass to `agent_cancel`.  Distinct from the orchestrator's
     /// internal `task_id` because we issue this *before* the task row
     /// is created (so we can cancel even during setup).
-    pub run_id:     String,
-    pub agent_id:   String,
+    pub run_id: String,
+    pub agent_id: String,
     /// ISO-8601 timestamp when the dispatch started.
     pub started_at: String,
 }
@@ -34,11 +34,11 @@ pub struct AgentRunStartedEvent {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct AgentRunCompletedEvent {
-    pub run_id:   String,
+    pub run_id: String,
     pub agent_id: String,
     /// `"completed"` | `"cancelled"` | `"error"`
-    pub status:   String,
-    pub error:    Option<String>,
+    pub status: String,
+    pub error: Option<String>,
     /// ISO-8601 timestamp when the dispatch finished.
     pub finished_at: String,
 }
@@ -54,9 +54,9 @@ pub struct AgentRunCompletedEvent {
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct AgentRunProgressEvent {
-    pub run_id:    String,
+    pub run_id: String,
     /// Cumulative tokens received from Ollama since dispatch.
-    pub tokens:    u32,
+    pub tokens: u32,
     /// Wall-clock milliseconds since dispatch.  Frontend computes
     /// tokens/sec = tokens / (elapsed_ms/1000).
     pub elapsed_ms: u32,

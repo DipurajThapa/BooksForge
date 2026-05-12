@@ -1,4 +1,11 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::print_stdout, clippy::print_stderr, clippy::unimplemented)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::unimplemented
+)]
 
 //! MZ-08 acceptance criteria for quick-action presets:
 //!   • Cancellation aborts mid-stream and partial output is captured.
@@ -33,10 +40,10 @@ use ulid::Ulid;
 #[derive(Default)]
 struct ChunkStreamMock {
     /// Tokens to emit one at a time before returning Ok.
-    chunks:        Vec<String>,
+    chunks: Vec<String>,
     /// If `Some`, the mock cancels the supplied CancelToken after emitting
     /// this many chunks (inclusive), simulating user clicking Cancel.
-    cancel_after:  Option<usize>,
+    cancel_after: Option<usize>,
 }
 
 impl ChunkStreamMock {
@@ -55,13 +62,20 @@ impl ChunkStreamMock {
 #[async_trait]
 impl OllamaClient for ChunkStreamMock {
     async fn version(&self) -> Result<OllamaVersion, OllamaError> {
-        Ok(OllamaVersion { version: "test".into() })
+        Ok(OllamaVersion {
+            version: "test".into(),
+        })
     }
-    async fn list_local_models(&self) -> Result<Vec<LocalModel>, OllamaError> { Ok(vec![]) }
+    async fn list_local_models(&self) -> Result<Vec<LocalModel>, OllamaError> {
+        Ok(vec![])
+    }
     async fn show(&self, model: &str) -> Result<ModelInfo, OllamaError> {
         Ok(ModelInfo {
-            name: model.to_owned(), digest: None, family: None,
-            parameter_size: None, quantization_level: None,
+            name: model.to_owned(),
+            digest: None,
+            family: None,
+            parameter_size: None,
+            quantization_level: None,
         })
     }
     async fn pull(&self, _model: &str, _progress: ProgressSink) -> Result<(), OllamaError> {
@@ -94,11 +108,11 @@ impl OllamaClient for ChunkStreamMock {
             return Err(OllamaError::Cancelled);
         }
         Ok(GenerateOutcome {
-            model:              request.model,
-            response:           full,
-            prompt_eval_count:  10,
-            eval_count:         emitted as u32,
-            total_duration_ns:  1_000_000,
+            model: request.model,
+            response: full,
+            prompt_eval_count: 10,
+            eval_count: emitted as u32,
+            total_duration_ns: 1_000_000,
         })
     }
 
@@ -116,9 +130,9 @@ impl OllamaClient for ChunkStreamMock {
 
 struct Harness {
     pub orchestrator: Orchestrator,
-    pub storage:      Arc<SqliteStorage>,
-    pub node_id:      Ulid,
-    pub _dir:         tempfile::TempDir,
+    pub storage: Arc<SqliteStorage>,
+    pub node_id: Ulid,
+    pub _dir: tempfile::TempDir,
 }
 
 async fn setup(ollama: Arc<dyn OllamaClient>) -> Harness {
@@ -134,29 +148,37 @@ async fn setup(ollama: Arc<dyn OllamaClient>) -> Harness {
     // Seed one scene node.
     let node_id = Ulid::new();
     let now = Utc::now();
-    storage.insert_node(&Node {
-        id:           node_id,
-        parent_id:    None,
-        kind:         NodeKind::Scene,
-        title:        "Test Scene".into(),
-        position:     Node::DEFAULT_POSITION.into(),
-        status:       NodeStatus::Drafting,
-        pov:          None,
-        beat:         None,
-        target_words: None,
-        created_at:   now,
-        updated_at:   now,
-        deleted_at:   None,
-    }).await.expect("insert_node");
+    storage
+        .insert_node(&Node {
+            id: node_id,
+            parent_id: None,
+            kind: NodeKind::Scene,
+            title: "Test Scene".into(),
+            position: Node::DEFAULT_POSITION.into(),
+            status: NodeStatus::Drafting,
+            pov: None,
+            beat: None,
+            target_words: None,
+            created_at: now,
+            updated_at: now,
+            deleted_at: None,
+        })
+        .await
+        .expect("insert_node");
 
     let storage_trait: Arc<dyn StorageRepository> = storage.clone();
-    let fs:           Arc<dyn BundleFilesystem>   = Arc::new(OsFilesystem);
+    let fs: Arc<dyn BundleFilesystem> = Arc::new(OsFilesystem);
     let snapshot = Arc::new(SnapshotService::new(storage_trait, fs, bundle));
 
     let orchestrator = Orchestrator::new(ollama, storage.clone(), OrchestratorConfig::default())
         .with_snapshot(snapshot);
 
-    Harness { orchestrator, storage, node_id, _dir: dir }
+    Harness {
+        orchestrator,
+        storage,
+        node_id,
+        _dir: dir,
+    }
 }
 
 fn drain_sink() -> (TokenSink, Arc<Mutex<String>>) {
@@ -176,21 +198,29 @@ async fn ok_call_writes_audit_row_with_full_output() {
     let h = setup(mock).await;
     let (sink, _) = drain_sink();
 
-    let outcome = h.orchestrator.run_quick_action(
-        h.node_id,
-        QuickActionPreset::Sharpen,
-        "Original passage.".into(),
-        "test-model".into(),
-        QuickActionOptions::default(),
-        CancelToken::new(),
-        sink,
-    ).await.expect("run_quick_action");
+    let outcome = h
+        .orchestrator
+        .run_quick_action(
+            h.node_id,
+            QuickActionPreset::Sharpen,
+            "Original passage.".into(),
+            "test-model".into(),
+            QuickActionOptions::default(),
+            CancelToken::new(),
+            sink,
+        )
+        .await
+        .expect("run_quick_action");
 
     assert_eq!(outcome.status, AiCallStatus::Ok);
     assert_eq!(outcome.output_text, "The river ran.");
 
-    let stored = h.storage.ai_call_get(outcome.ai_call_id).await
-        .expect("ai_call_get").expect("row exists");
+    let stored = h
+        .storage
+        .ai_call_get(outcome.ai_call_id)
+        .await
+        .expect("ai_call_get")
+        .expect("row exists");
     assert_eq!(stored.status, AiCallStatus::Ok);
     assert_eq!(stored.output_text.as_deref(), Some("The river ran."));
     assert_eq!(stored.preset, QuickActionPreset::Sharpen);
@@ -201,31 +231,42 @@ async fn ok_call_writes_audit_row_with_full_output() {
 #[tokio::test]
 async fn cancellation_mid_stream_writes_cancelled_row_with_partial_output() {
     let mock = Arc::new(
-        ChunkStreamMock::with_chunks(vec!["alpha ", "beta ", "gamma ", "delta"])
-            .cancel_after(2),
+        ChunkStreamMock::with_chunks(vec!["alpha ", "beta ", "gamma ", "delta"]).cancel_after(2),
     );
     let h = setup(mock).await;
     let (sink, _) = drain_sink();
 
-    let outcome = h.orchestrator.run_quick_action(
-        h.node_id,
-        QuickActionPreset::Rephrase,
-        "scope".into(),
-        "test-model".into(),
-        QuickActionOptions::default(),
-        CancelToken::new(),
-        sink,
-    ).await.expect("run_quick_action");
+    let outcome = h
+        .orchestrator
+        .run_quick_action(
+            h.node_id,
+            QuickActionPreset::Rephrase,
+            "scope".into(),
+            "test-model".into(),
+            QuickActionOptions::default(),
+            CancelToken::new(),
+            sink,
+        )
+        .await
+        .expect("run_quick_action");
 
     assert_eq!(outcome.status, AiCallStatus::Cancelled);
     // Partial output (first two chunks) must survive.
     assert_eq!(outcome.output_text, "alpha beta ");
 
-    let stored = h.storage.ai_call_get(outcome.ai_call_id).await
-        .expect("ai_call_get").expect("row exists");
+    let stored = h
+        .storage
+        .ai_call_get(outcome.ai_call_id)
+        .await
+        .expect("ai_call_get")
+        .expect("row exists");
     assert_eq!(stored.status, AiCallStatus::Cancelled);
     assert_eq!(stored.output_text.as_deref(), Some("alpha beta "));
-    assert!(stored.error_message.as_deref().unwrap_or("").contains("cancelled"));
+    assert!(stored
+        .error_message
+        .as_deref()
+        .unwrap_or("")
+        .contains("cancelled"));
 }
 
 #[tokio::test]
@@ -234,42 +275,58 @@ async fn apply_takes_pre_ai_snapshot_and_stamps_ledger() {
     let h = setup(mock).await;
     let (sink, _) = drain_sink();
 
-    let outcome = h.orchestrator.run_quick_action(
-        h.node_id,
-        QuickActionPreset::Sharpen,
-        "rough prose".into(),
-        "test-model".into(),
-        QuickActionOptions::default(),
-        CancelToken::new(),
-        sink,
-    ).await.unwrap();
+    let outcome = h
+        .orchestrator
+        .run_quick_action(
+            h.node_id,
+            QuickActionPreset::Sharpen,
+            "rough prose".into(),
+            "test-model".into(),
+            QuickActionOptions::default(),
+            CancelToken::new(),
+            sink,
+        )
+        .await
+        .unwrap();
     assert_eq!(outcome.status, AiCallStatus::Ok);
 
     let snapshots_before = h.storage.list_snapshots(None).await.unwrap().len();
 
-    let result = h.orchestrator.apply_quick_action(
-        outcome.ai_call_id,
-        outcome.output_text.clone(),
-        ApplyOp::Replace,
-    ).await.expect("apply_quick_action");
+    let result = h
+        .orchestrator
+        .apply_quick_action(
+            outcome.ai_call_id,
+            outcome.output_text.clone(),
+            ApplyOp::Replace,
+        )
+        .await
+        .expect("apply_quick_action");
 
     // 1. Audit row stamped with snapshot id + applied_at.
-    let stored = h.storage.ai_call_get(outcome.ai_call_id).await.unwrap().unwrap();
+    let stored = h
+        .storage
+        .ai_call_get(outcome.ai_call_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(stored.pre_edit_snapshot_id, Some(result.pre_snapshot_id));
     assert!(stored.applied_at.is_some());
 
     // 2. Snapshot exists and uses the `pre_ai` trigger.
     let snapshots_after = h.storage.list_snapshots(None).await.unwrap();
     assert_eq!(snapshots_after.len(), snapshots_before + 1);
-    let snap = snapshots_after.iter().find(|s| s.id == result.pre_snapshot_id).unwrap();
+    let snap = snapshots_after
+        .iter()
+        .find(|s| s.id == result.pre_snapshot_id)
+        .unwrap();
     assert_eq!(snap.trigger, SnapshotTrigger::PreAi);
 
     // 3. Re-applying the same call is rejected (idempotency).
-    let err = h.orchestrator.apply_quick_action(
-        outcome.ai_call_id,
-        "anything".into(),
-        ApplyOp::Replace,
-    ).await.unwrap_err();
+    let err = h
+        .orchestrator
+        .apply_quick_action(outcome.ai_call_id, "anything".into(), ApplyOp::Replace)
+        .await
+        .unwrap_err();
     assert!(err.to_string().to_lowercase().contains("already applied"));
 }
 
@@ -287,33 +344,47 @@ async fn ok_continue_appends_to_existing_scene() {
         }]
     });
     let bytes = serde_json::to_vec(&pm_doc).unwrap();
-    h.storage.save_scene(&booksforge_domain::SceneContent {
-        node_id:    h.node_id,
-        pm_doc,
-        word_count: 2,
-        char_count: 16,
-        hash:       blake3::hash(&bytes).to_hex().to_string(),
-        updated_at: Utc::now(),
-    }).await.unwrap();
+    h.storage
+        .save_scene(&booksforge_domain::SceneContent {
+            node_id: h.node_id,
+            pm_doc,
+            word_count: 2,
+            char_count: 16,
+            hash: blake3::hash(&bytes).to_hex().to_string(),
+            updated_at: Utc::now(),
+        })
+        .await
+        .unwrap();
 
     let (sink, _) = drain_sink();
-    let outcome = h.orchestrator.run_quick_action(
-        h.node_id,
-        QuickActionPreset::Continue_,
-        "First paragraph.".into(),
-        "test-model".into(),
-        QuickActionOptions::default(),
-        CancelToken::new(),
-        sink,
-    ).await.unwrap();
+    let outcome = h
+        .orchestrator
+        .run_quick_action(
+            h.node_id,
+            QuickActionPreset::Continue_,
+            "First paragraph.".into(),
+            "test-model".into(),
+            QuickActionOptions::default(),
+            CancelToken::new(),
+            sink,
+        )
+        .await
+        .unwrap();
 
-    h.orchestrator.apply_quick_action(
-        outcome.ai_call_id,
-        outcome.output_text.clone(),
-        ApplyOp::Append,
-    ).await.unwrap();
+    h.orchestrator
+        .apply_quick_action(
+            outcome.ai_call_id,
+            outcome.output_text.clone(),
+            ApplyOp::Append,
+        )
+        .await
+        .unwrap();
 
     let scene = h.storage.load_scene(h.node_id).await.unwrap().unwrap();
-    let blocks = scene.pm_doc.get("content").and_then(|v| v.as_array()).unwrap();
+    let blocks = scene
+        .pm_doc
+        .get("content")
+        .and_then(|v| v.as_array())
+        .unwrap();
     assert_eq!(blocks.len(), 2, "append must add a second paragraph");
 }

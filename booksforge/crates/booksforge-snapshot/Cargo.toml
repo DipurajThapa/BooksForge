@@ -8,10 +8,8 @@ rust-version.workspace = true
 booksforge-domain  = { path = "../booksforge-domain" }
 booksforge-storage = { path = "../booksforge-storage" }
 booksforge-fs      = { path = "../booksforge-fs" }
-async-trait.workspace = true
 blake3.workspace      = true
 chrono.workspace      = true
-serde.workspace       = true
 serde_json.workspace  = true
 thiserror.workspace   = true
 tokio.workspace       = true
