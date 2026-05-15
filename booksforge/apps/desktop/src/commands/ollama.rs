@@ -147,6 +147,9 @@ pub async fn ollama_smoke_test(
             top_p: None,
             num_ctx: None,
             num_predict: Some(32), // hard cap — prevents runaway output
+            // Smoke test — keep model defaults.
+            repeat_penalty: None,
+            stop: None,
         }),
     };
 

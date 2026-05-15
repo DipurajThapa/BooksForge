@@ -251,8 +251,126 @@ pub fn parse_and_validate(raw: &str) -> Result<SceneDraftProposal, String> {
         }
     }
 
+    // Path C — truncated-JSON salvage. The model started a
+    // SceneDraftProposal JSON but ran out of `num_predict` budget
+    // mid-string at line N. Path A failed because the JSON is
+    // syntactically invalid; Path B was skipped because the output
+    // starts with `{`. Salvage the prose by scanning for every
+    // `"text": "..."` pair we can find before the truncation point.
+    // Each one becomes a paragraph node in a synthetic pm_doc.
+    if stripped.starts_with('{') {
+        let texts = extract_text_values(stripped);
+        let total_words: u32 = texts
+            .iter()
+            .map(|t| t.split_whitespace().count() as u32)
+            .sum();
+        if total_words >= 30 && !texts.is_empty() {
+            let paragraphs: Vec<serde_json::Value> = texts
+                .iter()
+                .filter(|t| !t.trim().is_empty())
+                .map(|t| {
+                    serde_json::json!({
+                        "type": "paragraph",
+                        "content": [{ "type": "text", "text": t }],
+                    })
+                })
+                .collect();
+            if !paragraphs.is_empty() {
+                tracing::warn!(
+                    agent = "scene-drafter-fic",
+                    word_count = total_words,
+                    paragraphs = paragraphs.len(),
+                    "truncated-JSON salvage: extracted {} paragraph(s) from a JSON-shaped \
+                     but unparseable response (output likely hit num_predict mid-string)",
+                    paragraphs.len(),
+                );
+                let synth = SceneDraftProposal {
+                    pm_doc: serde_json::json!({
+                        "type": "doc",
+                        "content": paragraphs,
+                    }),
+                    word_count: total_words,
+                    notes: "(salvaged from truncated JSON — pm_doc rebuilt from `text` values \
+                            scanned before truncation point)"
+                        .to_owned(),
+                };
+                return Ok(synth);
+            }
+        }
+    }
+
     // Neither path worked — return the strict error for the runner's retry log.
     strict_attempt
+}
+
+/// Extract every JSON string value associated with a `"text"` key from
+/// the input. Tolerates truncation: stops cleanly at end-of-input or at
+/// an unterminated string. Used by the truncated-JSON salvage path.
+fn extract_text_values(raw: &str) -> Vec<String> {
+    let bytes = raw.as_bytes();
+    let mut texts = Vec::new();
+    let needle = b"\"text\"";
+    let mut i = 0;
+    while i + needle.len() < bytes.len() {
+        if &bytes[i..i + needle.len()] == needle {
+            // Skip past the `"text"` token + any whitespace + the `:`
+            // + any whitespace + the opening quote of the value.
+            let mut j = i + needle.len();
+            while j < bytes.len() && (bytes[j] as char).is_whitespace() {
+                j += 1;
+            }
+            if j < bytes.len() && bytes[j] == b':' {
+                j += 1;
+                while j < bytes.len() && (bytes[j] as char).is_whitespace() {
+                    j += 1;
+                }
+                if j < bytes.len() && bytes[j] == b'"' {
+                    j += 1;
+                    let mut s = String::new();
+                    let mut escape = false;
+                    while j < bytes.len() {
+                        let c = bytes[j] as char;
+                        if escape {
+                            // Decode common JSON escapes; otherwise pass through.
+                            match c {
+                                'n' => s.push('\n'),
+                                't' => s.push('\t'),
+                                'r' => s.push('\r'),
+                                '"' => s.push('"'),
+                                '\\' => s.push('\\'),
+                                '/' => s.push('/'),
+                                _ => s.push(c),
+                            }
+                            escape = false;
+                            j += 1;
+                            continue;
+                        }
+                        if c == '\\' {
+                            escape = true;
+                            j += 1;
+                            continue;
+                        }
+                        if c == '"' {
+                            // Closed string — record it.
+                            j += 1;
+                            break;
+                        }
+                        s.push(c);
+                        j += 1;
+                    }
+                    // If the string was truncated (no closing quote
+                    // found before end-of-input), still keep it.
+                    if !s.is_empty() {
+                        texts.push(s);
+                    }
+                    i = j;
+                    continue;
+                }
+            }
+        }
+        i += 1;
+    }
+    texts
 }
 
 #[cfg(test)]

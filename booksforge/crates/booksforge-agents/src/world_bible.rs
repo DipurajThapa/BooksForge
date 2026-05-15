@@ -94,11 +94,19 @@ pub fn spec() -> AgentSpec {
 /// Parse the model's raw output into a `WorldBibleProposal` and run the
 /// proposal's `validate()`. Uses the workspace `json_repair` helper
 /// (BACKLOG §A10) so a malformed list element is salvaged.
+///
+/// `#[allow(clippy::print_stderr)]` is intentional: the parse-failure
+/// path dumps the repaired JSON to stderr so a downstream operator
+/// can see the actual shape qwen3.6 returned (e.g. an object at a
+/// path the schema declares as `String`). Strict-error logging is
+/// silent, so without this diagnostic each retry hits the same wall
+/// without telling us why.
+#[allow(clippy::print_stderr)]
 pub fn parse_and_validate(raw: &str) -> Result<WorldBibleProposal, String> {
     // `main_locations` is the only object-list at the top level; the
     // rest (social_rules, conflict_sources, motifs, continuity_constraints)
     // are list-of-strings.
-    let (repaired, audit) =
+    let (mut repaired, audit) =
         crate::json_repair::parse_and_repair_strict_objects(raw, &["main_locations"])?;
     if audit.dropped_list_elements > 0 {
         tracing::warn!(
@@ -107,8 +115,83 @@ pub fn parse_and_validate(raw: &str) -> Result<WorldBibleProposal, String> {
             "json_repair salvaged malformed list elements before deserialise",
         );
     }
-    let proposal: WorldBibleProposal = serde_json::from_value(repaired)
-        .map_err(|e| format!("JSON parse error after repair: {e}"))?;
+
+    // RCA 2026-05-15: qwen3.6:latest emits arrays at paths the schema
+    // declares as `String`. The template's prose uses plural phrasing
+    // ("rules", "details", "2-3 paragraphs") which the model reads as
+    // array-of-strings. The runner's 3-retry budget gets exhausted on
+    // the same `invalid type: sequence, expected a string` error
+    // because the prompt is deterministic enough to reproduce it
+    // across attempts. Coerce the known string-typed paths by joining
+    // array elements with "\n\n" before deserialise. No-op when the
+    // model returns the schema-correct shape.
+    //
+    // Paths come straight from `WorldBibleProposal` field types:
+    //   - history                             : String
+    //   - sensory_palette.{5 senses}          : String
+    //   - main_locations[*].purpose_in_story  : String
+    //   - main_locations[*].sensory_signature : String
+    //   - main_locations[*].key_constraints   : String
+    let coerced = crate::json_repair::coerce_arrays_to_strings_at(
+        &mut repaired,
+        &[
+            // Top-level String fields.
+            &["history"],
+            &["sensory_palette", "sight"],
+            &["sensory_palette", "sound"],
+            &["sensory_palette", "smell"],
+            &["sensory_palette", "touch"],
+            &["sensory_palette", "taste"],
+            // WorldLocation String fields (wildcard descent into the
+            // main_locations array; coercion only fires if the
+            // element-level value is the wrong shape).
+            &["main_locations", "*", "purpose_in_story"],
+            &["main_locations", "*", "sensory_signature"],
+            &["main_locations", "*", "key_constraints"],
+            // Vec<String> fields. qwen3.6 occasionally emits each
+            // element as a `{name, description}` object instead of a
+            // bare string (observed in symbolic_motifs as
+            // `{object: "...", meaning: "..."}`). Wildcard descent into
+            // each element coerces the element-level dict/array to a
+            // joined string via flatten_to_strings.
+            &["social_rules", "*"],
+            &["conflict_sources", "*"],
+            &["symbolic_motifs", "*"],
+            &["continuity_constraints", "*"],
+        ],
+    );
+    if coerced > 0 {
+        tracing::warn!(
+            agent = "world-bible",
+            coerced,
+            "coerced array-of-string fields to joined string for schema-string paths",
+        );
+    }
+
+    let proposal: WorldBibleProposal = serde_json::from_value(repaired.clone())
+        .map_err(|e| {
+            // Dump the full repaired JSON to /tmp on parse failure so
+            // the failing field path can be inspected after the run.
+            // Also emit a head-truncated dump to stderr for inline
+            // visibility. The runner's tracing::warn only logs the
+            // serde error message ("invalid type: X, expected Y")
+            // which tells us what's wrong but not WHERE — and the
+            // field path is the load-bearing piece of information for
+            // picking the right coercion target.
+            let dump = serde_json::to_string_pretty(&repaired)
+                .unwrap_or_else(|_| "<unserialisable>".to_owned());
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let path = format!("/tmp/world-bible-fail-{ts}.json");
+            let _ = std::fs::write(&path, &dump);
+            let head: String = dump.chars().take(3000).collect();
+            eprintln!(
+                "world-bible parse FAIL: {e}\n--- repaired JSON head (first 3000 chars) ---\n{head}\n---\nfull dump: {path}"
+            );
+            format!("JSON parse error after repair: {e}")
+        })?;
     let errs = proposal.validate();
     if !errs.is_empty() {
         return Err(format!("semantic validation failed: {}", errs.join("; ")));

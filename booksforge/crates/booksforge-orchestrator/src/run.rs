@@ -213,7 +213,13 @@ impl Orchestrator {
             prior_scene_corpus: None,
             on_token: None,
         };
-        crate::runner::run(self.storage.clone(), self.ollama.clone(), &self.config, input).await
+        crate::runner::run(
+            self.storage.clone(),
+            self.ollama.clone(),
+            &self.config,
+            input,
+        )
+        .await
     }
 
     /// Run the Copyeditor agent against a single scene.  Uses the generic
@@ -2270,6 +2276,13 @@ impl Orchestrator {
                             .unwrap_or_else(|| spec.context_budget.total()),
                     ),
                     num_predict: Some(spec.context_budget.max_output_tokens),
+                    // This code path is the outline-architect-specific
+                    // loop. The scene-drafter hardening (see runner.rs)
+                    // doesn't apply here — outline-architect emits a
+                    // bounded chapter list that doesn't trip the
+                    // explainer-loop failure mode.
+                    repeat_penalty: None,
+                    stop: None,
                 }),
             };
 

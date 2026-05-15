@@ -26,7 +26,7 @@
 use std::sync::Arc;
 
 use booksforge_domain::{
-    AgentTaskStatus, BookMode, CharacterBibleProposal, CharacterCard, ChapterPlan, Node, NodeKind,
+    AgentTaskStatus, BookMode, ChapterPlan, CharacterBibleProposal, CharacterCard, Node, NodeKind,
     NodeStatus, OutlineProposal, PacingExpectation, PartPlan, ProjectBrief, ScenePlan,
 };
 use booksforge_fs::{BundleFilesystem, BundlePath, OsFilesystem};
@@ -103,7 +103,9 @@ fn sample_brief() -> ProjectBrief {
         audience: "adult literary readers".into(),
         tone: "spare, lyrical".into(),
         target_word_count: 75_000,
-        premise: "A widow finds letters in her late husband's drawer that point to a parallel life.".into(),
+        premise:
+            "A widow finds letters in her late husband's drawer that point to a parallel life."
+                .into(),
         key_promises: vec![
             "a deepening mystery about who the husband really was".into(),
             "an emotional reckoning with grief".into(),
@@ -115,7 +117,9 @@ fn sample_brief() -> ProjectBrief {
         forbidden_tropes: vec!["chosen-one".into(), "fated mates".into()],
         era_setting: Some("1990s rural Pennsylvania".into()),
         cultural_context: Some("working-class, post-industrial".into()),
-        creative_seed: Some("told through alternating chapters of present grief + past letters".into()),
+        creative_seed: Some(
+            "told through alternating chapters of present grief + past letters".into(),
+        ),
     }
 }
 
@@ -199,7 +203,12 @@ async fn concept_scorer_happy_path_passes_gate() {
     let brief = sample_brief();
     let r = h
         .orchestrator
-        .run_concept_scorer(h.project_id, &brief, "qwen3.5:9b".into(), CancelToken::new())
+        .run_concept_scorer(
+            h.project_id,
+            &brief,
+            "qwen3.5:9b".into(),
+            CancelToken::new(),
+        )
         .await
         .expect("orchestrator returns Ok");
 

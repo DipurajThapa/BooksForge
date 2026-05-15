@@ -585,7 +585,18 @@ const s: Record<string, React.CSSProperties> = {
   section: {
     background: "#fff",
     border: "1px solid var(--color-neutral-200)",
-    borderRadius: 6, overflow: "hidden",
+    borderRadius: 6,
+    // `overflow: hidden` clips the rounded corners against the inner
+    // header background. Combined with `flex-shrink: 0` it keeps the
+    // section at its natural height — without flex-shrink:0, a parent
+    // `<div style="display:flex; flex-direction:column">` will
+    // proportionally compress every child to fit the parent's height,
+    // and the section's own overflow:hidden then clips the body /
+    // header content silently. That was the "fields are static and
+    // overlapping" symptom — the cards looked like header-only because
+    // the body had been compressed out of view.
+    overflow: "hidden",
+    flexShrink: 0,
   },
   sectionHeader: {
     padding: "12px 16px",
@@ -605,7 +616,13 @@ const s: Record<string, React.CSSProperties> = {
     color: "var(--color-neutral-600)", lineHeight: 1.5,
   },
   sectionBody: { padding: 16, display: "flex", flexDirection: "column", gap: 12 },
-  field: { display: "flex", flexDirection: "column", gap: 4 },
+  field: {
+    // Explicit width so the flex column inside a flex column parent
+    // (sectionBody) doesn't collapse the contained input to its
+    // intrinsic min-content width in some WebKit builds.
+    display: "flex", flexDirection: "column", gap: 4,
+    width: "100%",
+  },
   fieldLabel: {
     fontSize: 11, fontWeight: 600,
     color: "var(--color-neutral-700)",
@@ -613,11 +630,23 @@ const s: Record<string, React.CSSProperties> = {
   },
   fieldHint: { fontSize: 11, color: "var(--color-neutral-500)" },
   input: {
+    // Visible-by-default form control. Explicit display:block + min-height
+    // guarantees the input is a meaningful block element even when wrapped
+    // inside flex containers where some WebKit builds collapse inline
+    // <input>/<textarea> to zero height. Border tone is one step darker
+    // than the previous neutral-300 so the form fields read clearly
+    // against the white section background.
+    display: "block",
     width: "100%", boxSizing: "border-box",
     padding: "8px 12px",
-    border: "1px solid var(--color-neutral-300)", borderRadius: 4,
-    background: "#fff", color: "var(--color-neutral-900)",
-    fontFamily: "var(--font-ui)", fontSize: 14, outline: "none",
+    border: "1px solid var(--color-neutral-400, #9ca3af)",
+    borderRadius: 4,
+    background: "#fff",
+    color: "var(--color-neutral-900)",
+    fontFamily: "var(--font-ui)", fontSize: 14,
+    lineHeight: 1.4,
+    minHeight: 40,
+    outline: "none",
   },
   error: {
     padding: "8px 12px",

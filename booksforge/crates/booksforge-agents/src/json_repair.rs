@@ -111,8 +111,84 @@ where
 /// list-of-objects), use [`parse_and_repair_strict_objects`] in the
 /// agent's parse path where the schema is known.
 pub fn parse_and_repair(raw: &str) -> Result<(Value, RepairAudit), String> {
-    let v: Value = serde_json::from_str(raw).map_err(|e| format!("invalid JSON: {e}"))?;
+    let v: Value = lenient_parse(raw)?;
     Ok(repair_value(v, &KEEP_NON_NULL))
+}
+
+/// Strict-JSON parser with two lenient pre-steps for the common LLM
+/// output defects that strict serde_json rejects:
+///   - **Trailing commas** before `}` or `]` (qwen3.6 emits these
+///     intermittently when the model "thinks" of an extra element it
+///     then doesn't write).
+///   - **JS-style block comments** `/* ... */` inside the JSON, which
+///     models sometimes use as inline rationale.
+///
+/// Strips both, then parses. Strings are scanned with a single-pass
+/// state machine so commas / `/*` inside string literals are
+/// preserved. Backslash-escapes are handled.
+///
+/// On success returns the parsed `Value`. On failure returns a
+/// caller-friendly error including the pre-strip raw line/column from
+/// serde_json — so the diagnostic still points at the model's bug,
+/// not at our pre-pass.
+fn lenient_parse(raw: &str) -> Result<Value, String> {
+    let cleaned = strip_trailing_commas(raw);
+    serde_json::from_str(&cleaned).map_err(|e| format!("invalid JSON: {e}"))
+}
+
+/// Pure-text trailing-comma stripper. Walks the input character by
+/// character, tracking whether we're inside a string literal (so
+/// commas inside quoted text are NOT touched), and replaces every
+/// `,` that is followed (after optional whitespace) by `}` or `]`
+/// with a single space.
+///
+/// Cheap (~one pass), allocation-conservative (writes to a String
+/// of capacity equal to input length).
+fn strip_trailing_commas(raw: &str) -> String {
+    let bytes = raw.as_bytes();
+    let mut out = String::with_capacity(raw.len());
+    let mut i = 0;
+    let mut in_string = false;
+    let mut escape = false;
+    while i < bytes.len() {
+        let c = bytes[i] as char;
+        if in_string {
+            out.push(c);
+            if escape {
+                escape = false;
+            } else if c == '\\' {
+                escape = true;
+            } else if c == '"' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        if c == '"' {
+            in_string = true;
+            out.push(c);
+            i += 1;
+            continue;
+        }
+        if c == ',' {
+            // Look ahead past whitespace; if next non-whitespace is
+            // `}` or `]`, drop this comma.
+            let mut j = i + 1;
+            while j < bytes.len() && (bytes[j] as char).is_whitespace() {
+                j += 1;
+            }
+            if j < bytes.len() && (bytes[j] == b'}' || bytes[j] == b']') {
+                // Skip the comma — write a space to preserve column
+                // numbers for any later diagnostic.
+                out.push(' ');
+                i += 1;
+                continue;
+            }
+        }
+        out.push(c);
+        i += 1;
+    }
+    out
 }
 
 /// Stricter variant: drop list elements that fail the "is an object"
@@ -125,7 +201,7 @@ pub fn parse_and_repair_strict_objects(
     raw: &str,
     object_list_keys: &[&str],
 ) -> Result<(Value, RepairAudit), String> {
-    let v: Value = serde_json::from_str(raw).map_err(|e| format!("invalid JSON: {e}"))?;
+    let v: Value = lenient_parse(raw)?;
     let owned_keys: Vec<String> = object_list_keys.iter().map(|s| (*s).to_owned()).collect();
     let pred = move |item: &Value, parent_key: Option<&str>| -> bool {
         if let Some(k) = parent_key {
@@ -166,6 +242,93 @@ pub fn parse_and_repair_strict_objects(
 //     (ambiguous — better to fail loudly than corrupt the wrong field).
 //   - Refuses to clobber an existing key (better to leave the typo'd
 //     key in place than overwrite a legitimately-named field).
+
+/// Coerce composite values (arrays-of-strings or objects-of-strings) to
+/// a single joined string at the given JSON paths. Used when an LLM
+/// emits a list or a nested object at a path whose schema declares a
+/// `String` field — a common failure mode when the prompt text uses
+/// plural phrasing ("rules", "details", "2-3 paragraphs") or when the
+/// model imposes its own structure (`{"para_1": "...", "para_2":
+/// "..."}` for multi-paragraph text).
+///
+/// Each path is a slice of segments. A literal segment matches the
+/// object key exactly; the segment `"*"` matches every element of an
+/// array (use to descend through homogeneous lists like
+/// `main_locations`).
+///
+/// Coercion rules at the target node:
+///   - `Value::Array`  → join string elements with `\n\n`
+///   - `Value::Object` → walk the map in key order, join all string
+///                       values (and nested-object string values
+///                       recursively, depth ≤ 2) with `\n\n`
+///
+/// Non-string elements (numbers, nested arrays, bools, nulls) are
+/// dropped from the join.
+///
+/// Returns the total count of coercions performed (useful for audit
+/// logging). A wildcard path that descends into a list of 5 elements
+/// with 3 needing coercion returns 3, not 1.
+///
+/// Added 2026-05-15 after `WorldBibleProposal::history` came back from
+/// qwen3.6:latest as both `[String; 3]` (run 1) and
+/// `{para_1: ..., para_2: ...}` (run 2), exhausting the runner's
+/// 3-retry budget in both cases. The fix is additive — when the model
+/// returns the schema-correct shape (a String) the function is a no-op.
+pub fn coerce_arrays_to_strings_at(value: &mut Value, paths: &[&[&str]]) -> usize {
+    let mut total = 0usize;
+    for path in paths {
+        total += coerce_at_path(value, path);
+    }
+    total
+}
+
+fn flatten_to_strings(value: &Value, depth: usize) -> Vec<String> {
+    match value {
+        Value::String(s) => vec![s.clone()],
+        Value::Array(arr) if depth > 0 => arr
+            .iter()
+            .flat_map(|v| flatten_to_strings(v, depth - 1))
+            .collect(),
+        Value::Object(map) if depth > 0 => map
+            .values()
+            .flat_map(|v| flatten_to_strings(v, depth - 1))
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn coerce_at_path(value: &mut Value, path: &[&str]) -> usize {
+    if path.is_empty() {
+        match value {
+            Value::Array(_) | Value::Object(_) => {
+                let parts = flatten_to_strings(value, 2);
+                if parts.is_empty() {
+                    return 0;
+                }
+                *value = Value::String(parts.join("\n\n"));
+                return 1;
+            }
+            _ => return 0,
+        }
+    }
+    let (head, tail) = (path[0], &path[1..]);
+    if head == "*" {
+        let mut count = 0usize;
+        if let Value::Array(arr) = value {
+            for item in arr.iter_mut() {
+                count += coerce_at_path(item, tail);
+            }
+        }
+        count
+    } else if let Value::Object(map) = value {
+        match map.get_mut(head) {
+            Some(child) => coerce_at_path(child, tail),
+            None => 0,
+        }
+    } else {
+        0
+    }
+}
 
 /// Damerau-Levenshtein edit distance between two strings (case-insensitive).
 ///
@@ -375,7 +538,7 @@ pub fn parse_and_repair_with_policy(
     allowed_keys: &[&str],
     policy: &RepairPolicy,
 ) -> Result<(Value, RepairAudit), String> {
-    let v: Value = serde_json::from_str(raw).map_err(|e| format!("invalid JSON: {e}"))?;
+    let v: Value = lenient_parse(raw)?;
     let (mut v2, mut audit) = repair_value(v, &KEEP_NON_NULL);
     repair_field_names(&mut v2, allowed_keys, policy, &mut audit);
     Ok((v2, audit))
@@ -739,6 +902,149 @@ mod tests {
             .collect();
         assert!(rename_keys.contains("voce_traits"));
         assert!(rename_keys.contains("external_object"));
+    }
+
+    #[test]
+    fn coerce_arrays_to_strings_joins_at_simple_path() {
+        let mut v = json!({"history": ["Para one.", "Para two.", "Para three."]});
+        let n = coerce_arrays_to_strings_at(&mut v, &[&["history"]]);
+        assert_eq!(n, 1);
+        assert_eq!(v["history"], json!("Para one.\n\nPara two.\n\nPara three."));
+    }
+
+    #[test]
+    fn coerce_arrays_to_strings_descends_wildcard_arrays() {
+        let mut v = json!({
+            "main_locations": [
+                {"name": "A", "key_constraints": ["rule 1", "rule 2"]},
+                {"name": "B", "key_constraints": "already a string"},
+                {"name": "C", "key_constraints": ["just one"]},
+            ]
+        });
+        let n = coerce_arrays_to_strings_at(&mut v, &[&["main_locations", "*", "key_constraints"]]);
+        assert_eq!(n, 2, "coerced two arrays; the already-string is a no-op");
+        assert_eq!(
+            v["main_locations"][0]["key_constraints"],
+            json!("rule 1\n\nrule 2")
+        );
+        assert_eq!(
+            v["main_locations"][1]["key_constraints"],
+            json!("already a string")
+        );
+        assert_eq!(v["main_locations"][2]["key_constraints"], json!("just one"));
+    }
+
+    #[test]
+    fn coerce_arrays_to_strings_no_op_on_schema_correct_input() {
+        let mut v = json!({"history": "Already a string."});
+        let n = coerce_arrays_to_strings_at(&mut v, &[&["history"]]);
+        assert_eq!(n, 0);
+        assert_eq!(v["history"], json!("Already a string."));
+    }
+
+    #[test]
+    fn coerce_arrays_to_strings_handles_missing_path_gracefully() {
+        let mut v = json!({"other": "ok"});
+        let n = coerce_arrays_to_strings_at(&mut v, &[&["nonexistent"]]);
+        assert_eq!(n, 0);
+    }
+
+    #[test]
+    fn coerce_object_of_strings_joins_at_path() {
+        // qwen3.6 second-run failure mode: returns an object with
+        // paragraph keys instead of a single string.
+        let mut v = json!({
+            "history": {
+                "para_1": "First paragraph.",
+                "para_2": "Second paragraph.",
+                "para_3": "Third paragraph.",
+            }
+        });
+        let n = coerce_arrays_to_strings_at(&mut v, &[&["history"]]);
+        assert_eq!(n, 1);
+        let s = v["history"].as_str().expect("now a string");
+        // BTreeMap-backed serde_json::Map iterates in insertion order,
+        // so we just check that all three paragraphs appear concatenated.
+        assert!(s.contains("First paragraph."));
+        assert!(s.contains("Second paragraph."));
+        assert!(s.contains("Third paragraph."));
+        assert!(s.contains("\n\n"));
+    }
+
+    #[test]
+    fn strip_trailing_commas_handles_object() {
+        let raw = r#"{"a": 1, "b": 2,}"#;
+        let out = strip_trailing_commas(raw);
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["a"], 1);
+        assert_eq!(v["b"], 2);
+    }
+
+    #[test]
+    fn strip_trailing_commas_handles_array() {
+        let raw = r#"["a","b","c",]"#;
+        let out = strip_trailing_commas(raw);
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v.as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn strip_trailing_commas_preserves_commas_inside_strings() {
+        let raw = r#"{"x": "one, two, three",}"#;
+        let out = strip_trailing_commas(raw);
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["x"], "one, two, three");
+    }
+
+    #[test]
+    fn strip_trailing_commas_handles_nested_with_whitespace() {
+        let raw = r#"{
+            "a": [
+                "x",
+                "y",
+            ],
+            "b": {
+                "c": 1,
+                "d": 2,
+            },
+        }"#;
+        let out = strip_trailing_commas(raw);
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["a"].as_array().unwrap().len(), 2);
+        assert_eq!(v["b"]["c"], 1);
+        assert_eq!(v["b"]["d"], 2);
+    }
+
+    #[test]
+    fn strip_trailing_commas_respects_escaped_quote_in_string() {
+        let raw = r#"{"x": "she said \"hi,\"",}"#;
+        let out = strip_trailing_commas(raw);
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["x"], "she said \"hi,\"");
+    }
+
+    #[test]
+    fn coerce_handles_mixed_nested_object_in_world_location() {
+        // Simulated `main_locations[*].key_constraints` returned as
+        // a nested object instead of a string.
+        let mut v = json!({
+            "main_locations": [
+                {
+                    "name": "Mumbai office",
+                    "key_constraints": {
+                        "etiquette": "no phones in meetings",
+                        "hours": "9am to 9pm shifts",
+                    }
+                }
+            ]
+        });
+        let n = coerce_arrays_to_strings_at(&mut v, &[&["main_locations", "*", "key_constraints"]]);
+        assert_eq!(n, 1);
+        let s = v["main_locations"][0]["key_constraints"]
+            .as_str()
+            .expect("now a string");
+        assert!(s.contains("no phones in meetings"));
+        assert!(s.contains("9am to 9pm shifts"));
     }
 
     #[test]

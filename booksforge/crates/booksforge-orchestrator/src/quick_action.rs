@@ -147,6 +147,11 @@ impl Orchestrator {
                 top_p: None,
                 num_ctx: None,
                 num_predict: options.max_output,
+                // Quick actions are small, bounded edits — not long-form
+                // scene drafts — so the qwen3.5:9b explainer-loop failure
+                // mode doesn't apply here. Keep Ollama defaults.
+                repeat_penalty: None,
+                stop: None,
             }),
         };
 

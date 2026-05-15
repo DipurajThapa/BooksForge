@@ -585,7 +585,11 @@ const s: Record<string, React.CSSProperties> = {
   section: {
     background: "#fff",
     border: "1px solid var(--color-neutral-200)",
-    borderRadius: 6, overflow: "hidden",
+    borderRadius: 6,
+    overflow: "hidden",
+    // flex-shrink:0 — parent `col` is a flex column; without this
+    // sections compress and the overflow:hidden clips the body.
+    flexShrink: 0,
   },
   sectionHeader: {
     padding: "12px 16px",
@@ -650,11 +654,20 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 13, color: "var(--color-neutral-800)",
   },
   numberInput: {
+    // Visible-by-default form control — display:block + min-height
+    // keep the narrow number input from collapsing inside the
+    // controls flex row. Border one step darker for contrast.
+    display: "block",
     width: 80,
     padding: "4px 8px",
-    border: "1px solid var(--color-neutral-300)", borderRadius: 4,
+    border: "1px solid var(--color-neutral-400, #9ca3af)",
+    borderRadius: 4,
+    background: "#fff", color: "var(--color-neutral-900)",
     fontFamily: "var(--font-mono)", fontSize: 12,
+    lineHeight: 1.4,
+    minHeight: 28,
     marginLeft: "auto",
+    outline: "none",
   },
   error: {
     padding: "8px 12px",

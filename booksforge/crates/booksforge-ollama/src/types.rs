@@ -152,6 +152,24 @@ pub struct GenerateOptions {
     /// Hard token budget enforced by the orchestrator — passed through to the model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub num_predict: Option<u32>,
+    /// Penalty for token repetition. Default in Ollama is 1.1, which is
+    /// too lax for qwen3.5:9b on sensory-introspective fiction prose —
+    /// the model occasionally locks into a self-referential "explainer"
+    /// loop where it writes meta-commentary about its own drafting
+    /// process ("Word count managed by expanding the sensory details
+    /// of the room and the internal monologue of the narrator…") as if
+    /// it were scene text. Setting 1.25 breaks the loop without
+    /// noticeably degrading prose quality. See the validation run
+    /// `book-output/my-confused-life/` (2026-05-14) for the full RCA.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repeat_penalty: Option<f32>,
+    /// Hard-stop generation when any of these strings is emitted. Used
+    /// to terminate the meta-commentary failure mode early (before the
+    /// model spawns another nested paragraph that breaks the pm_doc
+    /// JSON tree). The orchestrator wires sensible defaults for the
+    /// scene drafter; other agents pass `None`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stop: Option<Vec<String>>,
 }
 
 /// Completed generation result.
@@ -323,5 +341,45 @@ mod tests {
         assert!(value
             .get("options")
             .is_none_or(|opts| opts.get("think").is_none()));
+    }
+
+    #[test]
+    fn generate_options_omits_repeat_penalty_and_stop_by_default() {
+        let opts = GenerateOptions::default();
+        let json = serde_json::to_string(&opts).unwrap();
+        assert!(
+            !json.contains("repeat_penalty"),
+            "default must not emit repeat_penalty: {json}"
+        );
+        assert!(
+            !json.contains("\"stop\""),
+            "default must not emit stop: {json}"
+        );
+    }
+
+    #[test]
+    fn generate_options_emits_repeat_penalty_when_set() {
+        let opts = GenerateOptions {
+            repeat_penalty: Some(1.25),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&opts).unwrap();
+        assert!(
+            json.contains("\"repeat_penalty\":1.25"),
+            "expected repeat_penalty:1.25 in: {json}"
+        );
+    }
+
+    #[test]
+    fn generate_options_emits_stop_array_when_set() {
+        let opts = GenerateOptions {
+            stop: Some(vec!["Word count managed".into(), "narrative arc".into()]),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&opts).unwrap();
+        assert!(
+            json.contains(r#""stop":["Word count managed","narrative arc"]"#),
+            "expected stop array in: {json}"
+        );
     }
 }

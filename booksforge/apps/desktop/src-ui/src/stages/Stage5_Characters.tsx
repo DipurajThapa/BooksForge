@@ -897,7 +897,11 @@ const s: Record<string, React.CSSProperties> = {
   section: {
     background: "#fff",
     border: "1px solid var(--color-neutral-200)",
-    borderRadius: 6, overflow: "hidden",
+    borderRadius: 6,
+    overflow: "hidden",
+    // flex-shrink:0 — parent `col` is a flex column; without this
+    // sections compress and the overflow:hidden clips the body.
+    flexShrink: 0,
   },
   sectionHeader: {
     padding: "12px 16px",
@@ -927,7 +931,12 @@ const s: Record<string, React.CSSProperties> = {
     background: "var(--color-neutral-50)",
   },
   cardHeader: { display: "flex", gap: 8, alignItems: "center" },
-  field: { display: "flex", flexDirection: "column", gap: 4 },
+  field: {
+    // Explicit width so the field doesn't shrink to min-content
+    // inside the nested flex columns (cardList → card → field).
+    display: "flex", flexDirection: "column", gap: 4,
+    width: "100%",
+  },
   fieldLabel: {
     fontSize: 11, fontWeight: 600,
     color: "var(--color-neutral-700)",
@@ -935,11 +944,20 @@ const s: Record<string, React.CSSProperties> = {
   },
   fieldHint: { fontSize: 11, color: "var(--color-neutral-500)" },
   input: {
+    // Visible-by-default form control — display:block + min-height
+    // prevents inline <input>/<textarea> from collapsing to zero
+    // height inside a flex column. Border one step darker for clear
+    // contrast against the card's white background.
+    display: "block",
     width: "100%", boxSizing: "border-box",
     padding: "6px 10px",
-    border: "1px solid var(--color-neutral-300)", borderRadius: 4,
+    border: "1px solid var(--color-neutral-400, #9ca3af)",
+    borderRadius: 4,
     background: "#fff", color: "var(--color-neutral-900)",
-    fontFamily: "var(--font-ui)", fontSize: 13, outline: "none",
+    fontFamily: "var(--font-ui)", fontSize: 13,
+    lineHeight: 1.4,
+    minHeight: 36,
+    outline: "none",
   },
   gridTwo: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
   addRow: { display: "flex" },

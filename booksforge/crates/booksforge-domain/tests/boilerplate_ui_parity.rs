@@ -29,8 +29,7 @@ const STAGE13_PATH: &str = concat!(
 /// array literal format is stable and unique in the file.
 fn parse_stage13_kinds() -> HashMap<String, bool> {
     let path = PathBuf::from(STAGE13_PATH);
-    let src = fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let src = fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
 
     // Locate the array literal.
     let array_start = src

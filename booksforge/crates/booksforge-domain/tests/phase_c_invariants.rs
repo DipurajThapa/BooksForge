@@ -304,8 +304,7 @@ fn audience_map_unknown_pacing_string_falls_back_to_default() {
         "genre_expectations": ["a"],
         "pacing_expectation": "warp_speed"
     });
-    let m: ReaderExpectationMap =
-        serde_json::from_value(bad).expect("tolerant parse must succeed");
+    let m: ReaderExpectationMap = serde_json::from_value(bad).expect("tolerant parse must succeed");
     assert_eq!(m.pacing_expectation, PacingExpectation::SlowBuild);
     assert_eq!(m.genre_expectations, vec!["a".to_owned()]);
 }

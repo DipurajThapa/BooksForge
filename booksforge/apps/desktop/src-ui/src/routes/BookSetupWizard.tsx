@@ -466,7 +466,12 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 13, color: "var(--color-neutral-600)",
     lineHeight: 1.6, margin: 0,
   },
-  field: { display: "flex", flexDirection: "column", gap: 4 },
+  field: {
+    // Explicit width so the field doesn't collapse to min-content
+    // inside the flex column step layout.
+    display: "flex", flexDirection: "column", gap: 4,
+    width: "100%",
+  },
   fieldLabel: {
     fontSize: 12, fontWeight: 600,
     color: "var(--color-neutral-700)",
@@ -475,12 +480,19 @@ const s: Record<string, React.CSSProperties> = {
   fieldHint: { fontSize: 11, color: "var(--color-neutral-500)" },
   required: { color: "var(--color-amber-600)" },
   input: {
+    // Visible-by-default form control — display:block + min-height
+    // keeps the input rendering as a full-width block inside the
+    // flex column. Border one step darker for contrast.
+    display: "block",
     width: "100%", boxSizing: "border-box",
     padding: "8px 12px",
-    border: "1px solid var(--color-neutral-300)",
+    border: "1px solid var(--color-neutral-400, #9ca3af)",
     borderRadius: 4,
     background: "#fff", color: "var(--color-neutral-900)",
-    fontFamily: "var(--font-ui)", fontSize: 14, outline: "none",
+    fontFamily: "var(--font-ui)", fontSize: 14,
+    lineHeight: 1.4,
+    minHeight: 40,
+    outline: "none",
   },
   pathRow: { display: "flex", gap: 8, alignItems: "center" },
   secondaryBtn: {

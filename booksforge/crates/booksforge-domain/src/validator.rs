@@ -65,7 +65,9 @@ where
     D: serde::Deserializer<'de>,
 {
     let s = Option::<String>::deserialize(deserializer)?;
-    Ok(s.as_deref().and_then(Severity::from_str).unwrap_or_default())
+    Ok(s.as_deref()
+        .and_then(Severity::from_str)
+        .unwrap_or_default())
 }
 
 /// A single finding emitted by a validator.

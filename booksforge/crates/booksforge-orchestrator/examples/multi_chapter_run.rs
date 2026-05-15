@@ -44,23 +44,34 @@ use booksforge_voice::fingerprint;
 use chrono::Utc;
 use ulid::Ulid;
 
+// Three-tier model routing (2026-05-15 refactor — reserve the heaviest
+// model for the steps that genuinely need its critical-thinking budget).
+//
+//   LIGHT  qwen3.5:9b     basic structured-output tasks (intake,
+//                         character/world bible, scene critic)
+//   MEDIUM qwen3.5:27b    creative drafting — scene_drafter_fic. The
+//                         dense 27B produces consistent literary prose
+//                         and is fast enough on Apple Silicon. Using
+//                         9B here was visibly hurting voice quality
+//                         (frequent AI-tell phrasing); using 3.6
+//                         here burns context for prose that isn't
+//                         doing the work the MoE excels at.
+//   HEAVY  qwen3.6:latest final polish ONLY — voice / metaphor /
+//                         dialogue / scene-tension. The MoE's wider
+//                         context (262k) and reasoning budget pay
+//                         off here because the polish stack reads the
+//                         entire scene and emits a craft-grade rewrite
+//                         that benefits from interpretive analysis.
 const MODEL_LIGHT: &str = "qwen3.5:9b";
+const MODEL_MEDIUM: &str = "qwen3.5:27b";
 const MODEL_HEAVY: &str = "qwen3.6:latest";
 
-const IDEA_TEXT: &str = "\
-A spare literary novel set in 1990s rural Pennsylvania. After her clockmaker \
-husband Arthur dies suddenly of a heart attack, Elara — his widow of forty \
-years — discovers a locked drawer in his workshop. Inside: twenty-three \
-sealed letters dated to the three weeks before his death, addressed to a \
-woman named Maeve Kowalski she has never heard of. Across two chapters, \
-Elara finds the letters (Chapter 1) and drives to Maeve's house to confront \
-her (Chapter 2). The novel is about inheritance, accumulated time, the way \
-a long marriage can quietly hold a thing the other person doesn't know. \
-Comp authors: Marilynne Robinson, Cormac McCarthy. No chosen-one tropes, no \
-'tapestry of memory' AI prose.";
+// IDEA_TEXT swapped for "My Confused Life" — same canonical pipeline,
+// different premise. Sourced from book-output/my-confused-life/01-brief.json.
+const IDEA_TEXT: &str = "Arjun, a burnt-out corporate man in his early thirties, hits a low point marked by job exhaustion, a cold relationship, and the death of a mentor. Through a slow, embarrassing encounter with the devotional tradition of Radha and Krishna, he discovers that peace is a by-product of service and that he can remain in the world while reshaping his sense of self through the practice of sharing more than he takes.";
 
-const CHAPTER_POV: &str = "third-limited";
-const TARGET_WORDS_PER_SCENE: u32 = 800;
+const CHAPTER_POV: &str = "first-person past tense";
+const TARGET_WORDS_PER_SCENE: u32 = 1200;
 
 /// One scene's spec.
 struct SceneSpec {
@@ -72,38 +83,154 @@ struct SceneSpec {
     reveal: &'static str,
 }
 
+// SCENES[] swapped for "My Confused Life" — 18 scenes across 6 chapters,
+// auto-decomposed from 02-outline.json by book-output/outline_to_scenes.py
+// using qwen3.5:9b. Pipeline (intake → bibles → drafter → critic →
+// polish stack) is unchanged.
 const SCENES: &[SceneSpec] = &[
     SceneSpec {
         chapter:  1,
         scene:    1,
-        title:    "The Locked Drawer",
-        goal:     "Elara opens the drawer she has avoided for three weeks and lifts out the leather folio inside.",
-        conflict: "Her hand resists the act of intrusion even as her eyes have already begun. The workshop holds her grief like a held breath.",
-        reveal:   "Inside the folio: a stack of twenty-three sealed envelopes, each addressed in Arthur's careful hand. The top one is dated three weeks before he died.",
+        title:    "Ch1 S1 — The Commute Home",
+        goal:     "Arjun navigates the chaotic Mumbai traffic while observing the city's energy.",
+        conflict: "He feels internally hollowed out by his demanding job.",
+        reveal:   "His detachment from his own family is highlighted by his inability to connect with the vibrant life around him.",
     },
     SceneSpec {
         chapter:  1,
         scene:    2,
-        title:    "Maeve Kowalski",
-        goal:     "Elara breaks the wax seal of the top letter and reads it.",
-        conflict: "She does not recognise the name on the envelope. The opening line of the letter is more intimate than anything Arthur ever said to her.",
-        reveal:   "The letter is addressed to Maeve Kowalski. The first sentence is: 'I have spent forty years building a machine that keeps time, but I cannot fix the way I am breaking.'",
+        title:    "Ch1 S2 — The Commute Home",
+        goal:     "Arjun enters his silent apartment and moves through the cold kitchen to prepare a meal.",
+        conflict: "His wife's emotional distance and the stark absence of warmth in the home resist his desire for connection and rest.",
+        reveal:   "The reader learns that Arjun has become so detached from his own family that he treats the silence of the house as a normal part of his daily routine.",
+    },
+    SceneSpec {
+        chapter:  1,
+        scene:    3,
+        title:    "Ch1 S3 — The Commute Home",
+        goal:     "Arjun receives the news of his mentor's death while navigating the relentless mechanical exhaustion of his daily life in Mumbai.",
+        conflict: "This shocking news shatters his remaining sense of professional order and deepens his detachment from his own family.",
+        reveal:   "The collapse of his professional composure exposes the fragility of his existence beneath the city's relentless rhythm.",
     },
     SceneSpec {
         chapter:  2,
         scene:    1,
-        title:    "The Drive",
-        goal:     "Elara drives the back roads to the address she found in Arthur's ledger — Maeve Kowalski's farmhouse, two counties over.",
-        conflict: "She tells herself she only wants to look at the house. She knows this is not true.",
-        reveal:   "The farmhouse is smaller than she imagined, and a woman in her sixties is already standing on the porch when Elara pulls into the gravel drive — as if she has been waiting.",
+        title:    "Ch2 S1 — The Unraveling",
+        goal:     "Arjun attempts to force his mind to focus on spreadsheets and strategy during a work crisis.",
+        conflict: "His mind refuses to concentrate, causing his physical and emotional state to collapse under the pressure of functioning without his usual anchors.",
+        reveal:   "The reader learns that Arjun's ability to function has completely disintegrated, leaving him unable to engage with his professional responsibilities.",
     },
     SceneSpec {
         chapter:  2,
         scene:    2,
-        title:    "The Threshold",
-        goal:     "Elara walks up to Maeve's porch and speaks her name.",
-        conflict: "She prepared a thousand things to say on the drive. Standing in front of the woman, she finds none of them true.",
-        reveal:   "Maeve does not invite her in. She says only: 'He told me you would come. He said it might take you a year.' Elara realises Maeve has been waiting since the funeral.",
+        title:    "Ch2 S2 — The Unraveling",
+        goal:     "Arjun wanders through a crowded Mumbai market, navigating the chaotic flow of people while trying to maintain his composure.",
+        conflict: "He feels like a ghost among fully alive people, struggling to connect with the vibrant energy around him as his emotional anchors crumble.",
+        reveal:   "The physical sensation of the crowd pressing against him highlights the widening gap between his internal isolation and the external reality of life continuing without him.",
+    },
+    SceneSpec {
+        chapter:  2,
+        scene:    3,
+        title:    "Ch2 S3 — The Unraveling",
+        goal:     "Arjun returns to his apartment and lies awake staring at the ceiling.",
+        conflict: "He struggles to sleep as the fading memories of his mentor leave him emotionally adrift.",
+        reveal:   "The absence of his mentor's guidance causes his physical and emotional life to begin collapsing.",
+    },
+    SceneSpec {
+        chapter:  3,
+        scene:    1,
+        title:    "Ch3 S1 — The Temple of Names",
+        goal:     "Arjun enters a small, crowded temple in the hinterland town and attempts to navigate the space while feeling out of place among devotees chanting names he does not know.",
+        conflict: "Arjun's internal skepticism and self-consciousness clash with the overwhelming, unfamiliar spiritual energy of the crowd, making him feel like an intruder in a world he does not understand.",
+        reveal:   "Despite his initial resistance, a sudden emotional shift occurs as Arjun is drawn into the collective devotion, realizing the sincerity behind the chants he previously dismissed as meaningless.",
+    },
+    SceneSpec {
+        chapter:  3,
+        scene:    2,
+        title:    "Ch3 S2 — The Temple of Names",
+        goal:     "Arjun observes the vibrant iconography of Radha and Krishna while noting the intense devotion of the surrounding crowd.",
+        conflict: "He struggles to comprehend the deep theological significance behind the rituals because he views the scene only through his own skeptical and self-conscious lens.",
+        reveal:   "A surprising emotional shift occurs as Arjun begins to feel the weight of the collective faith he previously dismissed.",
+    },
+    SceneSpec {
+        chapter:  3,
+        scene:    3,
+        title:    "Ch3 S3 — The Temple of Names",
+        goal:     "Arjun joins the rhythmic chant of the kirtan despite his initial embarrassment.",
+        conflict: "His self-conscious skepticism clashes with the sudden, strange warmth rising in his chest.",
+        reveal:   "The immersive power of the devotional world shifts his perspective, transforming his doubt into a moment of unexpected emotional connection.",
+    },
+    SceneSpec {
+        chapter:  4,
+        scene:    1,
+        title:    "Ch4 S1 — The First Offering",
+        goal:     "Arjun returns to the temple town to volunteer for distributing food to the hungry.",
+        conflict: "His hands shake violently from the effort of giving, revealing that his ego still resists the act of selfless service.",
+        reveal:   "The reader learns that Arjun's desire to help is currently undermined by his own inability to let go of his pride.",
+    },
+    SceneSpec {
+        chapter:  4,
+        scene:    2,
+        title:    "Ch4 S2 — The First Offering",
+        goal:     "Arjun watches a local devotee serve others with quiet joy while he struggles to overcome his own internal resistance to giving.",
+        conflict: "His ego clings to the belief that he is not yet worthy of such an act, creating a sharp contrast with the devotee's effortless ease.",
+        reveal:   "The scene exposes that his hesitation is not a lack of desire to help, but a stubborn attachment to his own sense of superiority.",
+    },
+    SceneSpec {
+        chapter:  4,
+        scene:    3,
+        title:    "Ch4 S3 — The First Offering",
+        goal:     "Arjun attempts to distribute the remaining supplies to the needy villagers despite his lingering hesitation.",
+        conflict: "His deep-seated ego and fear of appearing weak resist the act of giving, causing him to stumble over his words and movements.",
+        reveal:   "A sudden, unexplainable sense of lightness washes over him as he finally hands out the last bag, hinting that his internal shift has begun.",
+    },
+    SceneSpec {
+        chapter:  5,
+        scene:    1,
+        title:    "Ch5 S1 — The Language of Names",
+        goal:     "Arjun sits with a group of devotees and listens to the repetition of divine names until the sound becomes a physical vibration.",
+        conflict: "The physical effort of maintaining stillness and focus battles the natural tendency of his mind to wander or the vibration to fade.",
+        reveal:   "He discovers that the chanting transforms from an external ritual into an internal language that speaks directly to his own heart.",
+    },
+    SceneSpec {
+        chapter:  5,
+        scene:    2,
+        title:    "Ch5 S2 — The Language of Names",
+        goal:     "Arjun begins to weave the names of deities into his daily thoughts.",
+        conflict: "The sharp edges of his anxiety resist this new practice.",
+        reveal:   "He discovers that the divine names soften his internal turmoil and become a language for his own heart.",
+    },
+    SceneSpec {
+        chapter:  5,
+        scene:    3,
+        title:    "Ch5 S3 — The Language of Names",
+        goal:     "Arjun sits in silence and begins to chant the names of the deities to align his heart with the divine.",
+        conflict: "His mind resists the practice by clinging to the urgent need to fix his chaotic life rather than simply receiving peace.",
+        reveal:   "He discovers that the act of service itself is the language through which the divine speaks directly to his own heart.",
+    },
+    SceneSpec {
+        chapter:  6,
+        scene:    1,
+        title:    "Ch6 S1 — The Return",
+        goal:     "Arjun walks back into Mumbai traffic, embracing his role as a participant in the city's flow.",
+        conflict: "He must reconcile his past detachment with the present reality of being fully engaged in his daily life.",
+        reveal:   "The reader learns that peace is no longer a distant destination but a by-product of his daily service.",
+    },
+    SceneSpec {
+        chapter:  6,
+        scene:    2,
+        title:    "Ch6 S2 — The Return",
+        goal:     "Arjun approaches his apartment door to face his wife with a new openness instead of the coldness of the past.",
+        conflict: "The weight of his previous emotional distance and the fear of failing to convey his transformed heart before entering.",
+        reveal:   "The reader learns that his daily service has reshaped his corporate life into a foundation for genuine peace and connection.",
+    },
+    SceneSpec {
+        chapter:  6,
+        scene:    3,
+        title:    "Ch6 S3 — The Return",
+        goal:     "Arjun enters his home and offers a simple gesture of care to his family.",
+        conflict: "He must reconcile his desire to remain in the corporate world with his newfound understanding that true peace comes from daily service.",
+        reveal:   "The reader learns that Arjun has successfully reshaped his sense of self by finding peace within his ordinary daily actions.",
     },
 ];
 
@@ -143,7 +270,7 @@ async fn main() {
     }
     let local = ollama.list_local_models().await.unwrap_or_default();
     let names: Vec<&str> = local.iter().map(|m| m.name.as_str()).collect();
-    for needed in [MODEL_LIGHT, MODEL_HEAVY] {
+    for needed in [MODEL_LIGHT, MODEL_MEDIUM, MODEL_HEAVY] {
         if !names.iter().any(|n| n.starts_with(needed)) {
             eprintln!("Required model {needed} not found. `ollama pull {needed}`.");
             std::process::exit(1);
@@ -220,6 +347,8 @@ async fn main() {
                 top_p: None,
                 num_ctx: Some(PIPELINE_NUM_CTX),
                 num_predict: Some(4),
+                repeat_penalty: None,
+                stop: None,
             }),
         };
         let sink: booksforge_ollama::TokenSink = Box::new(|_t: &str| {});
@@ -271,7 +400,11 @@ async fn main() {
             2, // chapter_count
             4, // characters
             context.clone(),
-            MODEL_HEAVY.to_owned(),
+            // LIGHT — character cards are structured JSON output, not
+            // critical-thinking work. The 9B handles voice_traits +
+            // chapter_arc reliably within its budget. Reserves the
+            // heavy model for the polish stack.
+            MODEL_LIGHT.to_owned(),
             CancelToken::new(),
         )
         .await
@@ -294,7 +427,11 @@ async fn main() {
             serde_json::to_value(&brief).unwrap(),
             serde_json::json!({}),
             context.clone(),
-            MODEL_HEAVY.to_owned(),
+            // LIGHT — world bible is structured-output reference data
+            // (locations + social rules + sensory palette), not
+            // narrative craft work. 9B emits the schema reliably with
+            // the coercion + lenient-parse defenses in place.
+            MODEL_LIGHT.to_owned(),
             CancelToken::new(),
         )
         .await
@@ -333,7 +470,13 @@ async fn main() {
                 String::new(),
                 prior_summary.clone(),
                 context.clone(),
-                MODEL_HEAVY.to_owned(),
+                // MEDIUM — drafting is craft work, not critical-
+                // thinking work. Dense 27B produces consistent
+                // literary prose with the right voice cadence and
+                // doesn't burn the heavy model's reasoning budget
+                // on what amounts to prose generation. The polish
+                // stack (HEAVY) does the interpretive lifting.
+                MODEL_MEDIUM.to_owned(),
                 CancelToken::new(),
                 None,
             )
@@ -496,6 +639,8 @@ async fn main() {
                     top_p: None,
                     num_ctx: Some(PIPELINE_NUM_CTX),
                     num_predict: Some(8_000),
+                    repeat_penalty: None,
+                    stop: None,
                 }),
             };
             let revised_buf = std::sync::Arc::new(std::sync::Mutex::new(String::new()));

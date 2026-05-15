@@ -715,8 +715,7 @@ pub async fn agent_run_book_pipeline(
     // cancel signal is passed through to every sub-stage's LLM call
     // below, so cancellation propagates without needing per-stage
     // run_ids on the UI side.
-    let (pipeline_run_id, pipeline_cancel) =
-        begin_agent_run(&state, &app, "book-pipeline").await;
+    let (pipeline_run_id, pipeline_cancel) = begin_agent_run(&state, &app, "book-pipeline").await;
     tracing::info!(run_id = %pipeline_run_id, "book-pipeline run started");
 
     // Resolve models for each tier from currently installed Ollama
