@@ -48,6 +48,7 @@ book-output/integrated-runs/
 book-output/incomplete-curse/
 book-output/manuscript/
 book-output/multi-chapter-runs/
+book-output/my-confused-life/
 
 # Top-level run logs
 book-output/*.log

@@ -1,0 +1,481 @@
+/* Web-fonts. Loaded over loopback when chromium prints; the user's
+   network policy applies. If offline, the cascade falls through to
+   Georgia / Times. */
+@import url("https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Cormorant+Garamond:wght@400;500;600;700&display=swap");
+
+/* Pandoc auto-emits a `<header id="title-block-header">` from the
+   `--metadata=title` flag. The composed manuscript has its own
+   typographically-controlled title page; hide pandoc's duplicate. */
+#title-block-header { display: none !important; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   fiction_print.css — publication-ready interior typography for the
+   BooksForge validation manuscript pipeline.
+
+   Targets the chromium print engine via `headless --print-to-pdf`.
+   Sized for a 6"×9" US trade-paperback trim with mirrored gutter
+   margins. Drop caps, chapter eyebrows, running heads, and page
+   numbers are wired through CSS Paged Media (`@page` rules).
+
+   Sectional structure expected from compose_book.py:
+       .frontmatter.half-title
+       .frontmatter.title-page
+       .frontmatter.copyright-page
+       .frontmatter.dedication
+       .frontmatter.epigraph
+       .chapter > .chapter-eyebrow + .chapter-title + .chapter-body
+       .backmatter.the-end
+       .backmatter.acknowledgements
+       .backmatter.about-the-author
+       .backmatter.colophon
+       .backmatter.back-cover
+   ───────────────────────────────────────────────────────────────────────── */
+
+
+/* ── Page geometry ────────────────────────────────────────────────────── */
+
+@page {
+    size: 6in 9in;
+    margin: 0.875in 0.75in;
+}
+
+/* Mirrored gutter: inside margin (spine side) is wider than outside.
+   `:left` = verso (left-hand page in a spread, even page number).
+   `:right` = recto (right-hand page, odd page number). */
+@page :left {
+    margin-left: 0.625in;   /* outside (smaller) */
+    margin-right: 0.875in;  /* spine side (wider gutter) */
+
+    @bottom-left { content: counter(page); font-family: "EB Garamond", Georgia, serif; font-size: 9.5pt; color: #555; }
+    @top-center {
+        content: "[Author Name]";
+        font-family: "EB Garamond", Georgia, serif;
+        font-size: 9pt;
+        font-style: italic;
+        color: #777;
+        letter-spacing: 0.04em;
+    }
+}
+@page :right {
+    margin-left: 0.875in;
+    margin-right: 0.625in;
+
+    @bottom-right { content: counter(page); font-family: "EB Garamond", Georgia, serif; font-size: 9.5pt; color: #555; }
+    @top-center {
+        content: string(book-title);
+        font-family: "EB Garamond", Georgia, serif;
+        font-size: 9pt;
+        font-style: italic;
+        color: #777;
+        letter-spacing: 0.04em;
+    }
+}
+
+/* Suppress running head + page number on the first page of every
+   chapter and on front/back matter pages. Chrome supports :first
+   reliably; :blank we approximate by using named `chapter-open` etc.
+   below. */
+@page chapter-open {
+    @top-center { content: ""; }
+    @bottom-center { content: counter(page); font-family: "EB Garamond", Georgia, serif; font-size: 9.5pt; color: #555; }
+    @bottom-left { content: ""; }
+    @bottom-right { content: ""; }
+}
+@page no-header {
+    @top-center { content: ""; }
+    @bottom-center { content: ""; }
+    @bottom-left { content: ""; }
+    @bottom-right { content: ""; }
+}
+
+/* Front matter: no header, no page number. The page counter still
+   advances behind the scenes; chapter 1 will land on whatever recto
+   the count ends on. */
+.frontmatter { page: no-header; }
+
+
+/* ── Typography defaults ─────────────────────────────────────────────── */
+
+html, body {
+    background: #fafaf7;
+    color: #1a1a1a;
+}
+
+body {
+    font-family: "EB Garamond", "Garamond Premier Pro", "Adobe Garamond Pro",
+                 Georgia, "Times New Roman", serif;
+    font-size: 11.5pt;
+    line-height: 1.45;
+    max-width: none;       /* override pandoc's default max-width */
+    margin: 0;
+    padding: 0;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "kern" 1, "liga" 1, "onum" 1, "calt" 1;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+}
+
+/* The string-set on the title gives :right pages a running head with
+   the book title (set from the title-page H1). */
+.book-title {
+    string-set: book-title content();
+}
+
+/* Body paragraphs: indent first line, small inter-paragraph space.
+   Pure trade-paperback uses zero inter-paragraph space (the indent
+   is the separator), but the user prefers ~1.5× more breathing room
+   between paragraphs for this design, so margin-bottom is 0.45em.
+   Fiction body paragraphs inside `.chapter-body` get this treatment;
+   front/back-matter paragraphs are styled per-section. */
+p {
+    margin: 0 0 0.45em;
+    text-align: justify;
+    text-indent: 1.5em;
+    orphans: 3;
+    widows: 3;
+}
+
+
+/* ── Front matter pages ──────────────────────────────────────────────── */
+
+.frontmatter {
+    page-break-before: right;   /* every front-matter section starts on a recto */
+    page-break-after: always;   /* and ends with a forced break */
+    height: 100vh;
+    box-sizing: border-box;     /* padding counts toward 100vh; no overflow */
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+}
+
+/* Half-title: title only, vertically centred. */
+.half-title {
+    justify-content: center;
+}
+.half-title .half-title-text,
+.half-title h1 {                 /* legacy h1 selector kept for older runs */
+    font-family: "Cormorant Garamond", "EB Garamond", Georgia, serif;
+    font-size: 24pt;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 0;
+    text-align: center;
+    text-indent: 0;
+}
+
+/* Full title page: title + author + publisher.
+   Vertical layout via competing auto margins:
+     - `.book-title  { margin-top: auto }` — eats space above the title
+     - `.publisher-mark { margin-top: auto }` — eats space above the publisher
+   The two auto margins split the available height, so the title cluster
+   lands at roughly 40% from the top (visual optical centre — slightly
+   high, the way printed title pages typically position the title block)
+   and the publisher mark sits at the bottom.
+
+   `text-align: center` is repeated on every child because the global
+   `p { text-align: justify }` rule above wins on specificity over the
+   `.frontmatter` parent's center alignment. Same trap for `text-indent`. */
+.title-page {
+    /* justify-content removed — auto margins drive the layout. */
+}
+.title-page .book-title {
+    font-family: "Cormorant Garamond", "EB Garamond", Georgia, serif;
+    font-size: 34pt;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    line-height: 1.15;
+    margin: auto 0 0.4in;        /* auto-top pushes title to vertical center */
+    text-align: center;
+    text-indent: 0;
+}
+.title-page .byline {
+    font-family: "EB Garamond", Georgia, serif;
+    font-size: 14pt;
+    font-style: italic;
+    text-indent: 0;
+    margin: 0;
+    color: #333;
+    text-align: center;
+}
+.title-page .publisher-mark {
+    font-family: "EB Garamond", Georgia, serif;
+    font-size: 10pt;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    text-indent: 0;
+    margin: auto 0 0;            /* auto-top pushes publisher to bottom */
+    color: #555;
+    text-align: center;
+}
+
+/* Copyright page: small body type, top-aligned, ragged-right. */
+.copyright-page {
+    justify-content: flex-start;
+    text-align: left;
+    padding-top: 1in;
+    font-size: 9.5pt;
+    line-height: 1.5;
+}
+.copyright-page p {
+    text-align: left;
+    text-indent: 0;
+    margin: 0 0 0.6em;
+    hyphens: none;
+}
+.copyright-page .copyright-title {
+    font-style: italic;
+    font-size: 11pt;
+    margin-bottom: 1em;
+}
+.copyright-page .disclaimer {
+    margin: 1.2em 0;
+    font-size: 9pt;
+    color: #333;
+}
+.copyright-page .bf-mark {
+    margin-top: 1.5em;
+    font-size: 8.5pt;
+    color: #888;
+    font-style: italic;
+}
+
+/* Dedication: short italic line, vertically centred.
+   Same justify/indent override trap as title-page — be explicit. */
+.dedication {
+    justify-content: center;
+}
+.dedication p, .dedication {
+    font-style: italic;
+    font-size: 13pt;
+    text-indent: 0;
+    line-height: 1.4;
+    text-align: center;
+}
+
+/* Epigraph: indented blockquote with attribution. */
+.epigraph {
+    justify-content: center;
+}
+.epigraph-quote {
+    margin: 0 1in;
+    border-left: none;
+    padding: 0;
+    font-style: italic;
+}
+.epigraph-quote p {
+    text-align: center;
+    text-indent: 0;
+    margin: 0 0 0.4em;
+    font-size: 12pt;
+    line-height: 1.5;
+}
+.epigraph-quote .attribution {
+    font-style: normal;
+    font-size: 10pt;
+    color: #555;
+    margin-top: 1em;
+}
+
+
+/* ── Chapter pages ───────────────────────────────────────────────────── */
+
+.chapter {
+    page: chapter-open;
+    page-break-before: right;
+    /* After the chapter opens on a recto, subsequent pages use the
+       default :left / :right templates with running heads. */
+}
+
+/* Restore the default running-head pages after the chapter-open page.
+   The chromium engine supports per-section `page:` properties, so each
+   internal flow continues with the standard chapter template until
+   the next .chapter resets it. */
+
+.chapter-eyebrow {
+    font-family: "EB Garamond", Georgia, serif;
+    font-size: 10pt;
+    font-weight: 400;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    text-indent: 0;
+    text-align: center;
+    margin: 1.25in 0 0.4em;
+    color: #777;
+}
+
+.chapter-title {
+    font-family: "Cormorant Garamond", "EB Garamond", Georgia, serif;
+    font-size: 22pt;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-align: center;
+    margin: 0 0 1in;
+    color: #1a1a1a;
+    line-height: 1.2;
+    page-break-after: avoid;
+}
+
+/* Drop cap on the first letter of the first paragraph after the
+   chapter title. Floated, 3-line drop. */
+.chapter-body > p:first-of-type {
+    text-indent: 0;
+}
+.chapter-body > p:first-of-type::first-letter {
+    font-family: "Cormorant Garamond", "EB Garamond", Georgia, serif;
+    float: left;
+    font-size: 3.6em;
+    line-height: 0.85;
+    padding: 0.05em 0.08em 0 0;
+    margin-right: 0.05em;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+/* Small-caps on the first ~3-5 words of the opening line (a classic
+   trade fiction touch). We can't easily measure word count in CSS, so
+   we approximate by setting font-variant on the first line. */
+.chapter-body > p:first-of-type::first-line {
+    font-variant: small-caps;
+    letter-spacing: 0.04em;
+}
+
+
+/* ── Back matter pages ───────────────────────────────────────────────── */
+
+.backmatter {
+    page-break-before: right;
+    page-break-after: always;
+    page: no-header;
+    padding-top: 1in;
+    box-sizing: border-box;
+}
+
+.backmatter h2 {
+    font-family: "Cormorant Garamond", "EB Garamond", Georgia, serif;
+    font-size: 18pt;
+    font-weight: 600;
+    text-align: center;
+    margin: 0 0 1em;
+    letter-spacing: 0.02em;
+}
+
+.backmatter p {
+    margin: 0 0 0.8em;
+    text-indent: 0;
+    text-align: justify;
+}
+
+/* "The End" page: just the ornament, vertically centred. */
+.the-end {
+    text-align: center;
+    height: 100vh;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.the-end .ornament {
+    font-size: 28pt;
+    color: #888;
+    text-indent: 0;
+    margin: 0;
+}
+
+.colophon p {
+    font-size: 10.5pt;
+    line-height: 1.55;
+}
+
+/* Back-cover: looks like an actual back cover, last page of the PDF.
+   `box-sizing: border-box` makes padding count toward `height: 100vh` so
+   the div doesn't overflow onto a second page (which left a tint-stripe
+   on p64 of the previous run). Reduced padding to 0.6in to give the
+   blurb more vertical room. */
+.back-cover {
+    background: #f0eee7;
+    padding: 0.6in 0.75in;
+    height: 100vh;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    page-break-after: avoid;  /* this is the last page; no orphan trailing blank */
+}
+.back-cover .back-cover-title {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-size: 22pt;
+    font-weight: 600;
+    text-align: center;
+    margin: 0 0 1em;
+    letter-spacing: 0.02em;
+}
+.back-cover .back-cover-blurb {
+    font-size: 11pt;
+    line-height: 1.55;
+    text-indent: 0;
+    text-align: left;
+    margin: 0 0 2em;
+    color: #1a1a1a;
+}
+.back-cover .back-cover-credit {
+    font-size: 10pt;
+    font-style: italic;
+    text-indent: 0;
+    text-align: center;
+    margin: auto 0 1em;
+    color: #444;
+}
+.back-cover .back-cover-isbn {
+    font-size: 9pt;
+    font-family: "Courier New", monospace;
+    text-indent: 0;
+    text-align: center;
+    margin: 0;
+    color: #666;
+    letter-spacing: 0.06em;
+}
+
+
+/* ── Scene breaks within a chapter ───────────────────────────────────── */
+
+/* compose_book.py converts each within-chapter scene-title H2 into a
+   `<p class="scene-break">* * *</p>` ornament. Centred, letter-spaced,
+   muted colour — the fiction-paperback convention. */
+p.scene-break {
+    text-align: center;
+    text-indent: 0;
+    margin: 1.5em 0;
+    color: #888;
+    font-size: 11pt;
+    letter-spacing: 0.4em;
+}
+
+/* Legacy: `---` in markdown → `<hr>` from pandoc → centred ornament.
+   Kept for any future manuscripts that use horizontal-rule breaks. */
+hr {
+    border: none;
+    text-align: center;
+    margin: 1.5em 0;
+}
+hr::after {
+    content: "* * *";
+    font-size: 11pt;
+    color: #888;
+    letter-spacing: 0.4em;
+}
+
+
+/* ── TOC (pandoc-generated, hidden in print) ─────────────────────────── */
+
+/* Pandoc's --toc inserts a nav at the top of the HTML. For a fiction
+   book interior we keep front matter author-curated, so suppress it. */
+nav#TOC, .toc { display: none; }
+
+
+/* ── Title page semantics for running head string ────────────────────── */
+
+/* When pandoc generates the H1 from `--metadata=title`, it lands at the
+   document start. Hide that duplicate H1 and rely on our composed
+   `.title-page` block. */
+body > h1:first-child { display: none; }
