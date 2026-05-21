@@ -785,7 +785,11 @@ const s: Record<string, React.CSSProperties> = {
   section: {
     background: "#fff",
     border: "1px solid var(--color-neutral-200)",
-    borderRadius: 6, overflow: "hidden",
+    borderRadius: 6,
+    overflow: "hidden",
+    // flex-shrink:0 — parent `col` is a flex column; without this
+    // sections compress and the overflow:hidden clips the body.
+    flexShrink: 0,
   },
   sectionHeader: {
     padding: "12px 16px",
@@ -928,11 +932,20 @@ const s: Record<string, React.CSSProperties> = {
     lineHeight: 1.6, margin: 0,
   },
   input: {
+    // Visible-by-default form control — display:block + min-height
+    // keeps the cover-/boilerplate-page title inputs from collapsing
+    // inside the boilerplate card's flex layout. Border one step
+    // darker for clear contrast.
+    display: "block",
     boxSizing: "border-box",
     padding: "6px 10px",
-    border: "1px solid var(--color-neutral-300)", borderRadius: 4,
+    border: "1px solid var(--color-neutral-400, #9ca3af)",
+    borderRadius: 4,
     background: "#fff", color: "var(--color-neutral-900)",
-    fontFamily: "var(--font-ui)", fontSize: 13, outline: "none",
+    fontFamily: "var(--font-ui)", fontSize: 13,
+    lineHeight: 1.4,
+    minHeight: 32,
+    outline: "none",
   },
   primaryBtnBusy: { opacity: 0.7, cursor: "wait" },
   primaryBtnSmall: {

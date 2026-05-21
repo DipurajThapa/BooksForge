@@ -72,10 +72,10 @@ pub struct VocabListInput {
 pub struct MemoryUpsertInput {
     /// Optional id — when present this is an edit; when absent this is a
     /// fresh row and storage assigns the id.
-    pub id:         Option<String>,
+    pub id: Option<String>,
     /// One of: "book" | "chapter" | "entity" | "style".
-    pub scope:      String,
-    pub key:        String,
+    pub scope: String,
+    pub key: String,
     /// JSON-stringified value — must parse as JSON.
     pub value_json: String,
 }
@@ -93,12 +93,12 @@ pub struct MemoryDeleteInput {
 #[ts(export)]
 pub struct VocabUpsertInput {
     /// Optional id — present when editing an existing entry.
-    pub id:           Option<String>,
-    pub layer:        String,
-    pub term:         String,
+    pub id: Option<String>,
+    pub layer: String,
+    pub term: String,
     pub display_term: String,
     /// "prefer" | "avoid" | "replace".
-    pub kind:         String,
-    pub replacement:  Option<String>,
-    pub rationale:    Option<String>,
+    pub kind: String,
+    pub replacement: Option<String>,
+    pub rationale: Option<String>,
 }

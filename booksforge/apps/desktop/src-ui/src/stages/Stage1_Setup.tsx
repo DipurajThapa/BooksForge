@@ -660,6 +660,11 @@ const s: Record<string, React.CSSProperties> = {
     background: "#fff",
     border: "1px solid var(--color-neutral-200)",
     borderRadius: 6,
+    // flex-shrink:0 keeps the section at its natural height. The
+    // parent `col` is a flex column; without this every section
+    // would proportionally compress to fit the parent's height,
+    // and the overflow:hidden then clips the body silently.
+    flexShrink: 0,
     overflow: "hidden",
   },
   sectionHeader: {
@@ -684,7 +689,13 @@ const s: Record<string, React.CSSProperties> = {
     padding: 16,
     display: "flex", flexDirection: "column", gap: 12,
   },
-  field: { display: "flex", flexDirection: "column", gap: 4 },
+  field: {
+    // Explicit width: in some WebKit builds a flex column inside a
+    // flex column parent shrinks to min-content; this forces the
+    // contained input back to full-width.
+    display: "flex", flexDirection: "column", gap: 4,
+    width: "100%",
+  },
   fieldLabel: {
     fontSize: 11, fontWeight: 600,
     color: "var(--color-neutral-700)",
@@ -693,12 +704,20 @@ const s: Record<string, React.CSSProperties> = {
   fieldHint: { fontSize: 11, color: "var(--color-neutral-500)" },
   required:  { color: "var(--color-amber-600)" },
   input: {
+    // Visible-by-default form control — explicit display:block + min-height
+    // guarantees an inline <input>/<textarea> doesn't collapse to zero
+    // height inside a flex column. Border tone one step darker than the
+    // previous neutral-300 so fields read against the white card.
+    display: "block",
     width: "100%", boxSizing: "border-box",
     padding: "8px 12px",
-    border: "1px solid var(--color-neutral-300)",
+    border: "1px solid var(--color-neutral-400, #9ca3af)",
     borderRadius: 4,
     background: "#fff", color: "var(--color-neutral-900)",
-    fontFamily: "var(--font-ui)", fontSize: 14, outline: "none",
+    fontFamily: "var(--font-ui)", fontSize: 14,
+    lineHeight: 1.4,
+    minHeight: 40,
+    outline: "none",
   },
   gridTwo: {
     display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12,

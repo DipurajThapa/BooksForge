@@ -299,11 +299,7 @@ mod tests {
                 .as_str()
                 .expect("string")
                 .to_owned();
-            assert_eq!(
-                kind.id(),
-                serde_id,
-                "id() drifted from serde for {kind:?}"
-            );
+            assert_eq!(kind.id(), serde_id, "id() drifted from serde for {kind:?}");
             // And id() round-trips through deserialise.
             let back: BoilerplateKind =
                 serde_json::from_value(serde_json::Value::String(kind.id().to_owned()))

@@ -542,9 +542,7 @@ mod tests {
     #[test]
     fn boilerplate_exactly_at_page_cap_is_accepted() {
         let pages: Vec<BoilerplatePage> = (0..MAX_BOILERPLATE_PAGES)
-            .map(|i| {
-                BoilerplatePage::new(format!("p-{i}"), BoilerplateKind::Other, i as u32)
-            })
+            .map(|i| BoilerplatePage::new(format!("p-{i}"), BoilerplateKind::Other, i as u32))
             .collect();
         validate_boilerplate_list(&pages).expect("cap-inclusive");
     }
@@ -552,9 +550,7 @@ mod tests {
     #[test]
     fn boilerplate_over_page_cap_is_rejected() {
         let pages: Vec<BoilerplatePage> = (0..MAX_BOILERPLATE_PAGES + 1)
-            .map(|i| {
-                BoilerplatePage::new(format!("p-{i}"), BoilerplateKind::Other, i as u32)
-            })
+            .map(|i| BoilerplatePage::new(format!("p-{i}"), BoilerplateKind::Other, i as u32))
             .collect();
         let err = validate_boilerplate_list(&pages).expect_err("must reject");
         assert!(format!("{err:?}").contains("cap is 50"));
@@ -571,19 +567,16 @@ mod tests {
     fn boilerplate_body_over_byte_cap_is_rejected() {
         let mut p = BoilerplatePage::new("p", BoilerplateKind::Acknowledgments, 0);
         p.body_md = "a".repeat(MAX_BOILERPLATE_BODY_BYTES + 1);
-        let err =
-            validate_boilerplate_list(std::slice::from_ref(&p)).expect_err("must reject");
+        let err = validate_boilerplate_list(std::slice::from_ref(&p)).expect_err("must reject");
         assert!(format!("{err:?}").contains("cap is 10000"));
     }
 
     #[test]
     fn boilerplate_body_oversize_reports_offending_title() {
-        let mut p =
-            BoilerplatePage::new("p", BoilerplateKind::Acknowledgments, 0);
+        let mut p = BoilerplatePage::new("p", BoilerplateKind::Acknowledgments, 0);
         p.title = "My Long Page".into();
         p.body_md = "x".repeat(MAX_BOILERPLATE_BODY_BYTES + 1);
-        let err =
-            validate_boilerplate_list(std::slice::from_ref(&p)).expect_err("must reject");
+        let err = validate_boilerplate_list(std::slice::from_ref(&p)).expect_err("must reject");
         // The error format quotes the title with serde's Debug.
         assert!(format!("{err:?}").contains("My Long Page"));
     }
@@ -597,10 +590,9 @@ mod tests {
         let fixture_bytes: &[u8] = b"\xff\xd8jpegbytes";
         let src = write_fixture(dir.path(), "my-front.jpg", fixture_bytes);
 
-        let set =
-            cover_import_inner("front", &src, &assets_dir, storage.as_ref())
-                .await
-                .expect("import succeeds");
+        let set = cover_import_inner("front", &src, &assets_dir, storage.as_ref())
+            .await
+            .expect("import succeeds");
 
         // CoverSet now has a front asset whose metadata matches.
         let front = set.front.as_ref().expect("front populated");
@@ -616,7 +608,10 @@ mod tests {
 
         // Re-load through storage and confirm round-trip equivalence.
         let loaded = load_cover_set_inner(storage.as_ref()).await.unwrap();
-        assert_eq!(loaded.front.as_ref().unwrap().bundle_path, front.bundle_path);
+        assert_eq!(
+            loaded.front.as_ref().unwrap().bundle_path,
+            front.bundle_path
+        );
     }
 
     #[tokio::test]
@@ -630,10 +625,9 @@ mod tests {
             .unwrap();
 
         let second = write_fixture(dir.path(), "second.png", b"second");
-        let set =
-            cover_import_inner("front", &second, &assets_dir, storage.as_ref())
-                .await
-                .unwrap();
+        let set = cover_import_inner("front", &second, &assets_dir, storage.as_ref())
+            .await
+            .unwrap();
 
         // Slot reflects the second import, not the first.
         let front = set.front.as_ref().unwrap();
@@ -660,10 +654,9 @@ mod tests {
         cover_import_inner("back", &b, &assets_dir, storage.as_ref())
             .await
             .unwrap();
-        let set =
-            cover_import_inner("spine", &s, &assets_dir, storage.as_ref())
-                .await
-                .unwrap();
+        let set = cover_import_inner("spine", &s, &assets_dir, storage.as_ref())
+            .await
+            .unwrap();
 
         assert!(set.front.is_some());
         assert!(set.back.is_some());
@@ -678,10 +671,9 @@ mod tests {
         let (storage, dir) = fresh_storage().await;
         let assets_dir = dir.path().join("assets");
         let bad = write_fixture(dir.path(), "cover.exe", b"nope");
-        let err =
-            cover_import_inner("front", &bad, &assets_dir, storage.as_ref())
-                .await
-                .expect_err("must reject");
+        let err = cover_import_inner("front", &bad, &assets_dir, storage.as_ref())
+            .await
+            .expect_err("must reject");
         assert!(format!("{err:?}").contains("not supported"));
     }
 
@@ -736,12 +728,9 @@ mod tests {
     #[tokio::test]
     async fn boilerplate_save_empty_list_is_a_no_op() {
         let (storage, _dir) = fresh_storage().await;
-        let r = boilerplate_save_inner(
-            BoilerplateSaveInput { pages: vec![] },
-            storage.as_ref(),
-        )
-        .await
-        .expect("empty save");
+        let r = boilerplate_save_inner(BoilerplateSaveInput { pages: vec![] }, storage.as_ref())
+            .await
+            .expect("empty save");
         assert_eq!(r.saved_count, 0);
         let loaded = load_boilerplate_inner(storage.as_ref()).await.unwrap();
         assert!(loaded.is_empty());

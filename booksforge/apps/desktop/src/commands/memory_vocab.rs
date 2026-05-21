@@ -71,10 +71,13 @@ pub async fn memory_upsert(
     state: State<'_, AppState>,
 ) -> Result<MemoryEntryDto, BooksForgeError> {
     let project = require_project(&state).await?;
-    let scope = MemoryScope::from_str(&input.scope)
-        .ok_or_else(|| BooksForgeError::validation(format!("invalid memory scope: {}", input.scope)))?;
+    let scope = MemoryScope::from_str(&input.scope).ok_or_else(|| {
+        BooksForgeError::validation(format!("invalid memory scope: {}", input.scope))
+    })?;
     if input.key.trim().is_empty() {
-        return Err(BooksForgeError::validation("memory key cannot be empty".to_owned()));
+        return Err(BooksForgeError::validation(
+            "memory key cannot be empty".to_owned(),
+        ));
     }
     let value_json: serde_json::Value = serde_json::from_str(&input.value_json)
         .map_err(|e| BooksForgeError::validation(format!("value_json is not valid JSON: {e}")))?;
@@ -85,7 +88,10 @@ pub async fn memory_upsert(
         let id = Ulid::from_string(id_str)
             .map_err(|e| BooksForgeError::validation(format!("invalid memory id: {e}")))?;
         // Preserve created_at on edit by reading the existing row.
-        let existing = project.storage.memory_get(scope, &input.key).await
+        let existing = project
+            .storage
+            .memory_get(scope, &input.key)
+            .await
             .map_err(|e| BooksForgeError::internal(e.to_string()))?;
         let created = existing.map(|e| e.created_at).unwrap_or(now);
         (id, created)
@@ -102,7 +108,10 @@ pub async fn memory_upsert(
         created_at,
         updated_at: now,
     };
-    project.storage.memory_upsert(&entry).await
+    project
+        .storage
+        .memory_upsert(&entry)
+        .await
         .map_err(|e| match e {
             // Domain-level scope errors should not occur for USER_AGENT_ID
             // (which has implicit all-scopes access via this command's
@@ -113,7 +122,10 @@ pub async fn memory_upsert(
             }
             _ => BooksForgeError::internal(e.to_string()),
         })?;
-    let _ = MemoryError::NotFound { scope, key: String::new() }; // touch import to silence unused-warn until compile
+    let _ = MemoryError::NotFound {
+        scope,
+        key: String::new(),
+    }; // touch import to silence unused-warn until compile
     Ok(memory_to_dto(entry))
 }
 
@@ -123,12 +135,18 @@ pub async fn memory_delete(
     state: State<'_, AppState>,
 ) -> Result<bool, BooksForgeError> {
     let project = require_project(&state).await?;
-    let scope = MemoryScope::from_str(&input.scope)
-        .ok_or_else(|| BooksForgeError::validation(format!("invalid memory scope: {}", input.scope)))?;
+    let scope = MemoryScope::from_str(&input.scope).ok_or_else(|| {
+        BooksForgeError::validation(format!("invalid memory scope: {}", input.scope))
+    })?;
     if input.key.trim().is_empty() {
-        return Err(BooksForgeError::validation("memory key cannot be empty".to_owned()));
+        return Err(BooksForgeError::validation(
+            "memory key cannot be empty".to_owned(),
+        ));
     }
-    let deleted = project.storage.memory_delete(scope, &input.key).await
+    let deleted = project
+        .storage
+        .memory_delete(scope, &input.key)
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
     Ok(deleted > 0)
 }
@@ -140,10 +158,16 @@ pub async fn vocab_upsert(
 ) -> Result<VocabEntryDto, BooksForgeError> {
     let project = require_project(&state).await?;
     if input.term.trim().is_empty() {
-        return Err(BooksForgeError::validation("vocab term cannot be empty".to_owned()));
+        return Err(BooksForgeError::validation(
+            "vocab term cannot be empty".to_owned(),
+        ));
     }
-    let kind = EntryKind::from_str(&input.kind)
-        .ok_or_else(|| BooksForgeError::validation(format!("invalid vocab kind: {} (expected prefer|avoid|replace)", input.kind)))?;
+    let kind = EntryKind::from_str(&input.kind).ok_or_else(|| {
+        BooksForgeError::validation(format!(
+            "invalid vocab kind: {} (expected prefer|avoid|replace)",
+            input.kind
+        ))
+    })?;
 
     let now = Utc::now();
     let id = match &input.id {
@@ -154,17 +178,24 @@ pub async fn vocab_upsert(
 
     let entry = VocabEntry {
         id,
-        layer:        input.layer.clone(),
-        term:         input.term.clone(),
-        display_term: if input.display_term.is_empty() { input.term.clone() } else { input.display_term.clone() },
+        layer: input.layer.clone(),
+        term: input.term.clone(),
+        display_term: if input.display_term.is_empty() {
+            input.term.clone()
+        } else {
+            input.display_term.clone()
+        },
         kind,
-        replacement:  input.replacement.clone(),
-        rationale:    input.rationale.clone(),
-        source:       EntrySource::User,
-        created_at:   now,
-        updated_at:   now,
+        replacement: input.replacement.clone(),
+        rationale: input.rationale.clone(),
+        source: EntrySource::User,
+        created_at: now,
+        updated_at: now,
     };
-    project.storage.vocab_upsert(&entry).await
+    project
+        .storage
+        .vocab_upsert(&entry)
+        .await
         .map_err(|e| BooksForgeError::internal(e.to_string()))?;
     Ok(vocab_to_dto(entry))
 }

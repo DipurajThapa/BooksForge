@@ -66,18 +66,38 @@ pub fn spec() -> AgentSpec {
         failure_modes: FAILURE_MODES,
         when_to_run:   WhenToRun::OnDemand,
         user_gate:     UserGate::Required,
-        // Critique benefits from thinking-mode — judging craft on
-        // multiple axes at once is the kind of multi-step reasoning
-        // small thinking budgets help with.
-        default_thinking: DefaultThinking::Enabled,
+        // 2026-05-15: flipped Enabled → Disabled.
+        //
+        // The original Enabled setting reasoned that multi-axis
+        // craft critique benefits from thinking-mode. In practice
+        // on qwen3.5:9b (LIGHT) and qwen3.6:latest (MoE), enabling
+        // thinking-mode routes the entire critic output into
+        // `message.thinking` and leaves `message.content` empty
+        // — producing `EOF while parsing a value at line 1 column 0`
+        // across all 3 retry attempts and gating the per-scene
+        // polish stack from ever running.
+        //
+        // Same failure mode the comments on world-bible (Run #16)
+        // and scene-drafter-fic call out: "explicit reasoning isn't
+        // earning its budget cost on this prompt class." Disable
+        // here too. The critique still works — the model just emits
+        // its reasoning inline rather than separating it.
+        default_thinking: DefaultThinking::Disabled,
     }
 }
 
 /// Parse the model's raw output into a `SceneCritiqueProposal` and run
 /// `validate()`. Uses the strict-objects json_repair on the
 /// `specific_edits` list (which must be objects, not stray strings).
+///
+/// 2026-05-15: derive `weakest_axis` from `scores` when the model
+/// omits it. Observed in qwen3.6:latest output — the critic emits a
+/// well-formed `scores` map + `specific_edits` + `overall_one_liner`
+/// but skips the explicit `weakest_axis` field. We can recover it
+/// deterministically from the scores (the key with the minimum value)
+/// rather than retry the call.
 pub fn parse_and_validate(raw: &str) -> Result<SceneCritiqueProposal, String> {
-    let (repaired, audit) =
+    let (mut repaired, audit) =
         crate::json_repair::parse_and_repair_strict_objects(raw, &["specific_edits"])?;
     if audit.dropped_list_elements > 0 {
         tracing::warn!(
@@ -86,6 +106,108 @@ pub fn parse_and_validate(raw: &str) -> Result<SceneCritiqueProposal, String> {
             "json_repair salvaged malformed list elements before deserialise",
         );
     }
+
+    // Fill in optional-but-required fields the model intermittently
+    // omits. Each fill is a deterministic recovery: we never invent
+    // values that change the critique's meaning.
+    if let serde_json::Value::Object(map) = &mut repaired {
+        // weakest_axis ← min-scoring axis in `scores`.
+        let has_axis = map
+            .get("weakest_axis")
+            .and_then(|v| v.as_str())
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false);
+        if !has_axis {
+            if let Some(serde_json::Value::Object(scores)) = map.get("scores") {
+                let weakest = scores
+                    .iter()
+                    .filter_map(|(k, v)| v.as_u64().map(|n| (k.clone(), n)))
+                    .min_by_key(|(_, n)| *n)
+                    .map(|(k, _)| k);
+                if let Some(name) = weakest {
+                    tracing::warn!(
+                        agent = "scene-critic",
+                        derived_axis = %name,
+                        "model omitted weakest_axis — derived from min-scoring axis",
+                    );
+                    map.insert("weakest_axis".to_owned(), serde_json::Value::String(name));
+                }
+            }
+        }
+
+        // specific_edits ← empty Vec when missing; filter out partial
+        // edit objects when present. `TargetedEdit` requires three
+        // fields (problem_quote, fix, axis); the model intermittently
+        // emits objects missing one of them. Dropping the bad element
+        // is better than rejecting the whole critique — the scores +
+        // remaining valid edits are still useful.
+        if !map.contains_key("specific_edits")
+            || matches!(map.get("specific_edits"), Some(serde_json::Value::Null))
+        {
+            tracing::warn!(
+                agent = "scene-critic",
+                "model omitted specific_edits — defaulting to empty list",
+            );
+            map.insert(
+                "specific_edits".to_owned(),
+                serde_json::Value::Array(Vec::new()),
+            );
+        } else if let Some(serde_json::Value::Array(edits)) = map.get_mut("specific_edits") {
+            let before = edits.len();
+            edits.retain(|e| {
+                if let serde_json::Value::Object(eo) = e {
+                    let has_quote = eo
+                        .get("problem_quote")
+                        .and_then(|v| v.as_str())
+                        .map(|s| !s.trim().is_empty())
+                        .unwrap_or(false);
+                    let has_fix = eo
+                        .get("fix")
+                        .and_then(|v| v.as_str())
+                        .map(|s| !s.trim().is_empty())
+                        .unwrap_or(false);
+                    let has_axis = eo
+                        .get("axis")
+                        .and_then(|v| v.as_str())
+                        .map(|s| !s.trim().is_empty())
+                        .unwrap_or(false);
+                    has_quote && has_fix && has_axis
+                } else {
+                    false
+                }
+            });
+            let dropped = before - edits.len();
+            if dropped > 0 {
+                tracing::warn!(
+                    agent = "scene-critic",
+                    dropped,
+                    "filtered specific_edits missing problem_quote / fix / axis",
+                );
+            }
+        }
+
+        // overall_one_liner ← placeholder if missing. The scores +
+        // edits carry the actionable information; the one-liner is
+        // a UI nicety we can synthesise.
+        let has_one_liner = map
+            .get("overall_one_liner")
+            .and_then(|v| v.as_str())
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false);
+        if !has_one_liner {
+            tracing::warn!(
+                agent = "scene-critic",
+                "model omitted overall_one_liner — defaulting",
+            );
+            map.insert(
+                "overall_one_liner".to_owned(),
+                serde_json::Value::String(
+                    "(critic emitted scores without a one-line summary)".to_owned(),
+                ),
+            );
+        }
+    }
+
     let proposal: SceneCritiqueProposal = serde_json::from_value(repaired)
         .map_err(|e| format!("JSON parse error after repair: {e}"))?;
     let errs = proposal.validate();
@@ -104,7 +226,8 @@ mod tests {
         let s = spec();
         assert_eq!(s.id, "scene-critic");
         assert_eq!(s.output_schema_id, "SceneCritiqueProposal");
-        assert!(matches!(s.default_thinking, DefaultThinking::Enabled));
+        // 2026-05-15: flipped to Disabled — see comment in spec().
+        assert!(matches!(s.default_thinking, DefaultThinking::Disabled));
     }
 
     #[test]

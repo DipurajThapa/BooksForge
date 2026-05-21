@@ -434,14 +434,42 @@ async fn run_inner<T: Serialize + Send + 'static>(
             // drafter takes the *better-quality* unconstrained output
             // and salvages it via parser logic, while every other
             // agent keeps the strict-JSON guarantee.
-            format: if spec.id == "scene-drafter-fic" {
+            // Agents whose templates emit bare prose (not JSON-shaped
+            // proposals) must NOT be forced into JSON-mode at the
+            // decoder level — that produces empty output or escape-
+            // garbled prose. The scene drafter has bare-prose recovery
+            // in its parser (Run #16 rationale); the four polish
+            // stages do too via `polish_common::parse_and_validate_polish`
+            // bare-prose recovery (2026-05-15).
+            format: if matches!(
+                spec.id,
+                "scene-drafter-fic"
+                    | "voice-polish"
+                    | "metaphor-polish"
+                    | "dialogue-polish"
+                    | "scene-tension-polish"
+            ) {
                 None
             } else {
                 Some("json".to_owned())
             },
             options: Some(GenerateOptions {
                 temperature: Some(0.3),
-                top_p: None,
+                // Scene-drafter hardening (2026-05-14 RCA, see
+                // book-output/my-confused-life/). qwen3.5:9b on
+                // sensory-introspective fiction prose locks into an
+                // "explainer loop" where it writes meta-commentary
+                // about its own drafting process as scene text. The
+                // result is an unclosable pm_doc tree 6+ levels deep
+                // that the parser can't repair. `top_p: 0.9` tightens
+                // sampling so the model is less likely to drift into
+                // the meta-language tokens that start the loop; every
+                // other agent keeps Ollama's default (1.0).
+                top_p: if spec.id == "scene-drafter-fic" {
+                    Some(0.9)
+                } else {
+                    None
+                },
                 // RCA_RUN15_THRASH.md Fix 1 — pipeline num_ctx pin.
                 // When the orchestrator config sets a pipeline-wide
                 // num_ctx, every call uses it (overriding the agent
@@ -455,6 +483,35 @@ async fn run_inner<T: Serialize + Send + 'static>(
                         .unwrap_or_else(|| spec.context_budget.total()),
                 ),
                 num_predict: Some(spec.context_budget.max_output_tokens),
+                // Same RCA: 1.25 breaks the qwen3.5:9b explainer loop
+                // by penalising token-level repetition above Ollama's
+                // 1.1 default. Applied only to the scene drafter — the
+                // other agents already produce well-bounded JSON and
+                // can keep the default behaviour.
+                repeat_penalty: if spec.id == "scene-drafter-fic" {
+                    Some(1.25)
+                } else {
+                    None
+                },
+                // Same RCA: stop sequences targeting the meta-language
+                // markers that signal the model has transitioned from
+                // narrating the scene to narrating itself. Each phrase
+                // was observed in the failed Ch3 S3 generation tail
+                // before the model derailed into multiple meta
+                // paragraphs and ran out of num_predict budget.
+                stop: if spec.id == "scene-drafter-fic" {
+                    Some(vec![
+                        "Word count managed".to_owned(),
+                        "ensuring the prose".to_owned(),
+                        "the prose remains".to_owned(),
+                        "internal monologue of the narrator".to_owned(),
+                        "narrative arc".to_owned(),
+                        "Note: ".to_owned(),
+                        "(Note:".to_owned(),
+                    ])
+                } else {
+                    None
+                },
             }),
         };
 

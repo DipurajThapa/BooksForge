@@ -727,7 +727,11 @@ const s: Record<string, React.CSSProperties> = {
   section: {
     background: "#fff",
     border: "1px solid var(--color-neutral-200)",
-    borderRadius: 6, overflow: "hidden",
+    borderRadius: 6,
+    overflow: "hidden",
+    // flex-shrink:0 — parent `col` is a flex column; without this
+    // sections compress and the overflow:hidden clips the body.
+    flexShrink: 0,
   },
   sectionHeader: {
     padding: "12px 16px",
@@ -762,7 +766,12 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 6,
     fontSize: 13, color: "var(--color-neutral-800)", lineHeight: 1.6,
   },
-  field: { display: "flex", flexDirection: "column", gap: 4 },
+  field: {
+    // Explicit width so a flex column inside a flex column parent
+    // doesn't collapse the contained input to min-content.
+    display: "flex", flexDirection: "column", gap: 4,
+    width: "100%",
+  },
   fieldLabel: {
     fontSize: 11, fontWeight: 600,
     color: "var(--color-neutral-700)",
@@ -770,12 +779,19 @@ const s: Record<string, React.CSSProperties> = {
   },
   fieldHint: { fontSize: 11, color: "var(--color-neutral-500)" },
   input: {
+    // Stage 7's only input is the target-chapter-count number picker,
+    // intentionally narrow (120px). Display:block + min-height keep
+    // it visible inside the flex column.
+    display: "block",
     width: 120, boxSizing: "border-box",
     padding: "8px 12px",
-    border: "1px solid var(--color-neutral-300)",
+    border: "1px solid var(--color-neutral-400, #9ca3af)",
     borderRadius: 4,
     background: "#fff", color: "var(--color-neutral-900)",
-    fontFamily: "var(--font-ui)", fontSize: 14, outline: "none",
+    fontFamily: "var(--font-ui)", fontSize: 14,
+    lineHeight: 1.4,
+    minHeight: 40,
+    outline: "none",
   },
   actionsRow: {
     display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 4,

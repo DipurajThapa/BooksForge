@@ -323,7 +323,9 @@ async fn boilerplate_page_body_md_survives_special_chars() {
     let (storage, _dir) = fresh().await;
 
     let mut page = BoilerplatePage::new("copy-1", BoilerplateKind::Copyright, 0);
-    page.body_md = "Copyright © 2026 by Author Name.\n\n\"All rights reserved.\"\n\n— ISBN 978-3-16-148410-0".into();
+    page.body_md =
+        "Copyright © 2026 by Author Name.\n\n\"All rights reserved.\"\n\n— ISBN 978-3-16-148410-0"
+            .into();
     let pages = vec![page];
 
     let entry = MemoryEntry {

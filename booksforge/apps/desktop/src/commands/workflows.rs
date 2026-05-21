@@ -709,6 +709,15 @@ pub async fn agent_run_book_pipeline(
     let project_id = Ulid::from_string(&input.project_id)
         .map_err(|_| BooksForgeError::validation("invalid project_id".to_owned()))?;
 
+    // Pipeline-level cancel token. Registered under `agent-run-started`
+    // with `agent_id = "book-pipeline"` so the frontend can target the
+    // whole pipeline through the existing `agent_cancel` IPC. The
+    // cancel signal is passed through to every sub-stage's LLM call
+    // below, so cancellation propagates without needing per-stage
+    // run_ids on the UI side.
+    let (pipeline_run_id, pipeline_cancel) = begin_agent_run(&state, &app, "book-pipeline").await;
+    tracing::info!(run_id = %pipeline_run_id, "book-pipeline run started");
+
     // Resolve models for each tier from currently installed Ollama
     // tags. Done once upfront so the user sees the resolution decision
     // in the dispatch log instead of three separate decisions.
@@ -886,7 +895,7 @@ pub async fn agent_run_book_pipeline(
                 CHUNKED_CHARACTER_COUNT,
                 context.clone(),
                 chunked_cb_model.clone(),
-                cb_cancel.clone(),
+                pipeline_cancel.clone(),
             )
             .await
             .map_err(|e| BooksForgeError::internal(e.to_string()));
@@ -987,7 +996,7 @@ pub async fn agent_run_book_pipeline(
                 serde_json::json!({}),
                 context.clone(),
                 bible_model.clone(),
-                wb_cancel.clone(),
+                pipeline_cancel.clone(),
             )
             .await
             .map_err(|e| BooksForgeError::internal(e.to_string()));
@@ -1149,7 +1158,7 @@ pub async fn agent_run_book_pipeline(
                 String::new(),
                 context_after_bibles.clone(),
                 drafter_model.clone(),
-                sd_cancel.clone(),
+                pipeline_cancel.clone(),
                 None,
             )
             .await
@@ -1256,7 +1265,13 @@ pub async fn agent_run_book_pipeline(
         )
         .await;
 
-        let cancelled = sd_cancel.is_cancelled();
+        // Either the per-stage cancel OR the pipeline-level cancel
+        // ends the loop. The orchestrator now polls pipeline_cancel
+        // (see the sed-replaced cancel arg above), so the typical
+        // path is `pipeline_cancel.is_cancelled()` flipping first.
+        // The `sd_cancel.is_cancelled()` half preserves the per-stage
+        // cancel path some old tests rely on.
+        let cancelled = pipeline_cancel.is_cancelled() || sd_cancel.is_cancelled();
         scene_results.push(stage);
         if cancelled {
             // User clicked cancel mid-pipeline — stop after the current
@@ -1266,11 +1281,26 @@ pub async fn agent_run_book_pipeline(
         }
     }
 
-    Ok(RunBookPipelineResult {
+    let result = RunBookPipelineResult {
         project_id: input.project_id,
         character_bible_status: cb_status,
         world_bible_status: wb_status,
         scenes: scene_results,
         total_elapsed_s: round1(total_start.elapsed().as_secs_f32()),
-    })
+    };
+
+    // Pipeline-level cleanup: drop the cancel-token registry entry +
+    // emit `agent-run-completed` so the ActivityBar / Stage 8 cancel
+    // button can clear. Status reflects whether the writer cancelled.
+    end_agent_run(
+        &state,
+        &app,
+        "book-pipeline",
+        pipeline_run_id,
+        &pipeline_cancel,
+        None, // No specific error to surface — failures are per-scene above.
+    )
+    .await;
+
+    Ok(result)
 }
